@@ -37,7 +37,7 @@ The system helps medical students and healthcare professionals practice clinical
 
 ## Live Demo
 
-https://dancing-swan-7e4fc8.netlify.app/
+https://dancing-swan-7e4fc8.netlify.app/ 
 
 ---
 
