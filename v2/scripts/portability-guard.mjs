@@ -1,16 +1,16 @@
 import { readdir, readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
-const portableSourceRoot = new URL(
-  "../packages/portability-smoke/src/",
-  import.meta.url
-);
+const portableSourceRoots = [
+  new URL("../packages/portability-smoke/src/", import.meta.url),
+  new URL("../packages/contracts/src/", import.meta.url)
+];
 
 const forbiddenPatterns = [
   ["Node scheme import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["']node:/u],
-  ["Node filesystem/path import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["'](?:fs(?:\/promises)?|path)["']/u],
-  ["runtime-specific global", /\b(?:process|Deno|window|document|localStorage|indexedDB|Buffer|__dirname|__filename|require)\b/u],
-  ["provider SDK", /(?:@supabase\/|@azure\/|@sentry\/|["']openai["'])/iu]
+  ["Node filesystem/path import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["'](?:fs|path)(?:\/[^"']*)?["']/u],
+  ["runtime-specific global", /\b(?:process|Deno|window|document|localStorage|indexedDB|IndexedDB|Buffer|__dirname|__filename|require)\b/u],
+  ["provider SDK", /(?:@supabase\/|@azure\/|@sentry\/|@openai\/|["']openai["'])/iu]
 ];
 
 async function collectTypeScriptFiles(directoryUrl) {
@@ -32,12 +32,14 @@ async function collectTypeScriptFiles(directoryUrl) {
 
 const violations = [];
 
-for (const fileUrl of await collectTypeScriptFiles(portableSourceRoot)) {
-  const source = await readFile(fileUrl, "utf8");
+for (const portableSourceRoot of portableSourceRoots) {
+  for (const fileUrl of await collectTypeScriptFiles(portableSourceRoot)) {
+    const source = await readFile(fileUrl, "utf8");
 
-  for (const [label, pattern] of forbiddenPatterns) {
-    if (pattern.test(source)) {
-      violations.push(`${label}: ${fileUrl.pathname}`);
+    for (const [label, pattern] of forbiddenPatterns) {
+      if (pattern.test(source)) {
+        violations.push(`${label}: ${fileUrl.pathname}`);
+      }
     }
   }
 }
@@ -46,4 +48,26 @@ if (violations.length > 0) {
   throw new Error(`Portable source violations:\n${violations.join("\n")}`);
 }
 
+const canonicalInstitutionTargets = [
+  ...(await collectTypeScriptFiles(new URL("../packages/contracts/src/", import.meta.url))),
+  new URL("../tests/fixtures/contracts-fixture.ts", import.meta.url)
+];
+const standaloneReversedInstitutionCode = /(?:^|[^A-Za-z0-9_])UJ(?:$|[^A-Za-z0-9_])/mu;
+const institutionCodeViolations = [];
+
+for (const fileUrl of canonicalInstitutionTargets) {
+  const source = await readFile(fileUrl, "utf8");
+
+  if (standaloneReversedInstitutionCode.test(source)) {
+    institutionCodeViolations.push(fileUrl.pathname);
+  }
+}
+
+if (institutionCodeViolations.length > 0) {
+  throw new Error(
+    `Invalid standalone institution code in canonical contracts/fixtures:\n${institutionCodeViolations.join("\n")}`
+  );
+}
+
 console.log("PORTABILITY_GUARD=PASS");
+console.log("INSTITUTION_UJ_GUARD=PASS count=0");

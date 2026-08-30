@@ -21,6 +21,9 @@
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "test:browser": "vitest run --config vitest.config.mjs",
     "test:deno": "deno test tests/deno/portability_test.ts",
+    "test:contracts:browser": "vitest run --config vitest.config.mjs tests/browser/contracts",
+    "test:contracts:deno": "deno test tests/deno/portability_test.ts",
+    "test:contracts": "npm run test:contracts:browser && npm run test:contracts:deno && npm run test:portability-guard",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
     "verify": "npm run typecheck && npm run test:portability-guard && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
