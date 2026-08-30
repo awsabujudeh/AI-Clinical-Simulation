@@ -1,0 +1,36 @@
+{
+  "name": "ai-clinical-simulation-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "npm": ">=11.0.0 <12"
+  },
+  "packageManager": "npm@11.17.0",
+  "allowScripts": {
+    "deno@2.9.6": true
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @ai-clinical-simulation/web",
+    "build": "npm run build --workspace @ai-clinical-simulation/web",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "test:browser": "vitest run --config vitest.config.mjs",
+    "test:deno": "deno test tests/deno/portability_test.ts",
+    "test:playwright": "playwright test --config playwright.config.mjs",
+    "test:portability-guard": "node scripts/portability-guard.mjs",
+    "verify": "npm run typecheck && npm run test:portability-guard && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@vitest/browser": "4.1.11",
+    "@vitest/browser-playwright": "4.1.11",
+    "deno": "2.9.6",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}
