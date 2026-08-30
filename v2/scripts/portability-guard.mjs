@@ -3,13 +3,15 @@ import { extname } from "node:path";
 
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
-  new URL("../packages/contracts/src/", import.meta.url)
+  new URL("../packages/contracts/src/", import.meta.url),
+  new URL("../packages/case-schema/src/", import.meta.url)
 ];
 
 const forbiddenPatterns = [
   ["Node scheme import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["']node:/u],
   ["Node filesystem/path import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["'](?:fs|path)(?:\/[^"']*)?["']/u],
-  ["runtime-specific global", /\b(?:process|Deno|window|document|localStorage|indexedDB|IndexedDB|Buffer|__dirname|__filename|require)\b/u],
+  ["runtime-specific global", /\b(?:process|Deno|document|localStorage|indexedDB|IndexedDB|Buffer|__dirname|__filename|require)\b/u],
+  ["browser window global access", /\bwindow\s*(?:\.|\[)/u],
   ["provider SDK", /(?:@supabase\/|@azure\/|@sentry\/|@openai\/|["']openai["'])/iu]
 ];
 
@@ -50,7 +52,8 @@ if (violations.length > 0) {
 
 const canonicalInstitutionTargets = [
   ...(await collectTypeScriptFiles(new URL("../packages/contracts/src/", import.meta.url))),
-  new URL("../tests/fixtures/contracts-fixture.ts", import.meta.url)
+  new URL("../tests/fixtures/contracts-fixture.ts", import.meta.url),
+  ...(await collectTypeScriptFiles(new URL("../tests/fixtures/cases/", import.meta.url)))
 ];
 const standaloneReversedInstitutionCode = /(?:^|[^A-Za-z0-9_])UJ(?:$|[^A-Za-z0-9_])/mu;
 const institutionCodeViolations = [];

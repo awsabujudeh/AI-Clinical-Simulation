@@ -4,6 +4,26 @@ This directory is the isolated workspace for Version 2. The repository-root `REA
 
 V2-001 establishes the preserved portability and test baseline. V2-002 adds shared contracts and identifiers only. It does not implement a Case Schema compiler or package content, clinical/session/assessment engines, medical rules, state transitions, vital calculations, production UI, authentication, databases, AI, speech, media, faculty features, cloud resources, or deployment.
 
+V2-003 adds the portable `packages/case-schema/` validator/compiler. It represents the frozen modular Case Package boundaries, validates structural references and publication governance, formats deterministic reports, and compiles immutable package values through the shared runtime-neutral `HashAdapter`. It contains no rule execution, scheduler, scoring, physiology, media loading, persistence, provider integration, or medical case content.
+
+## V2-003 Case Schema validator/compiler
+
+Draft validation requires strict schema and reference integrity while reporting unresolved approval, source, curriculum, fallback, and review gates as warnings. `preparePublicationCandidate` accepts only an eligible `UNDER_REVIEW` or `APPROVED` source, applies every candidate-readiness gate, and projects it without mutation onto the exact target `PUBLISHED` artifact. This target status describes the would-be immutable package; it does not claim that persistence or publication has occurred. The same unchanged source content/evidence therefore produces the same candidate after `UNDER_REVIEW` becomes `APPROVED`.
+
+Final publication validation requires an `APPROVED` source plus an external exact-package Approval Record whose Case Version identity, semantic version, required Clinical/Technical review references, and `approved_package_hash` match the recomputed candidate. The record remains outside Case Package bytes, matching the separate `case_approvals` and `case_packages` governance boundary. Candidate preparation and final compilation are pure: neither persists data nor mutates lifecycle state.
+
+Both readiness layers fail closed for approved required modules and sources, compatible declarations, resolved curriculum mappings, required visual fallback, separate approved Clinical and Technical reviews, and mandatory Rule Reachability evidence. `CURRICULUM_UX` never substitutes for Clinical Review. Rule Reachability uses the system-owned `validation.rule-reachability` code; it cannot be omitted or downgraded, and `PASSED` evidence must bind validator/version identity, evidence hash, exact Case Version identity/version, current review-subject hash, and completion time. V2-003 validates this evidence but implements no reachability analyzer or Clinical Engine.
+
+The immutable compiled package uses three deterministic SHA-256 boundaries. In every boundary, the `HashAdapter` hashes the UTF-8 bytes of the stated canonical JSON string:
+
+- Review-subject hash: canonical identity plus the 14 content modules, excluding `manifest` and `validation`, so review evidence can bind exact content without circular hashing.
+- Module hash: canonical JSON for each individual Draft module; the manifest module hash covers the pre-compilation manifest without generated hashes.
+- Candidate package hash: canonical JSON for the complete would-be published package, including the normalized target manifest, every exact module, generated module hashes, and the immutable validation/review/evidence snapshot. It excludes only the final `package_hash` field. The external Approval Record is not package content and is therefore outside this hash boundary.
+
+The review-subject hash and candidate-package hash have separate authority. Clinical Review binds authored clinical/content material; it does not authorize publication. Exact-package approval binds the complete candidate artifact, and any candidate hash change invalidates the prior external approval. No module, manifest, review-subject, candidate-package, or approval hash depends on itself.
+
+Canonical JSON recursively sorts object keys and preserves array order. Only shared JSON-contract values are accepted; `Date`, `Map`, `Set`, `undefined`, functions, classes, and executable case scripts are rejected. Hash implementations stay outside the package behind `HashAdapter`.
+
 ## V2-002 shared contracts
 
 `packages/contracts/` is the single owner of portable runtime-validation schemas and inferred TypeScript types shared by later V2 packages. It contains identifiers, locale and institution metadata, lifecycle categories, action/request/proposal boundaries, the canonical event envelope, the explicit Patient State shape, public API errors, and narrow runtime adapter interfaces. It contains no clinical logic and no adapter implementations.
@@ -44,6 +64,7 @@ npm run typecheck
 npm run test:browser
 npm run test:deno
 npm run test:contracts
+npm run test:case-schema
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -59,7 +80,7 @@ npm exec playwright install chromium
 
 ## Portable package rules
 
-Code under `packages/portability-smoke/src/` and `packages/contracts/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries and checks canonical contract sources/fixtures for a reversed University of Jordan code.
+Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, and `packages/case-schema/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries and checks canonical contract/case fixtures for a reversed University of Jordan code.
 
 ## Source of Truth and rollback
 
