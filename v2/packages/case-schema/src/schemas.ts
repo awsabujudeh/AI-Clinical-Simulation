@@ -17,6 +17,7 @@ import {
   JsonValueSchema,
   LocalizationKeySchema,
   MediaAssetIdSchema,
+  ObservationProjectionDefinitionSchema,
   PatientLanguageSchema,
   PatientStateSchema,
   RealUtcTimeSchema,
@@ -212,9 +213,15 @@ export type CaseInitialPatientState = z.infer<typeof CaseInitialPatientStateSche
 
 export const InitialStateModuleSchema = z.strictObject({
   ...moduleBaseShape,
-  patient_state: CaseInitialPatientStateSchema
+  patient_state: CaseInitialPatientStateSchema,
+  observation_projection: ObservationProjectionDefinitionSchema.optional()
 });
 export type InitialStateModule = z.infer<typeof InitialStateModuleSchema>;
+
+export const PublishedInitialStateModuleSchema = InitialStateModuleSchema.extend({
+  observation_projection: ObservationProjectionDefinitionSchema
+});
+export type PublishedInitialStateModule = z.infer<typeof PublishedInitialStateModuleSchema>;
 
 export const FactDisclosureModeSchema = z.enum([
   "on_direct_question",
@@ -523,6 +530,7 @@ export type CompiledCaseManifest = z.infer<typeof CompiledCaseManifestSchema>;
 
 export const CompiledCasePackageSchema = z.strictObject({
   ...DraftCasePackageSchema.shape,
+  initial_state: PublishedInitialStateModuleSchema,
   manifest: CompiledCaseManifestSchema,
   package_hash: HashDigestSchema
 });

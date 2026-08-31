@@ -6,6 +6,22 @@ V2-001 establishes the preserved portability and test baseline. V2-002 adds shar
 
 V2-003 adds the portable `packages/case-schema/` validator/compiler. It represents the frozen modular Case Package boundaries, validates structural references and publication governance, formats deterministic reports, and compiles immutable package values through the shared runtime-neutral `HashAdapter`. It contains no rule execution, scheduler, scoring, physiology, media loading, persistence, provider integration, or medical case content.
 
+V2-004 adds only the portable Patient State and observation-projection foundation under `packages/clinical-engine/`. It reuses the shared Patient State contract, treats that state as authoritative, and projects case-configured observation values and explicit rhythm descriptors without transitions, treatment effects, scheduling, physiology, or disease-specific behavior.
+
+## V2-004 Patient State and observation projection
+
+Patient State owns clinical truth. Numeric observations, monitor values, and waveform descriptors are deterministic read-only projections from that explicit state plus a case-controlled projection definition. They never mutate the state and are never used to infer clinical truth backward. The portable observation definition/output schemas are owned by `packages/contracts/`; Clinical Engine owns only projection behavior.
+
+Cardiac rhythm is an explicit Patient State dimension. The rhythm projector accepts only the explicit `cardiac_rhythm` value and its case-provided mapping; heart rate and blood pressure are not rhythm inputs. The package renders controlled rhythm and waveform identities but contains no ECG renderer or UI.
+
+Observation definitions provide fixed mappings for hemodynamic, respiratory, oxygenation, consciousness, rhythm, and optional temperature state codes. The definition is stored inline as `initial_state.observation_projection`, so normal module, review-subject, candidate, and package hashes bind every reviewed vital and waveform mapping. Drafts may omit it temporarily; candidate and final publication validation require schema version `1.0` and complete coverage for the authored initial Patient State. Runtime processing must use the pinned Case Package field rather than a sidecar policy.
+
+Generic validation enforces JSON-safe strict shapes, finite/nonnegative numeric fields, SpO2 percentage bounds, systolic-greater-than-diastolic structure, unique active intervention/complication identities, and complete mappings for the supplied state. It makes no case-specific medical-plausibility judgment. An unavailable, failed-device, or nonpulsatile BP representation may later need an explicit availability/status contract rather than sentinel numbers; no such representation is introduced in V2-004.
+
+The V2-003 authored initial state remains session-free. `initializePatientState` validates that shared derived shape and attaches only the caller-supplied runtime Session ID; it does not invent or persist session data. V2-004 has no state transitions, rule evaluation, medication or treatment effects, scheduler, runtime clock, randomness, network, database, UI, or provider integration.
+
+V2-004 publication validation proves only initial-state projection coverage. When V2-005 defines the reachable state/effect vocabulary, its Rule Reachability evidence and publication validation must prove projection coverage for every reachable observation-driving state code. V2-004 does not claim or implement that future analysis.
+
 ## V2-003 Case Schema validator/compiler
 
 Draft validation requires strict schema and reference integrity while reporting unresolved approval, source, curriculum, fallback, and review gates as warnings. `preparePublicationCandidate` accepts only an eligible `UNDER_REVIEW` or `APPROVED` source, applies every candidate-readiness gate, and projects it without mutation onto the exact target `PUBLISHED` artifact. This target status describes the would-be immutable package; it does not claim that persistence or publication has occurred. The same unchanged source content/evidence therefore produces the same candidate after `UNDER_REVIEW` becomes `APPROVED`.
@@ -26,7 +42,7 @@ Canonical JSON recursively sorts object keys and preserves array order. Only sha
 
 ## V2-002 shared contracts
 
-`packages/contracts/` is the single owner of portable runtime-validation schemas and inferred TypeScript types shared by later V2 packages. It contains identifiers, locale and institution metadata, lifecycle categories, action/request/proposal boundaries, the canonical event envelope, the explicit Patient State shape, public API errors, and narrow runtime adapter interfaces. It contains no clinical logic and no adapter implementations.
+`packages/contracts/` is the single owner of portable runtime-validation schemas and inferred TypeScript types shared by later V2 packages. It contains identifiers, locale and institution metadata, lifecycle categories, action/request/proposal boundaries, the canonical event envelope, the explicit Patient State shape, strict observation definition/output data contracts, public API errors, and narrow runtime adapter interfaces. It contains no projection behavior, clinical logic, or adapter implementations.
 
 Domain and catalogue identifiers use justified lowercase namespaces, such as `case.*`, `rule.*`, and approved Action IDs like `investigation.*`. Runtime/operational identifiers use bounded ASCII-safe opaque values and keep distinct TypeScript brands without requiring invented prefixes. Persisted Event IDs are canonical UUIDs as required by the Physical Architecture. State, sequence, and proposal versions remain validated integer counters.
 
@@ -65,6 +81,7 @@ npm run test:browser
 npm run test:deno
 npm run test:contracts
 npm run test:case-schema
+npm run test:clinical-engine
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -76,11 +93,11 @@ Install the single Playwright browser once before browser-based tests:
 npm exec playwright install chromium
 ```
 
-`npm run test:browser` executes the shared TypeScript smoke and focused contract tests in Vitest Browser Mode. `npm run test:deno` imports the same source files through project-local Deno. Both runtimes assert the same representative serialized contract result. `npm run test:contracts` runs the focused Browser and Deno contract checks plus the forbidden-import guard.
+`npm run test:browser` executes the shared TypeScript smoke and focused contract tests in Vitest Browser Mode. `npm run test:deno` imports the same source files through project-local Deno. Both runtimes assert the same representative serialized results. `npm run test:contracts`, `npm run test:case-schema`, and `npm run test:clinical-engine` run their focused Browser/Deno checks plus the forbidden-import guard.
 
 ## Portable package rules
 
-Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, and `packages/case-schema/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries and checks canonical contract/case fixtures for a reversed University of Jordan code.
+Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, and `packages/clinical-engine/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, UI frameworks, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic Clinical Engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
 
 ## Source of Truth and rollback
 

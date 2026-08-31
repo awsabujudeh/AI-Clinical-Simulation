@@ -1,10 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
+const clinicalEngineSourceRoot = new URL("../packages/clinical-engine/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
-  new URL("../packages/case-schema/src/", import.meta.url)
+  new URL("../packages/case-schema/src/", import.meta.url),
+  clinicalEngineSourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -12,7 +14,8 @@ const forbiddenPatterns = [
   ["Node filesystem/path import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["'](?:fs|path)(?:\/[^"']*)?["']/u],
   ["runtime-specific global", /\b(?:process|Deno|document|localStorage|indexedDB|IndexedDB|Buffer|__dirname|__filename|require)\b/u],
   ["browser window global access", /\bwindow\s*(?:\.|\[)/u],
-  ["provider SDK", /(?:@supabase\/|@azure\/|@sentry\/|@openai\/|["']openai["'])/iu]
+  ["provider SDK", /(?:@supabase\/|@azure\/|@sentry\/|@openai\/|["']openai["'])/iu],
+  ["UI framework", /(?:from\s+|import\s*(?:\(\s*)?)["'](?:react(?:-dom)?|vue|svelte|@angular\/[^"']+)["']/u]
 ];
 
 async function collectTypeScriptFiles(directoryUrl) {
@@ -50,6 +53,45 @@ if (violations.length > 0) {
   throw new Error(`Portable source violations:\n${violations.join("\n")}`);
 }
 
+const clinicalEngineSourceFiles = await collectTypeScriptFiles(clinicalEngineSourceRoot);
+const diseaseSpecificTerms = /\b(?:STEMI|anaphylaxis)\b/iu;
+const runtimeNondeterminism = /\b(?:Math\.random|Date\.now)\s*\(/u;
+const duplicateObservationContractAuthority = /\b(?:export\s+)?const\s+(?:ObservationProjectionDefinitionSchema|ObservationProjectionSchema|RhythmObservationDefinitionSchema|RhythmObservationMappingsSchema|RhythmObservationSchema)\s*=/u;
+const clinicalEngineViolations = [];
+
+for (const fileUrl of clinicalEngineSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+
+  if (diseaseSpecificTerms.test(source)) {
+    clinicalEngineViolations.push(`Disease-specific source term: ${fileUrl.pathname}`);
+  }
+  if (runtimeNondeterminism.test(source)) {
+    clinicalEngineViolations.push(`Runtime nondeterminism: ${fileUrl.pathname}`);
+  }
+  if (duplicateObservationContractAuthority.test(source)) {
+    clinicalEngineViolations.push(`Duplicate shared observation schema authority: ${fileUrl.pathname}`);
+  }
+}
+
+if (clinicalEngineViolations.length > 0) {
+  throw new Error(
+    `Clinical Engine foundation violations:\n${clinicalEngineViolations.join("\n")}`
+  );
+}
+
+const caseSchemaSourceFiles = await collectTypeScriptFiles(
+  new URL("../packages/case-schema/src/", import.meta.url)
+);
+const caseSchemaClinicalEngineDependency = /(?:from\s+|import\s*(?:\(\s*)?)["'][^"']*clinical-engine[^"']*["']/u;
+
+for (const fileUrl of caseSchemaSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+
+  if (caseSchemaClinicalEngineDependency.test(source)) {
+    throw new Error(`Case Schema must consume shared observation contracts, not Clinical Engine: ${fileUrl.pathname}`);
+  }
+}
+
 const canonicalInstitutionTargets = [
   ...(await collectTypeScriptFiles(new URL("../packages/contracts/src/", import.meta.url))),
   new URL("../tests/fixtures/contracts-fixture.ts", import.meta.url),
@@ -74,3 +116,6 @@ if (institutionCodeViolations.length > 0) {
 
 console.log("PORTABILITY_GUARD=PASS");
 console.log("INSTITUTION_UJ_GUARD=PASS count=0");
+console.log("CLINICAL_ENGINE_DISEASE_NEUTRALITY_GUARD=PASS");
+console.log("CLINICAL_ENGINE_DETERMINISM_GUARD=PASS");
+console.log("OBSERVATION_CONTRACT_AUTHORITY_GUARD=PASS");

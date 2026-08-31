@@ -1,20 +1,26 @@
 import { describe, expect, test } from "vitest";
 
+import { CaseControlledValueSchema } from "../../packages/contracts/src/index.ts";
+
 import {
   CASE_MODULE_NAMES,
   DraftCasePackageSchema,
   canonicalSerialize,
   compileCasePackage,
+  computeModuleHashes,
   computeReviewSubjectHash,
   hashCanonicalJson,
   preparePublicationCandidate
 } from "../../packages/case-schema/src/index.ts";
 import {
   TEST_HASH_ADAPTER,
+  bindSyntheticReviewAndReachabilityEvidence,
+  createCandidateReadyUnderReviewCase,
   createFinalPublicationFixture,
   createPublicationApprovalRecord,
   reverseObjectKeyInsertionOrder
 } from "../fixtures/cases/synthetic-case.ts";
+import type { DraftCasePackage } from "../../packages/case-schema/src/index.ts";
 
 describe("deterministic Case Package compilation", () => {
   test("sorts object keys recursively while preserving array order and rejecting non-JSON", () => {
@@ -156,6 +162,56 @@ describe("deterministic Case Package compilation", () => {
     );
     expect(await computeReviewSubjectHash(manifestChanged, TEST_HASH_ADAPTER)).toBe(
       await computeReviewSubjectHash(fixture.underReview, TEST_HASH_ADAPTER)
+    );
+  });
+
+  test.each([
+    [
+      "numeric observation mapping",
+      (casePackage: DraftCasePackage) => {
+        const stateCode = casePackage.initial_state.patient_state.hemodynamic_state;
+        casePackage.initial_state.observation_projection!.hemodynamic_mappings[
+          stateCode
+        ]!.heart_rate_bpm = 71;
+      }
+    ],
+    [
+      "rhythm waveform descriptor",
+      (casePackage: DraftCasePackage) => {
+        const rhythmCode = casePackage.initial_state.patient_state.cardiac_rhythm;
+        casePackage.initial_state.observation_projection!.rhythm_mappings[
+          rhythmCode
+        ]!.waveform_descriptor = CaseControlledValueSchema.parse(
+          "waveform.synthetic-neutral-revised"
+        );
+      }
+    ]
+  ] as const)("binds %s changes to review, module, and candidate hashes", async (_label, mutate) => {
+    const baseline = await createCandidateReadyUnderReviewCase();
+    const baselineReviewHash = await computeReviewSubjectHash(baseline, TEST_HASH_ADAPTER);
+    const baselineModuleHashes = await computeModuleHashes(baseline, TEST_HASH_ADAPTER);
+    const baselineCandidate = await preparePublicationCandidate(baseline, TEST_HASH_ADAPTER);
+    const changed = DraftCasePackageSchema.parse(JSON.parse(JSON.stringify(baseline)));
+    mutate(changed);
+
+    const staleReviewCandidate = await preparePublicationCandidate(changed, TEST_HASH_ADAPTER);
+    expect(staleReviewCandidate.success).toBe(false);
+    expect(staleReviewCandidate.report.issues.map((item) => item.code)).toContain(
+      "REVIEW_CONTENT_HASH_MISMATCH"
+    );
+
+    const changedReviewHash = await computeReviewSubjectHash(changed, TEST_HASH_ADAPTER);
+    const changedModuleHashes = await computeModuleHashes(changed, TEST_HASH_ADAPTER);
+    await bindSyntheticReviewAndReachabilityEvidence(changed);
+    const changedCandidate = await preparePublicationCandidate(changed, TEST_HASH_ADAPTER);
+
+    expect(baselineCandidate.success).toBe(true);
+    expect(changedCandidate.success).toBe(true);
+    if (!baselineCandidate.success || !changedCandidate.success) return;
+    expect(changedModuleHashes.initial_state).not.toBe(baselineModuleHashes.initial_state);
+    expect(changedReviewHash).not.toBe(baselineReviewHash);
+    expect(changedCandidate.candidate.candidate_package_hash).not.toBe(
+      baselineCandidate.candidate.candidate_package_hash
     );
   });
 });

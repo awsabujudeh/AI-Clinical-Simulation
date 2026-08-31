@@ -7,4 +7,5 @@ export * from "./institutions.ts";
 export * from "./json.ts";
 export * from "./lifecycle.ts";
 export * from "./locales.ts";
+export * from "./observations.ts";
 export * from "./patient-state.ts";

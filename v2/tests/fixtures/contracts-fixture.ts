@@ -6,6 +6,8 @@ import {
   CanonicalEventEnvelopeSchema,
   IntentCandidateSchema,
   JORDAN_UNIVERSITY_OF_SCIENCE_AND_TECHNOLOGY,
+  ObservationProjectionDefinitionSchema,
+  ObservationProjectionSchema,
   PatientLanguageSchema,
   PatientStateSchema,
   SessionModeSchema,
@@ -119,6 +121,57 @@ export const VALID_PATIENT_STATE = {
   outcome_flags: []
 } as const;
 
+export const VALID_OBSERVATION_PROJECTION_DEFINITION = {
+  projection_schema_version: "1.0",
+  projection_definition_id: "projection.contract-portability-v1",
+  hemodynamic_mappings: {
+    "hemodynamics.stable": {
+      heart_rate_bpm: 72,
+      systolic_bp_mm_hg: 118,
+      diastolic_bp_mm_hg: 74
+    }
+  },
+  respiratory_mappings: {
+    "respiratory.normal": { respiratory_rate_per_minute: 14 }
+  },
+  oxygenation_mappings: {
+    "oxygenation.adequate": { spo2_percent: 98 }
+  },
+  temperature_mappings: {
+    "temperature.normal": { temperature_celsius: 36.8 }
+  },
+  consciousness_mappings: {
+    "consciousness.alert": { display_code: "display.consciousness-alert" }
+  },
+  rhythm_mappings: {
+    "rhythm.regular": {
+      display_code: "display.rhythm-regular",
+      waveform_descriptor: "waveform.regular"
+    }
+  }
+} as const;
+
+export const VALID_OBSERVATION_PROJECTION = {
+  observation_schema_version: "1.0",
+  projection_definition_id: "projection.contract-portability-v1",
+  session_id: VALID_PATIENT_STATE.session_id,
+  case_version: VALID_PATIENT_STATE.case_version,
+  state_version: VALID_PATIENT_STATE.state_version,
+  clinical_time: VALID_PATIENT_STATE.clinical_time,
+  heart_rate_bpm: 72,
+  systolic_bp_mm_hg: 118,
+  diastolic_bp_mm_hg: 74,
+  respiratory_rate_per_minute: 14,
+  spo2_percent: 98,
+  temperature_celsius: 36.8,
+  consciousness_display_code: "display.consciousness-alert",
+  rhythm: {
+    cardiac_rhythm: "rhythm.regular",
+    display_code: "display.rhythm-regular",
+    waveform_descriptor: "waveform.regular"
+  }
+} as const;
+
 export const VALID_API_ERROR = {
   api_schema_version: "1.0",
   request_id: "req_01JTEST00000000000000000001",
@@ -160,6 +213,10 @@ export function createContractPortabilitySnapshot() {
     action_proposal: ActionProposalSchema.parse(VALID_ACTION_PROPOSAL),
     event: CanonicalEventEnvelopeSchema.parse(VALID_EVENT),
     patient_state: PatientStateSchema.parse(VALID_PATIENT_STATE),
+    observation_projection_definition: ObservationProjectionDefinitionSchema.parse(
+      VALID_OBSERVATION_PROJECTION_DEFINITION
+    ),
+    observation_projection: ObservationProjectionSchema.parse(VALID_OBSERVATION_PROJECTION),
     api_error: ApiErrorResponseSchema.parse(VALID_API_ERROR)
   };
 }
@@ -186,5 +243,7 @@ export const CONTRACT_PORTABILITY_EXPECTED = JSON.stringify({
   action_proposal: VALID_ACTION_PROPOSAL,
   event: VALID_EVENT,
   patient_state: VALID_PATIENT_STATE,
+  observation_projection_definition: VALID_OBSERVATION_PROJECTION_DEFINITION,
+  observation_projection: VALID_OBSERVATION_PROJECTION,
   api_error: VALID_API_ERROR
 });

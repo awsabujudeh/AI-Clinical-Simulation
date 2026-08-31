@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   CASE_MODULE_NAMES,
+  CompiledCasePackageSchema,
   DraftCasePackageSchema,
   FactDisclosureModeSchema
 } from "../../packages/case-schema/src/index.ts";
@@ -17,6 +18,26 @@ describe("Case Schema module contracts", () => {
     expect(parsed.manifest.case_version).toBe("2.0.0");
     expect(parsed.initial_state.patient_state.state_version).toBe(0);
     expect(parsed.initial_state.patient_state.clinical_time).toBe(0);
+  });
+
+  test("keeps observation policy optional in Draft but required in compiled packages", () => {
+    const draftWithoutProjection = JSON.parse(JSON.stringify(MINIMAL_DRAFT_CASE));
+    delete draftWithoutProjection.initial_state.observation_projection;
+    expect(DraftCasePackageSchema.safeParse(draftWithoutProjection).success).toBe(true);
+
+    const compiledShapeWithoutProjection = {
+      ...draftWithoutProjection,
+      manifest: {
+        ...draftWithoutProjection.manifest,
+        status: "PUBLISHED",
+        hash_algorithm: "SHA-256",
+        module_hashes: Object.fromEntries(
+          CASE_MODULE_NAMES.map((moduleName) => [moduleName, "0".repeat(64)])
+        )
+      },
+      package_hash: "0".repeat(64)
+    };
+    expect(CompiledCasePackageSchema.safeParse(compiledShapeWithoutProjection).success).toBe(false);
   });
 
   test("reuses frozen disclosure values and treats aliases as interpretation-only", () => {

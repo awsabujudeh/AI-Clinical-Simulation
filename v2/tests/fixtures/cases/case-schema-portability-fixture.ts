@@ -118,15 +118,15 @@ export const CASE_SCHEMA_PORTABILITY_EXPECTED = JSON.stringify({
     "[ERROR] DUPLICATE_ACTION_ID module=action_catalogue path=$.action_catalogue.actions related=examination.synthetic-check :: Duplicate Action ID: examination.synthetic-check",
     "[ERROR] DANGLING_ACTION_REFERENCE module=rules path=$.rules.rules related=procedure.synthetic-missing :: Dangling Action ID reference: procedure.synthetic-missing"
   ].join("\n"),
-  review_subject_hash: "0d68b7c328188f48e5ad6ae1efae1fde746a199fdec4702c5e97c6bd8bf73702",
-  candidate_package_hash: "f2bf41f08833ea7cfc66ff20018d216c6109ec889b43dc744c80ea08c57ecd44",
+  review_subject_hash: "233b80f71a1b8c880560f13d07558746c55258632dc1eb6c12e4a2495c03f5da",
+  candidate_package_hash: "e588c583a0db3b8992dcb4abf35c364db03a431bb8b4caa1e80b4cb3d77aca7d",
   module_hashes: {
     manifest: "92b579f434f9ed8628713d0c0c2dd23291b1940c4b51771e025bd5c4837dfc52",
     classification: "d6959d05e12cfd5e94172e97c3a1d128077420693300ecca35450d3b85d62114",
     localization: "2f4ae4ceaca3b7da9a5ae09af690bf16266aabf62975aafab755fe6a283d018e",
     patient_profile: "3b6b53f2b81109175ec7614ce18ec3d9b5899a76ae7985db977261e0042cea0d",
     presentation: "d7ee67c0812242a8f0ffc3ac2fef3db4835ecda8b804bb00e4dbb6fc381af894",
-    initial_state: "21f96c78a273a3ec17803f806d794e0cc9bf1190ab6fbfcc05c96508153f671c",
+    initial_state: "fc74a0e495e29cfc68b4b024cac31c1c15ac1ae47fe16ad488d2144496b1a8c4",
     clinical_facts: "ef8197a2530ccb9d9a719a844fd25ddfbd17cfc6c814ba0152bf5248e72ee0c3",
     action_catalogue: "fff90d1704adf94029fcd7352d4254ce8c59a8b385b670140eb108511df9c022",
     rules: "677fe0c9029113218ce74631cb0a3a5943163c919be0281149bd12b94b2ba859",
@@ -135,8 +135,8 @@ export const CASE_SCHEMA_PORTABILITY_EXPECTED = JSON.stringify({
     dialogue_policy: "d13009f1610061df79f9757d642113b7fcc16db1252ed007b3c93045efcb855f",
     visual_manifest: "369da0920414f9db45e3d9a03da7ba31acd3e98e3aef8c77c98ff9ecc328748d",
     curriculum_mappings: "4c41e7f792c6974fd06d0c97ed6e488f904b8bcfbb5eee4f20953a5fa1859eaf",
-    validation: "d9cf9a79a1a2910e2a2c3477d74ce004f2f8f5b5102bc6627a9bc7233e8ee928",
+    validation: "7316db0cfa7746f1a32db532e4ea8a774fe22070b1c1b57d9df5edd6f04123f3",
     instructor_notes: "ac4aa6c3c43cf33e60f8ee41ca74e2249995c2ef9dd6795ace0d20ddf8689a60"
   },
-  package_hash: "f2bf41f08833ea7cfc66ff20018d216c6109ec889b43dc744c80ea08c57ecd44"
+  package_hash: "e588c583a0db3b8992dcb4abf35c364db03a431bb8b4caa1e80b4cb3d77aca7d"
 });

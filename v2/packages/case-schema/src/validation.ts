@@ -138,6 +138,27 @@ function addDanglingIssues(
   }
 }
 
+function addMissingObservationMappingIssue(
+  issues: CaseValidationIssue[],
+  mappings: Readonly<Record<string, unknown>>,
+  stateValue: string,
+  code: string,
+  path: string,
+  label: string,
+  mode: ValidationMode
+): void {
+  if (!Object.hasOwn(mappings, stateValue)) {
+    issues.push(issue({
+      code,
+      severity: gateSeverity(mode),
+      module: "initial_state",
+      path,
+      relatedIds: [stateValue],
+      message: `The initial Patient State has no ${label} projection mapping.`
+    }));
+  }
+}
+
 function validateReviewGate(
   casePackage: DraftCasePackage,
   issues: CaseValidationIssue[],
@@ -380,6 +401,78 @@ function validateParsedCase(
       relatedIds: [casePackage.initial_state.patient_state.case_version, manifest.case_version],
       message: "Initial Patient State case version must match the manifest."
     }));
+  }
+
+  const initialPatientState = casePackage.initial_state.patient_state;
+  const observationProjection = casePackage.initial_state.observation_projection;
+
+  if (observationProjection === undefined) {
+    issues.push(issue({
+      code: "OBSERVATION_PROJECTION_MISSING",
+      severity: publicationSeverity,
+      module: "initial_state",
+      path: "$.initial_state.observation_projection",
+      relatedIds: [],
+      message: "A reviewed observation projection definition is required for publication."
+    }));
+  } else {
+    addMissingObservationMappingIssue(
+      issues,
+      observationProjection.hemodynamic_mappings,
+      initialPatientState.hemodynamic_state,
+      "OBSERVATION_HEMODYNAMIC_MAPPING_MISSING",
+      "$.initial_state.observation_projection.hemodynamic_mappings",
+      "hemodynamic",
+      mode
+    );
+    addMissingObservationMappingIssue(
+      issues,
+      observationProjection.respiratory_mappings,
+      initialPatientState.respiratory_state,
+      "OBSERVATION_RESPIRATORY_MAPPING_MISSING",
+      "$.initial_state.observation_projection.respiratory_mappings",
+      "respiratory",
+      mode
+    );
+    addMissingObservationMappingIssue(
+      issues,
+      observationProjection.oxygenation_mappings,
+      initialPatientState.oxygenation,
+      "OBSERVATION_OXYGENATION_MAPPING_MISSING",
+      "$.initial_state.observation_projection.oxygenation_mappings",
+      "oxygenation",
+      mode
+    );
+    addMissingObservationMappingIssue(
+      issues,
+      observationProjection.consciousness_mappings,
+      initialPatientState.consciousness,
+      "OBSERVATION_CONSCIOUSNESS_MAPPING_MISSING",
+      "$.initial_state.observation_projection.consciousness_mappings",
+      "consciousness",
+      mode
+    );
+    addMissingObservationMappingIssue(
+      issues,
+      observationProjection.rhythm_mappings,
+      initialPatientState.cardiac_rhythm,
+      "OBSERVATION_RHYTHM_MAPPING_MISSING",
+      "$.initial_state.observation_projection.rhythm_mappings",
+      "cardiac-rhythm",
+      mode
+    );
+
+    if (observationProjection.temperature_mappings !== undefined) {
+      addMissingObservationMappingIssue(
+        issues,
+        observationProjection.temperature_mappings,
+        initialPatientState.temperature_state,
+        "OBSERVATION_TEMPERATURE_MAPPING_MISSING",
+        "$.initial_state.observation_projection.temperature_mappings",
+        "temperature",
+        mode
+      );
+    }
   }
 
   if (!casePackage.patient_profile.supported_languages.includes(
@@ -994,8 +1087,13 @@ export async function validateForPublication(
 
   try {
     const reviewSubjectHash = await computeReviewSubjectHash(parsed.data, hashAdapter);
-    const candidate = await buildPublicationCandidateArtifact(parsed.data, hashAdapter);
     const issues = validateParsedCase(parsed.data, "PUBLICATION", reviewSubjectHash);
+
+    if (issues.some((validationIssue) => validationIssue.severity === "ERROR")) {
+      return createValidationReport("PUBLICATION", issues);
+    }
+
+    const candidate = await buildPublicationCandidateArtifact(parsed.data, hashAdapter);
 
     if (approvalInput === undefined || approvalInput === null) {
       issues.push(issue({

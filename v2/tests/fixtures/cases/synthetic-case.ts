@@ -154,6 +154,35 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
       active_interventions: [],
       active_complications: [],
       outcome_flags: []
+    },
+    observation_projection: {
+      projection_schema_version: "1.0",
+      projection_definition_id: "projection.synthetic-case-v1",
+      hemodynamic_mappings: {
+        "hemodynamics.neutral": {
+          heart_rate_bpm: 70,
+          systolic_bp_mm_hg: 110,
+          diastolic_bp_mm_hg: 70
+        }
+      },
+      respiratory_mappings: {
+        "respiratory.neutral": { respiratory_rate_per_minute: 15 }
+      },
+      oxygenation_mappings: {
+        "oxygenation.neutral": { spo2_percent: 97 }
+      },
+      temperature_mappings: {
+        "temperature.neutral": { temperature_celsius: 36.5 }
+      },
+      consciousness_mappings: {
+        "consciousness.alert": { display_code: "display.consciousness-alert" }
+      },
+      rhythm_mappings: {
+        "rhythm.neutral": {
+          display_code: "display.rhythm-neutral",
+          waveform_descriptor: "waveform.synthetic-neutral"
+        }
+      }
     }
   },
   clinical_facts: {
@@ -359,6 +388,34 @@ function cloneCase(casePackage: DraftCasePackage): DraftCasePackage {
   return DraftCasePackageSchema.parse(JSON.parse(JSON.stringify(casePackage)));
 }
 
+export async function bindSyntheticReviewAndReachabilityEvidence(
+  casePackage: DraftCasePackage,
+  hashAdapter: HashAdapter = TEST_HASH_ADAPTER
+) {
+  const reviewSubjectHash = await computeReviewSubjectHash(casePackage, hashAdapter);
+
+  for (const review of casePackage.validation.reviews) {
+    review.reviewed_content_hash = reviewSubjectHash;
+  }
+
+  const reachabilityEvidence = casePackage.validation.deferred_checks.find(
+    (evidence) => evidence.validation_code === RULE_REACHABILITY_VALIDATION_CODE
+  );
+
+  if (reachabilityEvidence !== undefined) {
+    reachabilityEvidence.validated_case_version_id = casePackage.manifest.case_version_id;
+    reachabilityEvidence.validated_case_version = casePackage.manifest.case_version;
+    reachabilityEvidence.validated_review_subject_hash = HashDigestSchema.parse(reviewSubjectHash);
+    reachabilityEvidence.evidence_hash = await hashCanonicalJson({
+      fixture: "synthetic-rule-reachability-evidence",
+      case_version_id: casePackage.manifest.case_version_id,
+      review_subject_hash: reviewSubjectHash
+    }, hashAdapter);
+  }
+
+  return reviewSubjectHash;
+}
+
 export async function createCandidateReadyUnderReviewCase(
   hashAdapter: HashAdapter = TEST_HASH_ADAPTER
 ): Promise<DraftCasePackage> {
@@ -408,10 +465,6 @@ export async function createCandidateReadyUnderReviewCase(
     })
   ];
 
-  const reviewSubjectHash = await computeReviewSubjectHash(casePackage, hashAdapter);
-  for (const review of casePackage.validation.reviews) {
-    review.reviewed_content_hash = reviewSubjectHash;
-  }
   casePackage.validation.deferred_checks = [
     ValidationEvidenceSchema.parse({
       validation_code: RULE_REACHABILITY_VALIDATION_CODE,
@@ -419,17 +472,14 @@ export async function createCandidateReadyUnderReviewCase(
       required_for_publication: true,
       validator_id: "validator.synthetic.rule-reachability",
       validator_version: "1.0.0",
-      evidence_hash: await hashCanonicalJson({
-        fixture: "synthetic-rule-reachability-evidence",
-        case_version_id: casePackage.manifest.case_version_id,
-        review_subject_hash: reviewSubjectHash
-      }, hashAdapter),
+      evidence_hash: "0000000000000000000000000000000000000000000000000000000000000000",
       validated_case_version_id: casePackage.manifest.case_version_id,
       validated_case_version: casePackage.manifest.case_version,
-      validated_review_subject_hash: reviewSubjectHash,
+      validated_review_subject_hash: "0000000000000000000000000000000000000000000000000000000000000000",
       completed_at_utc: "2026-08-30T12:03:00Z"
     })
   ];
+  await bindSyntheticReviewAndReachabilityEvidence(casePackage, hashAdapter);
 
   return DraftCasePackageSchema.parse(casePackage);
 }

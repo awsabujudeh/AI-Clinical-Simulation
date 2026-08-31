@@ -15,6 +15,7 @@ import {
 import {
   MINIMAL_DRAFT_CASE,
   TEST_HASH_ADAPTER,
+  bindSyntheticReviewAndReachabilityEvidence,
   createApprovedSourceCase,
   createCandidateReadyUnderReviewCase,
   createDanglingActionReferenceCase,
@@ -65,6 +66,34 @@ describe("Draft Case validation", () => {
     expect(formatValidationReport(first)).toBe(formatValidationReport(second));
   });
 
+  test("allows an incomplete Draft to omit observation policy but reports it", () => {
+    const incomplete = DraftCasePackageSchema.parse(
+      JSON.parse(JSON.stringify(MINIMAL_DRAFT_CASE))
+    );
+    delete incomplete.initial_state.observation_projection;
+
+    const report = validateDraftCase(incomplete);
+    expect(report.valid).toBe(true);
+    expect(report.publishable).toBe(false);
+    expect(issueCodes(report)).toContain("OBSERVATION_PROJECTION_MISSING");
+    expect(report.issues.find(
+      (item) => item.code === "OBSERVATION_PROJECTION_MISSING"
+    )?.severity).toBe("WARNING");
+  });
+
+  test("rejects structurally invalid or unsupported observation definitions", () => {
+    const unsupported = JSON.parse(JSON.stringify(MINIMAL_DRAFT_CASE));
+    unsupported.initial_state.observation_projection.projection_schema_version = "999.0";
+    const unknownField = JSON.parse(JSON.stringify(MINIMAL_DRAFT_CASE));
+    unknownField.initial_state.observation_projection.unreviewed_default = true;
+
+    for (const input of [unsupported, unknownField]) {
+      const report = validateDraftCase(input);
+      expect(report.valid).toBe(false);
+      expect(issueCodes(report)).toContain("SCHEMA_INVALID");
+    }
+  });
+
   test.each([
     ["duplicate Action ID", createDuplicateActionCase, "DUPLICATE_ACTION_ID"],
     ["duplicate Rule ID", createDuplicateRuleCase, "DUPLICATE_RULE_ID"],
@@ -110,6 +139,71 @@ describe("Publication candidate readiness", () => {
 
     expect(prepared.success).toBe(false);
     expect(issueCodes(prepared.report)).toContain("PUBLICATION_CANDIDATE_LIFECYCLE_INVALID");
+  });
+
+  test("requires inline observation policy for candidate readiness", async () => {
+    const source = await createCandidateReadyUnderReviewCase();
+    delete source.initial_state.observation_projection;
+    const prepared = await preparePublicationCandidate(source, TEST_HASH_ADAPTER);
+
+    expect(prepared.success).toBe(false);
+    expect(issueCodes(prepared.report)).toContain("OBSERVATION_PROJECTION_MISSING");
+  });
+
+  test("fails candidate readiness for unsupported observation schema version", async () => {
+    const source = JSON.parse(JSON.stringify(await createCandidateReadyUnderReviewCase()));
+    source.initial_state.observation_projection.projection_schema_version = "2.0";
+    const prepared = await preparePublicationCandidate(source, TEST_HASH_ADAPTER);
+
+    expect(prepared.success).toBe(false);
+    expect(issueCodes(prepared.report)).toContain("SCHEMA_INVALID");
+    expect(prepared.report.issues.some(
+      (item) => item.path === "$.initial_state.observation_projection.projection_schema_version"
+    )).toBe(true);
+  });
+
+  test.each([
+    ["hemodynamic_mappings", "hemodynamic_state", "OBSERVATION_HEMODYNAMIC_MAPPING_MISSING"],
+    ["respiratory_mappings", "respiratory_state", "OBSERVATION_RESPIRATORY_MAPPING_MISSING"],
+    ["oxygenation_mappings", "oxygenation", "OBSERVATION_OXYGENATION_MAPPING_MISSING"],
+    ["consciousness_mappings", "consciousness", "OBSERVATION_CONSCIOUSNESS_MAPPING_MISSING"],
+    ["rhythm_mappings", "cardiac_rhythm", "OBSERVATION_RHYTHM_MAPPING_MISSING"]
+  ] as const)(
+    "requires the initial-state %s mapping selected by %s",
+    async (mappingName, stateName, expectedCode) => {
+      const source = await createCandidateReadyUnderReviewCase();
+      const definition = source.initial_state.observation_projection!;
+      const stateValue = source.initial_state.patient_state[stateName];
+      delete definition[mappingName][stateValue];
+      const report = await validateForPublicationCandidate(source, TEST_HASH_ADAPTER);
+
+      expect(report.valid).toBe(false);
+      expect(issueCodes(report)).toContain(expectedCode);
+    }
+  );
+
+  test("allows temperature omission but fails when configured temperature cannot resolve", async () => {
+    const withoutTemperature = await createCandidateReadyUnderReviewCase();
+    delete withoutTemperature.initial_state.observation_projection!.temperature_mappings;
+    await bindSyntheticReviewAndReachabilityEvidence(withoutTemperature);
+    const omittedReport = await validateForPublicationCandidate(
+      withoutTemperature,
+      TEST_HASH_ADAPTER
+    );
+
+    const missingTemperature = await createCandidateReadyUnderReviewCase();
+    const currentTemperature = missingTemperature.initial_state.patient_state.temperature_state;
+    delete missingTemperature.initial_state.observation_projection!.temperature_mappings![
+      currentTemperature
+    ];
+    const missingReport = await validateForPublicationCandidate(
+      missingTemperature,
+      TEST_HASH_ADAPTER
+    );
+
+    expect(omittedReport.valid).toBe(true);
+    expect(missingReport.valid).toBe(false);
+    expect(issueCodes(missingReport)).toContain("OBSERVATION_TEMPERATURE_MAPPING_MISSING");
   });
 
   test("invalidates Clinical Review and reachability evidence when reviewed content changes", async () => {
@@ -195,6 +289,19 @@ describe("Final publication validation", () => {
 
     expect(report.publishable).toBe(false);
     expect(issueCodes(report)).toContain("PACKAGE_APPROVAL_MISSING");
+  });
+
+  test("fails final publication when inline observation policy is missing", async () => {
+    const fixture = await createFinalPublicationFixture();
+    delete fixture.approved.initial_state.observation_projection;
+    const report = await validateForPublication(
+      fixture.approved,
+      fixture.approval,
+      TEST_HASH_ADAPTER
+    );
+
+    expect(report.publishable).toBe(false);
+    expect(issueCodes(report)).toContain("OBSERVATION_PROJECTION_MISSING");
   });
 
   test("exact-package approval cannot replace Clinical Review", async () => {
