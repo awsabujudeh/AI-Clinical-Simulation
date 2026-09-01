@@ -30,6 +30,10 @@ import {
   ObservationProjectionDefinitionSchema,
   ObservationProjectionSchema
 } from "./observations.ts";
+import {
+  ClinicalTimeRatioSchema,
+  TimelinePausePolicySchema
+} from "./session-clock.ts";
 
 export const RULE_SCHEMA_VERSION = "1.0" as const;
 export const SCHEDULER_SCHEMA_VERSION = "1.0" as const;
@@ -327,6 +331,24 @@ export const SchedulerStateSchema = z.strictObject({
 });
 export type SchedulerState = z.infer<typeof SchedulerStateSchema>;
 
+export const InterruptingEventTypesSchema = z.array(EventTypeSchema).max(64)
+  .superRefine((eventTypes, context) => {
+    const sorted = [...eventTypes].sort();
+    if (new Set(eventTypes).size !== eventTypes.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Interrupting event types must be unique"
+      });
+    }
+    if (eventTypes.some((eventType, index) => eventType !== sorted[index])) {
+      context.addIssue({
+        code: "custom",
+        message: "Interrupting event types must use canonical lexical order"
+      });
+    }
+  });
+export type InterruptingEventTypes = z.infer<typeof InterruptingEventTypesSchema>;
+
 export const PinnedClinicalPolicyEnvelopeSchema = z.strictObject({
   policy_schema_version: z.literal(PINNED_CLINICAL_POLICY_SCHEMA_VERSION),
   case_package_id: CasePackageIdSchema,
@@ -338,7 +360,10 @@ export const PinnedClinicalPolicyEnvelopeSchema = z.strictObject({
   rules: z.array(TransitionRuleSchema).max(512),
   timeline_policy: z.strictObject({
     scheduler_schema_version: z.literal(SCHEDULER_SCHEMA_VERSION),
+    time_ratio: ClinicalTimeRatioSchema,
+    pause_policy: TimelinePausePolicySchema,
     max_derived_evaluations: MaximumDerivedEvaluationsSchema,
+    interrupting_event_types: InterruptingEventTypesSchema,
     initial_scheduled_items: z.array(ScheduledItemSchema).max(128)
   }),
   observation_projection: ObservationProjectionDefinitionSchema,

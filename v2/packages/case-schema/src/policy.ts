@@ -39,7 +39,10 @@ export function createPinnedClinicalPolicy(
     rules: casePackage.rules.rules,
     timeline_policy: {
       scheduler_schema_version: casePackage.timeline_policy.scheduler_schema_version,
+      time_ratio: casePackage.timeline_policy.time_ratio,
+      pause_policy: casePackage.timeline_policy.pause_policy,
       max_derived_evaluations: casePackage.timeline_policy.max_derived_evaluations,
+      interrupting_event_types: casePackage.timeline_policy.interrupting_event_types,
       initial_scheduled_items: casePackage.timeline_policy.initial_scheduled_items
     },
     observation_projection: casePackage.initial_state.observation_projection,

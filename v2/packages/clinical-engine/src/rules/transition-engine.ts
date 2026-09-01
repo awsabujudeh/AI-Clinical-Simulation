@@ -169,7 +169,8 @@ function triggerMatches(
   rule: TransitionRule,
   trigger: ClinicalEvaluationTrigger,
   clinicalTime: number,
-  context: ConditionEvaluationContext
+  context: ConditionEvaluationContext,
+  clinicalTimeWindowStartExclusive?: number
 ): boolean {
   switch (rule.trigger.trigger_type) {
     case "COMMITTED_EVENT":
@@ -177,8 +178,13 @@ function triggerMatches(
         && trigger.event_type === rule.trigger.event_type
         && (rule.trigger.action_id === undefined || trigger.action_id === rule.trigger.action_id);
     case "CLINICAL_TIME_THRESHOLD":
+      // PROCESS_DUE treats the input state's Clinical Time as already settled.
+      // The exclusive lower bound prevents old thresholds from firing again
+      // when Session orchestration visits multiple chronological boundaries.
       return trigger.trigger_type === "CLINICAL_TIME"
-        && clinicalTime >= rule.trigger.threshold_clinical_time;
+        && clinicalTime >= rule.trigger.threshold_clinical_time
+        && (clinicalTimeWindowStartExclusive === undefined
+          || rule.trigger.threshold_clinical_time > clinicalTimeWindowStartExclusive);
     case "SCHEDULED_ITEM":
       return trigger.trigger_type === "SCHEDULED_ITEM"
         && (rule.trigger.scheduled_item_id === undefined
@@ -199,7 +205,8 @@ function evaluateRulesForTrigger(
   caseFactIds: ReadonlySet<string>,
   trace: TraceCollector,
   budget: EngineWorkBudget,
-  activationKeys: Set<string>
+  activationKeys: Set<string>,
+  clinicalTimeWindowStartExclusive?: number
 ): FiredRule[] {
   const fired: FiredRule[] = [];
   const context: ConditionEvaluationContext = {
@@ -221,7 +228,13 @@ function evaluateRulesForTrigger(
       data: { trigger_type: trigger.trigger_type }
     });
     if (budget.exceeded !== undefined) break;
-    if (!triggerMatches(rule, trigger, clinicalTime, context)) {
+    if (!triggerMatches(
+      rule,
+      trigger,
+      clinicalTime,
+      context,
+      clinicalTimeWindowStartExclusive
+    )) {
       trace.add({
         kind: "RULE_INELIGIBLE",
         clinical_time: context.clinicalTime,
@@ -601,6 +614,7 @@ function executeStep(input: {
   trace: TraceCollector;
   budget: EngineWorkBudget;
   activationKeys: Set<string>;
+  clinicalTimeWindowStartExclusive?: number;
 }): StepResult {
   let state = input.state;
   let schedulerState = input.schedulerState;
@@ -639,7 +653,8 @@ function executeStep(input: {
     input.caseFactIds,
     input.trace,
     input.budget,
-    input.activationKeys
+    input.activationKeys,
+    input.clinicalTimeWindowStartExclusive
   );
   if (input.budget.exceeded !== undefined) return { success: false, issues: [] };
   const operations = collectRuleOperations(fired);
@@ -1045,7 +1060,10 @@ function executeParsedRequest(request: PinnedClinicalEvaluationRequest): Clinica
     caseFactIds,
     trace,
     budget,
-    activationKeys
+    activationKeys,
+    ...(request.operation === "PROCESS_DUE"
+      ? { clinicalTimeWindowStartExclusive: state.clinical_time }
+      : {})
   });
   if (budget.exceeded !== undefined) {
     return budgetFailure(state, publicTrigger, policy, trace, budget, cycleEvaluations);

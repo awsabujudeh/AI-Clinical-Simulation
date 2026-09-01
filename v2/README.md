@@ -10,6 +10,18 @@ V2-004 adds only the portable Patient State and observation-projection foundatio
 
 V2-005 adds the portable declarative transition and Clinical-Time scheduler foundation. Shared contracts own the versioned rule/effect/scheduler data language, Case Schema embeds and hash-binds it, and Clinical Engine evaluates it without taking Session Engine, persistence, or committed-event authority.
 
+V2-006A adds only the portable Session/Clinical clock and interruptible Clinical-Time advancement foundation under `packages/session-engine/`. Normal Expo progression uses explicit elapsed input and the pinned `time_ratio = 1.0`; pause freezes Clinical Time and resume never catches up paused wall duration. Action-driven compressed advancement is separate: it pays the full Case-owned Clinical duration while deterministically draining V2-005 scheduled work through each due boundary and visiting Clinical-Time threshold rules at their exact monotonic boundary. Case-owned, hash-bound interrupt event classifications in `timeline_policy` can stop advancement at the exact reached Clinical Time while later work remains pending.
+
+At the same Clinical Time, authoritative due Case work is drained before any future external learner command is evaluated. Independent scheduled completions remain independent and are never converted into an additive global wait. V2-006A has no runtime clocks, timers, command routing, idempotency store, persistence, API, UI, investigation model, assessment, AI, voice, or media behavior. Run `npm run test:session-engine` for its focused Browser/Deno suite or `npm run test:v2-006a` for all affected portable packages.
+
+V2-006B adds the pure external learner-command transaction boundary. A minimal `PinnedSessionCaseContext` is derived from one compiled Case Package and binds the same package/Case Version identities, semantic version, package hash, Clinical policy, and orchestration-required action catalogue; callers cannot inject action or policy sidecars. `processExternalLearnerCommand` validates the shared `ActionRequest`, drains Case-owned due work before command evaluation, invokes only the pinned Clinical Engine entry point, and commits the command plus ordered Clinical event proposals into a new immutable in-memory Session aggregate. Clinical proposals never own Event IDs or Session sequence.
+
+Command fingerprints use canonical JSON plus an injected `HashAdapter`; Patient/Scheduler state and wall-clock time are outside that equivalence boundary. Exact retries replay the committed event range without execution or sequence allocation, conflicting retries fail closed, and failed attempts create no replay record. Event UUIDs come from an injected testable factory, while trusted real UTC commit time is an explicit dependency. A pre-command Case interrupt commits its independently authoritative due settlement but neither executes nor records the learner command. Immediate V2-005 effects settle in the command transaction; positive-delay scheduler mutations commit atomically for later Clinical-Time processing. No zero-delay scheduler language, persistence, API, UI, database, assessment, AI, voice, or media behavior is added. Run `npm run test:v2-006b` for the affected command-orchestration regression set.
+
+V2-006C closes the in-memory Session boundary with one `SessionCoordinator`. It loads and atomically compare-and-swaps complete Session aggregates through a storage-neutral `SessionCommitAdapter`; the portable `InMemorySessionCommitAdapter` proves copy isolation, append-only progression, stale-write rejection, and deterministic double-click replay. Its composite commit token uses existing authoritative Patient State version, next event sequence, clock state/time, and trusted real-time anchor rather than inventing another mutable version counter. Future Postgres or IndexedDB adapters must implement this same boundary outside the portable core.
+
+Trusted-time synchronization receives explicit UTC authority and never reads a live clock. RUNNING sessions advance elapsed whole seconds through the pinned ratio and V2-006A chronological scheduler path, so browser-sleep catch-up cannot skip Case work. An interrupt commits only the reached interval and advances the real-time anchor proportionally; PAUSED sessions never catch up, and resume establishes a new anchor. Normal sync/catch-up remains distinct from Case-owned action-duration advancement. Pause/resume produce generic committed lifecycle events but no clinical effects. Run `npm run test:v2-006` for the complete portable V2-006 closure suite.
+
 ## V2-005 rule transitions and Clinical Scheduler
 
 Rules use a small strict `1.0` vocabulary: bounded triggers and conditions; allowlisted Patient State changes; typed pain, intervention, complication, and outcome changes; relative or absolute Clinical-Time schedules; stable cancellation; and deterministic event proposals. Arbitrary paths, scripts, direct numeric-vital effects, physiology arithmetic, wall-clock timers, and disease-specific branches are prohibited. Rules change explicit Patient State codes; the pinned V2-004 observation definition then projects monitor values and rhythm descriptors.
@@ -103,6 +115,9 @@ npm run test:contracts
 npm run test:case-schema
 npm run test:clinical-engine
 npm run test:v2-005
+npm run test:session-engine
+npm run test:v2-006b
+npm run test:v2-006
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -118,7 +133,7 @@ npm exec playwright install chromium
 
 ## Portable package rules
 
-Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, and `packages/clinical-engine/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, UI frameworks, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic Clinical Engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
+Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, `packages/clinical-engine/src/`, and `packages/session-engine/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, UI frameworks, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
 
 ## Source of Truth and rollback
 

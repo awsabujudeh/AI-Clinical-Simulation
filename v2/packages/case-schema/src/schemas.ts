@@ -15,6 +15,7 @@ import {
   FactIdSchema,
   InstitutionIdSchema,
   InstitutionMetadataSchema,
+  InterruptingEventTypesSchema,
   JsonValueSchema,
   LocalizationKeySchema,
   MediaAssetIdSchema,
@@ -32,6 +33,8 @@ import {
   SourceVersionIdSchema,
   SCHEDULER_SCHEMA_VERSION,
   ScheduledItemSchema,
+  ClinicalTimeRatioSchema,
+  TimelinePausePolicySchema,
   TimingWindowIdSchema,
   TransitionRuleSchema,
   VisualManifestIdSchema
@@ -311,12 +314,13 @@ export const TimingWindowSchema = z.strictObject({
 export const TimelinePolicyModuleSchema = z.strictObject({
   ...moduleBaseShape,
   scheduler_schema_version: z.literal(SCHEDULER_SCHEMA_VERSION),
-  time_ratio: z.number().finite().positive().max(100),
-  pause_policy: z.enum(["PAUSE_CLINICAL_TIME", "CASE_DEFINED"]),
+  time_ratio: ClinicalTimeRatioSchema,
+  pause_policy: TimelinePausePolicySchema,
   deterministic_seed_policy: z.enum(["REQUIRED", "FIXED"]),
   max_derived_evaluations: z.number().int().min(1).max(32),
   timing_windows: z.array(TimingWindowSchema).max(128),
   initial_scheduled_event_types: z.array(EventTypeSchema).max(64),
+  interrupting_event_types: InterruptingEventTypesSchema,
   initial_scheduled_items: z.array(ScheduledItemSchema).max(128)
 });
 export type TimelinePolicyModule = z.infer<typeof TimelinePolicyModuleSchema>;

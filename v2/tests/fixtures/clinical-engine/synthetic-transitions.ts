@@ -202,7 +202,10 @@ export function createSyntheticPinnedPolicy(
     rules,
     timeline_policy: {
       scheduler_schema_version: "1.0",
+      time_ratio: 1,
+      pause_policy: "PAUSE_CLINICAL_TIME",
       max_derived_evaluations: 16,
+      interrupting_event_types: [],
       initial_scheduled_items: []
     },
     observation_projection: SYNTHETIC_OBSERVATION_DEFINITION,

@@ -276,6 +276,7 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
       }
     ],
     initial_scheduled_event_types: [],
+    interrupting_event_types: [],
     initial_scheduled_items: []
   },
   assessment_rubric: {
