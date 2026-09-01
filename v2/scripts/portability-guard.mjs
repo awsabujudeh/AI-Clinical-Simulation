@@ -55,8 +55,9 @@ if (violations.length > 0) {
 
 const clinicalEngineSourceFiles = await collectTypeScriptFiles(clinicalEngineSourceRoot);
 const diseaseSpecificTerms = /\b(?:STEMI|anaphylaxis)\b/iu;
-const runtimeNondeterminism = /\b(?:Math\.random|Date\.now)\s*\(/u;
+const runtimeNondeterminism = /\b(?:Math\.random|Date\.now|performance\.now|setTimeout|setInterval|crypto\.getRandomValues|crypto\.randomUUID|localeCompare)\s*\(/u;
 const duplicateObservationContractAuthority = /\b(?:export\s+)?const\s+(?:ObservationProjectionDefinitionSchema|ObservationProjectionSchema|RhythmObservationDefinitionSchema|RhythmObservationMappingsSchema|RhythmObservationSchema)\s*=/u;
+const duplicateRuleContractAuthority = /\b(?:export\s+)?const\s+(?:TransitionRuleSchema|RuleEffectSchema|RuleConditionSchema|SchedulerStateSchema|ScheduledItemSchema|ClinicalEventProposalSchema|TransitionTraceSchema)\s*=/u;
 const clinicalEngineViolations = [];
 
 for (const fileUrl of clinicalEngineSourceFiles) {
@@ -70,6 +71,9 @@ for (const fileUrl of clinicalEngineSourceFiles) {
   }
   if (duplicateObservationContractAuthority.test(source)) {
     clinicalEngineViolations.push(`Duplicate shared observation schema authority: ${fileUrl.pathname}`);
+  }
+  if (duplicateRuleContractAuthority.test(source)) {
+    clinicalEngineViolations.push(`Duplicate shared rule/effect schema authority: ${fileUrl.pathname}`);
   }
 }
 
@@ -90,6 +94,23 @@ for (const fileUrl of caseSchemaSourceFiles) {
   if (caseSchemaClinicalEngineDependency.test(source)) {
     throw new Error(`Case Schema must consume shared observation contracts, not Clinical Engine: ${fileUrl.pathname}`);
   }
+  if (duplicateRuleContractAuthority.test(source)) {
+    throw new Error(`Case Schema must embed shared rule/effect contracts, not redefine them: ${fileUrl.pathname}`);
+  }
+}
+
+const sharedContractSourceFiles = await collectTypeScriptFiles(
+  new URL("../packages/contracts/src/", import.meta.url)
+);
+let sharedRuleAuthorityCount = 0;
+for (const fileUrl of sharedContractSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+  if (/\bexport\s+const\s+TransitionRuleSchema\s*=/u.test(source)) {
+    sharedRuleAuthorityCount += 1;
+  }
+}
+if (sharedRuleAuthorityCount !== 1) {
+  throw new Error(`Expected exactly one shared TransitionRuleSchema authority; found ${sharedRuleAuthorityCount}.`);
 }
 
 const canonicalInstitutionTargets = [
@@ -119,3 +140,4 @@ console.log("INSTITUTION_UJ_GUARD=PASS count=0");
 console.log("CLINICAL_ENGINE_DISEASE_NEUTRALITY_GUARD=PASS");
 console.log("CLINICAL_ENGINE_DETERMINISM_GUARD=PASS");
 console.log("OBSERVATION_CONTRACT_AUTHORITY_GUARD=PASS");
+console.log("RULE_EFFECT_CONTRACT_AUTHORITY_GUARD=PASS count=1");

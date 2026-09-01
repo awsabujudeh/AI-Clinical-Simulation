@@ -115,7 +115,7 @@ describe("deterministic Case Package compilation", () => {
     for (const review of changed.validation.reviews) {
       review.reviewed_content_hash = updatedReviewHash;
     }
-    changed.validation.deferred_checks[0]!.validated_review_subject_hash = updatedReviewHash;
+    await bindSyntheticReviewAndReachabilityEvidence(changed);
     const changedCandidate = await preparePublicationCandidate(changed, TEST_HASH_ADAPTER);
 
     expect(changedCandidate.success).toBe(true);

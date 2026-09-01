@@ -17,7 +17,7 @@ import {
   ReviewRecordSchema,
   ValidationEvidenceSchema,
   computeReviewSubjectHash,
-  hashCanonicalJson,
+  generateRuleReachabilityEvidence,
   preparePublicationCandidate,
   type DraftCasePackage,
   type PublicationApprovalRecord
@@ -163,6 +163,11 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
           heart_rate_bpm: 70,
           systolic_bp_mm_hg: 110,
           diastolic_bp_mm_hg: 70
+        },
+        "hemodynamics.alternate": {
+          heart_rate_bpm: 76,
+          systolic_bp_mm_hg: 112,
+          diastolic_bp_mm_hg: 72
         }
       },
       respiratory_mappings: {
@@ -221,27 +226,46 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
   },
   rules: {
     module_schema_version: "2.0",
+    rule_schema_version: "1.0",
     rules: [
       {
+        rule_schema_version: "1.0",
         rule_id: "rule.synthetic.observation",
+        rule_version: "1.0.0",
         trigger: {
+          trigger_type: "COMMITTED_EVENT",
           event_type: "EXAM_PERFORMED",
           action_id: "examination.synthetic-check"
         },
+        preconditions: [],
+        exclusions: [],
+        priority: 10,
+        conflict_policy: "REPLACE",
+        effects: [
+          {
+            effect_type: "SET_STATE",
+            effect_id: "effect.synthetic.observation-marker",
+            target: "hemodynamic_state",
+            value: "hemodynamics.alternate"
+          }
+        ],
+        emitted_events: [],
         referenced_action_ids: ["examination.synthetic-check"],
         referenced_rule_ids: [],
         referenced_fact_ids: ["fact.synthetic.concern"],
         source_ids: ["source.synthetic.001"],
         timing_window_ids: ["window.synthetic.response"],
-        effect_descriptors: [{ effect_code: "effect.synthetic-marker" }]
+        scoring_evidence_refs: []
       }
     ]
   },
   timeline_policy: {
     module_schema_version: "2.0",
+    scheduler_schema_version: "1.0",
     time_ratio: 1,
     pause_policy: "PAUSE_CLINICAL_TIME",
     deterministic_seed_policy: "REQUIRED",
+    max_derived_evaluations: 16,
     timing_windows: [
       {
         timing_window_id: "window.synthetic.response",
@@ -251,7 +275,8 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
         reference_action_id: "examination.synthetic-check"
       }
     ],
-    initial_scheduled_event_types: []
+    initial_scheduled_event_types: [],
+    initial_scheduled_items: []
   },
   assessment_rubric: {
     module_schema_version: "2.0",
@@ -403,14 +428,12 @@ export async function bindSyntheticReviewAndReachabilityEvidence(
   );
 
   if (reachabilityEvidence !== undefined) {
-    reachabilityEvidence.validated_case_version_id = casePackage.manifest.case_version_id;
-    reachabilityEvidence.validated_case_version = casePackage.manifest.case_version;
-    reachabilityEvidence.validated_review_subject_hash = HashDigestSchema.parse(reviewSubjectHash);
-    reachabilityEvidence.evidence_hash = await hashCanonicalJson({
-      fixture: "synthetic-rule-reachability-evidence",
-      case_version_id: casePackage.manifest.case_version_id,
-      review_subject_hash: reviewSubjectHash
-    }, hashAdapter);
+    const generated = await generateRuleReachabilityEvidence(
+      casePackage,
+      reachabilityEvidence.completed_at_utc,
+      hashAdapter
+    );
+    Object.assign(reachabilityEvidence, generated.evidence);
   }
 
   return reviewSubjectHash;

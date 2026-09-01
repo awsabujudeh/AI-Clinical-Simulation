@@ -1,9 +1,19 @@
 import { z } from "zod";
 
-import type { HashAdapter } from "../../contracts/src/index.ts";
+import type {
+  HashAdapter,
+  ImmediateStateEffect
+} from "../../contracts/src/index.ts";
 
 import { buildPublicationCandidateArtifact } from "./candidate.ts";
 import { computeReviewSubjectHash } from "./hashing.ts";
+import {
+  RULE_REACHABILITY_ANALYZER_ID,
+  RULE_REACHABILITY_ANALYZER_VERSION,
+  analyzeRuleReachability,
+  computeRuleReachabilityEvidenceHash,
+  type RuleReachabilityAnalysis
+} from "./reachability.ts";
 import {
   CaseValidationIssueSchema,
   createValidationReport,
@@ -159,6 +169,316 @@ function addMissingObservationMappingIssue(
   }
 }
 
+type CaseRule = DraftCasePackage["rules"]["rules"][number];
+
+function ruleActionReferences(rule: CaseRule): string[] {
+  const references = [...rule.referenced_action_ids];
+
+  if (rule.trigger.trigger_type === "COMMITTED_EVENT" && rule.trigger.action_id !== undefined) {
+    references.push(rule.trigger.action_id);
+  }
+
+  const triggerConditions = rule.trigger.trigger_type === "STATE_CONDITION"
+    ? rule.trigger.conditions
+    : [];
+  for (const condition of [...triggerConditions, ...rule.preconditions, ...rule.exclusions]) {
+    if (
+      condition.condition_type === "TRIGGER_ACTION_ID"
+      || condition.condition_type === "PRIOR_EVENT_OCCURRED"
+    ) {
+      if (condition.action_id !== undefined) {
+        references.push(condition.action_id);
+      }
+    }
+  }
+
+  for (const event of rule.emitted_events) {
+    if (event.action_id !== undefined) {
+      references.push(event.action_id);
+    }
+  }
+
+  for (const effect of rule.effects) {
+    if (effect.effect_type === "SCHEDULE_RELATIVE" || effect.effect_type === "SCHEDULE_ABSOLUTE") {
+      for (const event of effect.emitted_events) {
+        if (event.action_id !== undefined) {
+          references.push(event.action_id);
+        }
+      }
+    }
+  }
+
+  return references;
+}
+
+function ruleFactReferences(rule: CaseRule): string[] {
+  const triggerConditions = rule.trigger.trigger_type === "STATE_CONDITION"
+    ? rule.trigger.conditions
+    : [];
+  return [
+    ...rule.referenced_fact_ids,
+    ...[...triggerConditions, ...rule.preconditions, ...rule.exclusions]
+      .filter((condition) => condition.condition_type === "CASE_FACT_PRESENT")
+      .map((condition) => condition.fact_id)
+  ];
+}
+
+function ruleEffectIds(rule: CaseRule): string[] {
+  return rule.effects.flatMap((effect) => {
+    if (effect.effect_type === "SCHEDULE_RELATIVE" || effect.effect_type === "SCHEDULE_ABSOLUTE") {
+      return [effect.effect_id, ...effect.effects.map((scheduledEffect) => scheduledEffect.effect_id)];
+    }
+
+    return [effect.effect_id];
+  });
+}
+
+function scheduledItemDeclarations(casePackage: DraftCasePackage) {
+  const fromRules = casePackage.rules.rules.flatMap((rule) =>
+    rule.effects.flatMap((effect) =>
+      effect.effect_type === "SCHEDULE_RELATIVE" || effect.effect_type === "SCHEDULE_ABSOLUTE"
+        ? [{
+            scheduled_item_id: effect.scheduled_item_id,
+            category: effect.category,
+            originating_rule_id: rule.rule_id
+          }]
+        : []
+    )
+  );
+
+  return [
+    ...casePackage.timeline_policy.initial_scheduled_items.map((item) => ({
+      scheduled_item_id: item.scheduled_item_id,
+      category: item.category,
+      originating_rule_id: item.originating_rule_id
+    })),
+    ...fromRules
+  ];
+}
+
+function immediateEffectChannel(effect: ImmediateStateEffect): string {
+  switch (effect.effect_type) {
+    case "SET_STATE":
+      return effect.target;
+    case "SET_PAIN_STATE":
+      return "pain_state";
+    case "ADD_INTERVENTION":
+    case "REMOVE_INTERVENTION":
+      return `active_interventions.${effect.intervention_id}`;
+    case "ADD_COMPLICATION":
+    case "REMOVE_COMPLICATION":
+      return `active_complications.${effect.complication_id}`;
+    case "ADD_OUTCOME_FLAG":
+    case "REMOVE_OUTCOME_FLAG":
+      return `outcome_flags.${effect.outcome_flag}`;
+  }
+}
+
+function ruleConditionsAreProvablyExclusive(left: CaseRule, right: CaseRule): boolean {
+  for (const leftCondition of left.preconditions) {
+    for (const rightCondition of right.preconditions) {
+      if (
+        leftCondition.condition_type === "STATE_EQUALS"
+        && rightCondition.condition_type === "STATE_EQUALS"
+        && leftCondition.target === rightCondition.target
+        && leftCondition.value !== rightCondition.value
+      ) {
+        return true;
+      }
+      if (
+        leftCondition.condition_type === "STATE_EQUALS"
+        && rightCondition.condition_type === "STATE_NOT_EQUALS"
+        && leftCondition.target === rightCondition.target
+        && leftCondition.value === rightCondition.value
+      ) {
+        return true;
+      }
+      if (
+        leftCondition.condition_type === "STATE_NOT_EQUALS"
+        && rightCondition.condition_type === "STATE_EQUALS"
+        && leftCondition.target === rightCondition.target
+        && leftCondition.value === rightCondition.value
+      ) {
+        return true;
+      }
+
+      const inverseCollectionCondition = (
+        leftType: string,
+        rightType: string,
+        leftId: string,
+        rightId: string
+      ) => leftCondition.condition_type === leftType
+        && rightCondition.condition_type === rightType
+        && leftId === rightId;
+
+      if (
+        (
+          "intervention_id" in leftCondition
+          && "intervention_id" in rightCondition
+          && (
+            inverseCollectionCondition(
+              "INTERVENTION_PRESENT",
+              "INTERVENTION_ABSENT",
+              leftCondition.intervention_id,
+              rightCondition.intervention_id
+            )
+            || inverseCollectionCondition(
+              "INTERVENTION_ABSENT",
+              "INTERVENTION_PRESENT",
+              leftCondition.intervention_id,
+              rightCondition.intervention_id
+            )
+          )
+        )
+        || (
+          "complication_id" in leftCondition
+          && "complication_id" in rightCondition
+          && (
+            inverseCollectionCondition(
+              "COMPLICATION_PRESENT",
+              "COMPLICATION_ABSENT",
+              leftCondition.complication_id,
+              rightCondition.complication_id
+            )
+            || inverseCollectionCondition(
+              "COMPLICATION_ABSENT",
+              "COMPLICATION_PRESENT",
+              leftCondition.complication_id,
+              rightCondition.complication_id
+            )
+          )
+        )
+        || (
+          "outcome_flag" in leftCondition
+          && "outcome_flag" in rightCondition
+          && (
+            inverseCollectionCondition(
+              "OUTCOME_FLAG_PRESENT",
+              "OUTCOME_FLAG_ABSENT",
+              leftCondition.outcome_flag,
+              rightCondition.outcome_flag
+            )
+            || inverseCollectionCondition(
+              "OUTCOME_FLAG_ABSENT",
+              "OUTCOME_FLAG_PRESENT",
+              leftCondition.outcome_flag,
+              rightCondition.outcome_flag
+            )
+          )
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function addStaticConflictIssues(
+  casePackage: DraftCasePackage,
+  issues: CaseValidationIssue[]
+): void {
+  const writes: Array<{
+    group: string;
+    channel: string;
+    value: string;
+    ruleId: string;
+    effectId: string;
+    conflictPolicy: CaseRule["conflict_policy"];
+    priority: number;
+    rule: CaseRule;
+  }> = [];
+
+  for (const rule of casePackage.rules.rules) {
+    const triggerKey = JSON.stringify(rule.trigger);
+
+    for (const effect of rule.effects) {
+      const immediateEffects = effect.effect_type === "SCHEDULE_RELATIVE"
+        || effect.effect_type === "SCHEDULE_ABSOLUTE"
+        ? effect.effects.map((scheduledEffect) => ({
+            effect: scheduledEffect,
+            group: `scheduled:${rule.rule_id}:${effect.effect_id}`,
+            conflictPolicy: effect.conflict_policy
+          }))
+        : effect.effect_type === "CANCEL_SCHEDULED"
+          ? []
+          : [{
+              effect,
+              group: `immediate:${triggerKey}`,
+              conflictPolicy: rule.conflict_policy
+            }];
+
+      for (const entry of immediateEffects) {
+        const { effect_id: _effectId, ...semanticEffect } = entry.effect;
+        writes.push({
+          group: entry.group,
+          channel: immediateEffectChannel(entry.effect),
+          value: JSON.stringify(semanticEffect),
+          ruleId: rule.rule_id,
+          effectId: entry.effect.effect_id,
+          conflictPolicy: entry.conflictPolicy,
+          priority: entry.group.startsWith("scheduled:")
+            ? effect.effect_type === "SCHEDULE_RELATIVE" || effect.effect_type === "SCHEDULE_ABSOLUTE"
+              ? effect.priority
+              : rule.priority
+            : rule.priority,
+          rule
+        });
+      }
+    }
+  }
+
+  const grouped = new Map<string, typeof writes>();
+  for (const write of writes) {
+    const key = `${write.group}\u0000${write.channel}`;
+    const group = grouped.get(key) ?? [];
+    group.push(write);
+    grouped.set(key, group);
+  }
+
+  for (const [key, group] of grouped) {
+    const conflictingPairs = group.flatMap((left, leftIndex) =>
+      group.slice(leftIndex + 1).some((right) =>
+        left.value !== right.value
+        && !ruleConditionsAreProvablyExclusive(left.rule, right.rule)
+      )
+        ? group.slice(leftIndex + 1).filter((right) =>
+            left.value !== right.value
+            && !ruleConditionsAreProvablyExclusive(left.rule, right.rule)
+          ).map((right) => [left, right] as const)
+        : []
+    );
+    if (conflictingPairs.length === 0) {
+      continue;
+    }
+
+    const mixedPolicy = conflictingPairs.some(
+      ([left, right]) => left.conflictPolicy !== right.conflictPolicy
+    );
+    const ambiguousSamePriority = conflictingPairs.some(
+      ([left, right]) => left.conflictPolicy === right.conflictPolicy
+        && left.priority === right.priority
+    );
+    if (!mixedPolicy && !ambiguousSamePriority) {
+      continue;
+    }
+
+    issues.push(issue({
+      code: mixedPolicy
+        ? "MIXED_CONFLICT_POLICIES"
+        : "AMBIGUOUS_EQUAL_PRIORITY_STATE_CONFLICT",
+      severity: "ERROR",
+      module: "rules",
+      path: "$.rules.rules.effects",
+      relatedIds: group.flatMap((write) => [write.ruleId, write.effectId]),
+      message: mixedPolicy
+        ? `Statically co-firing contradictory writes use mixed conflict policies for ${key.split("\u0000")[1]}.`
+        : `Statically obvious equal-priority contradictory writes target ${key.split("\u0000")[1]}.`
+    }));
+  }
+}
+
 function validateReviewGate(
   casePackage: DraftCasePackage,
   issues: CaseValidationIssue[],
@@ -248,11 +568,53 @@ function validateReviewGate(
 function validateParsedCase(
   casePackage: DraftCasePackage,
   mode: ValidationMode,
-  expectedReviewHash?: HashDigest
+  expectedReviewHash?: HashDigest,
+  reachabilityAnalysis?: RuleReachabilityAnalysis,
+  expectedReachabilityEvidenceHash?: HashDigest
 ): CaseValidationIssue[] {
   const issues: CaseValidationIssue[] = [];
   const publicationSeverity = gateSeverity(mode);
   const manifest = casePackage.manifest;
+
+  if (reachabilityAnalysis !== undefined) {
+    for (const unreachableRule of reachabilityAnalysis.unreachable_rules) {
+      issues.push(issue({
+        code: "RULE_UNREACHABLE",
+        severity: publicationSeverity,
+        module: "rules",
+        path: "$.rules.rules",
+        relatedIds: [unreachableRule.rule_id, ...unreachableRule.reason_codes],
+        message: "Static analysis could not prove this declarative rule reachable."
+      }));
+    }
+
+    for (const coverageIssue of reachabilityAnalysis.projection_coverage_issues) {
+      issues.push(issue({
+        code: "REACHABLE_OBSERVATION_MAPPING_MISSING",
+        severity: publicationSeverity,
+        module: "initial_state",
+        path: coverageIssue.mapping_path,
+        relatedIds: [coverageIssue.state_target, coverageIssue.state_value],
+        message: "A reachable observation-driving Patient State value has no pinned projection mapping."
+      }));
+    }
+
+    for (const livenessFinding of reachabilityAnalysis.scheduler_liveness_findings) {
+      issues.push(issue({
+        code: "SCHEDULER_LIVENESS_UNSAFE",
+        severity: publicationSeverity,
+        module: "rules",
+        path: livenessFinding.path,
+        relatedIds: [
+          livenessFinding.rule_id,
+          livenessFinding.effect_id,
+          livenessFinding.scheduled_item_id,
+          livenessFinding.code
+        ],
+        message: "Static analysis found runtime scheduling that cannot prove strict Clinical-Time progress."
+      }));
+    }
+  }
 
   addDuplicateIssues(
     issues,
@@ -600,15 +962,104 @@ function validateParsedCase(
   }
 
   for (const rule of casePackage.rules.rules) {
-    const ruleActionReferences = [
-      ...(rule.trigger.action_id === undefined ? [] : [rule.trigger.action_id]),
-      ...rule.referenced_action_ids
-    ];
-    addDanglingIssues(issues, ruleActionReferences, actions, "DANGLING_ACTION_REFERENCE", "rules", "$.rules.rules", "Action ID");
+    addDanglingIssues(issues, ruleActionReferences(rule), actions, "DANGLING_ACTION_REFERENCE", "rules", "$.rules.rules", "Action ID");
     addDanglingIssues(issues, rule.referenced_rule_ids, rules, "DANGLING_RULE_REFERENCE", "rules", "$.rules.rules", "Rule ID");
-    addDanglingIssues(issues, rule.referenced_fact_ids, facts, "DANGLING_FACT_REFERENCE", "rules", "$.rules.rules", "Fact ID");
+    addDanglingIssues(issues, ruleFactReferences(rule), facts, "DANGLING_FACT_REFERENCE", "rules", "$.rules.rules", "Fact ID");
     addDanglingIssues(issues, rule.source_ids, sources, "DANGLING_SOURCE_REFERENCE", "rules", "$.rules.rules", "Source ID");
     addDanglingIssues(issues, rule.timing_window_ids, timingWindows, "DANGLING_TIMING_WINDOW_REFERENCE", "rules", "$.rules.rules", "timing-window ID");
+
+    addDuplicateIssues(
+      issues,
+      ruleEffectIds(rule),
+      "DUPLICATE_RULE_EFFECT_ID",
+      "rules",
+      "$.rules.rules.effects",
+      "Rule Effect ID"
+    );
+  }
+
+  addStaticConflictIssues(casePackage, issues);
+
+  const scheduledDeclarations = scheduledItemDeclarations(casePackage);
+  const declaredScheduledItemIds = new Set(
+    scheduledDeclarations.map((declaration) => declaration.scheduled_item_id)
+  );
+  const declaredScheduledCategories = new Set(
+    scheduledDeclarations.map((declaration) => declaration.category)
+  );
+
+  for (const declaration of scheduledDeclarations) {
+    addDanglingIssues(
+      issues,
+      [declaration.originating_rule_id],
+      rules,
+      "DANGLING_RULE_REFERENCE",
+      "timeline_policy",
+      "$.timeline_policy.initial_scheduled_items",
+      "originating Rule ID"
+    );
+  }
+
+  for (const item of casePackage.timeline_policy.initial_scheduled_items) {
+    addDanglingIssues(
+      issues,
+      item.emitted_events.flatMap((event) =>
+        event.action_id === undefined ? [] : [event.action_id]
+      ),
+      actions,
+      "DANGLING_ACTION_REFERENCE",
+      "timeline_policy",
+      "$.timeline_policy.initial_scheduled_items.emitted_events",
+      "Action ID"
+    );
+  }
+
+  for (const rule of casePackage.rules.rules) {
+    if (rule.trigger.trigger_type === "SCHEDULED_ITEM") {
+      const triggerDeclared = (
+        rule.trigger.scheduled_item_id === undefined
+        || declaredScheduledItemIds.has(rule.trigger.scheduled_item_id)
+      ) && (
+        rule.trigger.category === undefined
+        || declaredScheduledCategories.has(rule.trigger.category)
+      );
+      if (!triggerDeclared) {
+        issues.push(issue({
+          code: "DANGLING_SCHEDULE_TRIGGER_REFERENCE",
+          severity: "ERROR",
+          module: "rules",
+          path: "$.rules.rules.trigger",
+          relatedIds: [rule.rule_id],
+          message: "Scheduled-item trigger references no declared scheduled item or category."
+        }));
+      }
+    }
+
+    for (const effect of rule.effects) {
+      if (effect.effect_type !== "CANCEL_SCHEDULED") {
+        continue;
+      }
+
+      const selector = effect.selector;
+      const declared = selector.selector_type === "SCHEDULED_ITEM_ID"
+        ? declaredScheduledItemIds.has(selector.scheduled_item_id)
+        : declaredScheduledCategories.has(selector.category);
+
+      if (!declared) {
+        issues.push(issue({
+          code: "DANGLING_SCHEDULE_CANCELLATION_REFERENCE",
+          severity: "ERROR",
+          module: "rules",
+          path: "$.rules.rules.effects.selector",
+          relatedIds: [
+            selector.selector_type === "SCHEDULED_ITEM_ID"
+              ? selector.scheduled_item_id
+              : selector.category
+          ],
+          message: "Schedule cancellation references no declared scheduled item or category."
+        }));
+      }
+    }
   }
 
   for (const timingWindow of casePackage.timeline_policy.timing_windows) {
@@ -825,6 +1276,20 @@ function validateParsedCase(
         message: "Mandatory Rule Reachability validation failed."
       }));
     } else {
+      if (
+        reachabilityEvidence.validator_id !== RULE_REACHABILITY_ANALYZER_ID
+        || reachabilityEvidence.validator_version !== RULE_REACHABILITY_ANALYZER_VERSION
+      ) {
+        issues.push(issue({
+          code: "RULE_REACHABILITY_EVIDENCE_STALE",
+          severity: publicationSeverity,
+          module: "validation",
+          path: "$.validation.deferred_checks",
+          relatedIds: [RULE_REACHABILITY_VALIDATION_CODE],
+          message: "Rule Reachability evidence was not produced by the currently supported analyzer."
+        }));
+      }
+
       const evidenceComplete = reachabilityEvidence.validator_id !== undefined
         && reachabilityEvidence.validator_version !== undefined
         && reachabilityEvidence.evidence_hash !== undefined
@@ -849,6 +1314,10 @@ function validateParsedCase(
           expectedReviewHash !== undefined
           && reachabilityEvidence.validated_review_subject_hash !== expectedReviewHash
         )
+        || (
+          expectedReachabilityEvidenceHash !== undefined
+          && reachabilityEvidence.evidence_hash !== expectedReachabilityEvidenceHash
+        )
       ) {
         issues.push(issue({
           code: "RULE_REACHABILITY_EVIDENCE_STALE",
@@ -857,6 +1326,17 @@ function validateParsedCase(
           path: "$.validation.deferred_checks",
           relatedIds: [RULE_REACHABILITY_VALIDATION_CODE],
           message: "Rule Reachability evidence is not bound to the current Case Version and review-subject hash."
+        }));
+      }
+
+      if (reachabilityAnalysis !== undefined && reachabilityAnalysis.result !== "PASSED") {
+        issues.push(issue({
+          code: "RULE_REACHABILITY_FAILED",
+          severity: publicationSeverity,
+          module: "validation",
+          path: "$.validation.deferred_checks",
+          relatedIds: [RULE_REACHABILITY_VALIDATION_CODE],
+          message: "Current deterministic Rule Reachability analysis fails publication safety."
         }));
       }
     }
@@ -948,7 +1428,43 @@ export function validateDraftCase(input: unknown): CaseValidationReport {
     return createValidationReport("DRAFT", schemaIssues(parsed.error));
   }
 
-  return createValidationReport("DRAFT", validateParsedCase(parsed.data, "DRAFT"));
+  return createValidationReport(
+    "DRAFT",
+    validateParsedCase(
+      parsed.data,
+      "DRAFT",
+      undefined,
+      analyzeRuleReachability(parsed.data)
+    )
+  );
+}
+
+async function reachabilityValidationContext(
+  casePackage: DraftCasePackage,
+  reviewSubjectHash: HashDigest,
+  hashAdapter: HashAdapter
+): Promise<{
+  analysis: RuleReachabilityAnalysis;
+  expectedEvidenceHash?: HashDigest;
+}> {
+  const analysis = analyzeRuleReachability(casePackage);
+  const evidence = casePackage.validation.deferred_checks.find(
+    (check) => check.validation_code === RULE_REACHABILITY_VALIDATION_CODE
+  );
+
+  if (evidence?.completed_at_utc === undefined) {
+    return { analysis };
+  }
+
+  return {
+    analysis,
+    expectedEvidenceHash: await computeRuleReachabilityEvidenceHash(
+      casePackage,
+      reviewSubjectHash,
+      evidence.completed_at_utc,
+      hashAdapter
+    )
+  };
 }
 
 export async function validateForPublicationCandidate(
@@ -963,9 +1479,20 @@ export async function validateForPublicationCandidate(
 
   try {
     const reviewSubjectHash = await computeReviewSubjectHash(parsed.data, hashAdapter);
+    const reachability = await reachabilityValidationContext(
+      parsed.data,
+      reviewSubjectHash,
+      hashAdapter
+    );
     return createValidationReport(
       "CANDIDATE",
-      validateParsedCase(parsed.data, "CANDIDATE", reviewSubjectHash)
+      validateParsedCase(
+        parsed.data,
+        "CANDIDATE",
+        reviewSubjectHash,
+        reachability.analysis,
+        reachability.expectedEvidenceHash
+      )
     );
   } catch {
     return createValidationReport("CANDIDATE", [issue({
@@ -1087,13 +1614,28 @@ export async function validateForPublication(
 
   try {
     const reviewSubjectHash = await computeReviewSubjectHash(parsed.data, hashAdapter);
-    const issues = validateParsedCase(parsed.data, "PUBLICATION", reviewSubjectHash);
+    const reachability = await reachabilityValidationContext(
+      parsed.data,
+      reviewSubjectHash,
+      hashAdapter
+    );
+    const issues = validateParsedCase(
+      parsed.data,
+      "PUBLICATION",
+      reviewSubjectHash,
+      reachability.analysis,
+      reachability.expectedEvidenceHash
+    );
 
-    if (issues.some((validationIssue) => validationIssue.severity === "ERROR")) {
-      return createValidationReport("PUBLICATION", issues);
+    let candidate: PublicationCandidate;
+    try {
+      candidate = await buildPublicationCandidateArtifact(parsed.data, hashAdapter);
+    } catch {
+      if (issues.some((validationIssue) => validationIssue.severity === "ERROR")) {
+        return createValidationReport("PUBLICATION", issues);
+      }
+      throw new Error("Publication candidate hashing failed.");
     }
-
-    const candidate = await buildPublicationCandidateArtifact(parsed.data, hashAdapter);
 
     if (approvalInput === undefined || approvalInput === null) {
       issues.push(issue({

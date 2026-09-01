@@ -30,6 +30,7 @@
     "test:clinical-engine:browser": "vitest run --config vitest.config.mjs tests/browser/clinical-engine",
     "test:clinical-engine:deno": "deno test tests/deno/clinical_engine_test.ts",
     "test:clinical-engine": "npm run test:clinical-engine:browser && npm run test:clinical-engine:deno && npm run test:portability-guard",
+    "test:v2-005": "vitest run --config vitest.config.mjs tests/browser/contracts.rules.browser.test.ts tests/browser/case-schema.reachability.browser.test.ts tests/browser/clinical-engine && deno test tests/deno/clinical_engine_test.ts && npm run test:portability-guard",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
     "verify": "npm run typecheck && npm run test:portability-guard && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"

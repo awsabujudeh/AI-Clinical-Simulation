@@ -71,6 +71,18 @@ export type ActionProposalId = z.infer<typeof ActionProposalIdSchema>;
 export const RuleIdSchema = prefixedIdentifier("rule").brand<"RuleId">();
 export type RuleId = z.infer<typeof RuleIdSchema>;
 
+export const RuleEffectIdSchema = prefixedIdentifier("effect").brand<"RuleEffectId">();
+export type RuleEffectId = z.infer<typeof RuleEffectIdSchema>;
+
+export const ScheduledItemIdSchema = prefixedIdentifier("scheduled-item").brand<"ScheduledItemId">();
+export type ScheduledItemId = z.infer<typeof ScheduledItemIdSchema>;
+
+export const FactIdSchema = prefixedIdentifier("fact").brand<"FactId">();
+export type FactId = z.infer<typeof FactIdSchema>;
+
+export const TimingWindowIdSchema = prefixedIdentifier("window").brand<"TimingWindowId">();
+export type TimingWindowId = z.infer<typeof TimingWindowIdSchema>;
+
 export const RubricIdSchema = prefixedIdentifier("rubric").brand<"RubricId">();
 export type RubricId = z.infer<typeof RubricIdSchema>;
 
@@ -161,3 +173,9 @@ export const SemanticVersionSchema = z
   )
   .brand<"SemanticVersion">();
 export type SemanticVersion = z.infer<typeof SemanticVersionSchema>;
+
+export const Sha256DigestSchema = z
+  .string()
+  .regex(/^[a-f0-9]{64}$/u, "Expected a lowercase SHA-256 hex digest")
+  .brand<"Sha256Digest">();
+export type Sha256Digest = z.infer<typeof Sha256DigestSchema>;

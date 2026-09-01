@@ -9,3 +9,4 @@ export * from "./lifecycle.ts";
 export * from "./locales.ts";
 export * from "./observations.ts";
 export * from "./patient-state.ts";
+export * from "./rules.ts";

@@ -12,6 +12,7 @@ import {
   CaseVersionIdSchema,
   CurriculumObjectiveIdSchema,
   EventTypeSchema,
+  FactIdSchema,
   InstitutionIdSchema,
   InstitutionMetadataSchema,
   JsonValueSchema,
@@ -21,12 +22,18 @@ import {
   PatientLanguageSchema,
   PatientStateSchema,
   RealUtcTimeSchema,
+  RULE_SCHEMA_VERSION,
   RuleIdSchema,
   RubricIdSchema,
   SchemaVersionSchema,
   SemanticVersionSchema,
+  Sha256DigestSchema,
   SourceIdSchema,
   SourceVersionIdSchema,
+  SCHEDULER_SCHEMA_VERSION,
+  ScheduledItemSchema,
+  TimingWindowIdSchema,
+  TransitionRuleSchema,
   VisualManifestIdSchema
 } from "../../contracts/src/index.ts";
 
@@ -71,14 +78,8 @@ function caseScopedIdentifier(prefix: string) {
     );
 }
 
-export const FactIdSchema = caseScopedIdentifier("fact").brand<"FactId">();
-export type FactId = z.infer<typeof FactIdSchema>;
-
 export const DialoguePolicyIdSchema = caseScopedIdentifier("dialogue").brand<"DialoguePolicyId">();
 export type DialoguePolicyId = z.infer<typeof DialoguePolicyIdSchema>;
-
-export const TimingWindowIdSchema = caseScopedIdentifier("window").brand<"TimingWindowId">();
-export type TimingWindowId = z.infer<typeof TimingWindowIdSchema>;
 
 export const VisualRecipeIdSchema = caseScopedIdentifier("recipe").brand<"VisualRecipeId">();
 export type VisualRecipeId = z.infer<typeof VisualRecipeIdSchema>;
@@ -107,10 +108,7 @@ export type ApproverReferenceId = z.infer<typeof ApproverReferenceIdSchema>;
 export const PatientProfileIdSchema = caseScopedIdentifier("patient").brand<"PatientProfileId">();
 export type PatientProfileId = z.infer<typeof PatientProfileIdSchema>;
 
-export const HashDigestSchema = z
-  .string()
-  .regex(/^[a-f0-9]{64}$/u, "Expected a lowercase SHA-256 hex digest")
-  .brand<"HashDigest">();
+export const HashDigestSchema = Sha256DigestSchema;
 export type HashDigest = z.infer<typeof HashDigestSchema>;
 
 const ExtensionKeySchema = z
@@ -292,27 +290,12 @@ export const ActionCatalogueModuleSchema = z.strictObject({
 });
 export type ActionCatalogueModule = z.infer<typeof ActionCatalogueModuleSchema>;
 
-export const DeclarativeEffectDescriptorSchema = z.strictObject({
-  effect_code: CaseControlledValueSchema,
-  target_code: CaseControlledValueSchema.optional()
-});
-
-export const CaseRuleSchema = z.strictObject({
-  rule_id: RuleIdSchema,
-  trigger: z.strictObject({
-    event_type: EventTypeSchema,
-    action_id: ActionIdSchema.optional()
-  }),
-  referenced_action_ids: z.array(ActionIdSchema).max(32),
-  referenced_rule_ids: z.array(RuleIdSchema).max(32),
-  referenced_fact_ids: z.array(FactIdSchema).max(32),
-  source_ids: z.array(SourceIdSchema).min(1).max(32),
-  timing_window_ids: z.array(TimingWindowIdSchema).max(16),
-  effect_descriptors: z.array(DeclarativeEffectDescriptorSchema).max(32)
-});
+export const CaseRuleSchema = TransitionRuleSchema;
+export type CaseRule = z.infer<typeof CaseRuleSchema>;
 
 export const RulesModuleSchema = z.strictObject({
   ...moduleBaseShape,
+  rule_schema_version: z.literal(RULE_SCHEMA_VERSION),
   rules: z.array(CaseRuleSchema).max(512)
 });
 export type RulesModule = z.infer<typeof RulesModuleSchema>;
@@ -327,11 +310,14 @@ export const TimingWindowSchema = z.strictObject({
 
 export const TimelinePolicyModuleSchema = z.strictObject({
   ...moduleBaseShape,
+  scheduler_schema_version: z.literal(SCHEDULER_SCHEMA_VERSION),
   time_ratio: z.number().finite().positive().max(100),
   pause_policy: z.enum(["PAUSE_CLINICAL_TIME", "CASE_DEFINED"]),
   deterministic_seed_policy: z.enum(["REQUIRED", "FIXED"]),
+  max_derived_evaluations: z.number().int().min(1).max(32),
   timing_windows: z.array(TimingWindowSchema).max(128),
-  initial_scheduled_event_types: z.array(EventTypeSchema).max(64)
+  initial_scheduled_event_types: z.array(EventTypeSchema).max(64),
+  initial_scheduled_items: z.array(ScheduledItemSchema).max(128)
 });
 export type TimelinePolicyModule = z.infer<typeof TimelinePolicyModuleSchema>;
 
