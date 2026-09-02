@@ -32,6 +32,10 @@ V2-007B preserves that internal scoring truth and adds explicit `LIVE` versus `F
 
 Learner disclosure is a separate pure projection. Active `ASSESSMENT` receives only neutral withheld status; active `PRACTICE_DEMO` receives structured findings only for behavior that is already resolved, never future rubric criteria or answer keys. Final debrief exposes the complete deterministic result and authoritative evidence package without generated prose, AI conclusions, RAG citations, or score mutation. Later Session/API code must supply trusted disclosure/finalization authority; no client `show_answers` flag exists. Run `npm run test:v2-007` for the complete V2-007 regression set.
 
+The pre-V2-009 Diagnostic Investigation Contract Gate adds no real medical Case content. Shared contracts define bounded `STRUCTURED_LAB`, `ECG`, `IMAGING`, `ULTRASOUND`, and `TEXT_REPORT` results. The existing `action_catalogue` owns investigation identity/result/timing/visibility, `clinical_facts` owns language-neutral findings, and `visual_manifest` owns versioned diagnostic assets with provenance, rights, Clinical Review, and hash metadata. No seventeenth module or runtime sidecar is introduced.
+
+Diagnostic truth remains independent from media. Media-bearing results require a Case-owned fact fallback; unavailable media never invokes AI or changes clinical truth. Independent `ASYNC_PARALLEL` Clinical-Time milestones remain independent and map onto the existing generic scheduler vocabulary, while unsupported blocking/patient-unavailable execution fails publication. All diagnostic policy is covered by normal module, review-subject, candidate, and package hashing. Run `npm run test:diagnostic-contract` for the focused Browser/Deno contract and publication-gate suite.
+
 ## V2-005 rule transitions and Clinical Scheduler
 
 Rules use a small strict `1.0` vocabulary: bounded triggers and conditions; allowlisted Patient State changes; typed pain, intervention, complication, and outcome changes; relative or absolute Clinical-Time schedules; stable cancellation; and deterministic event proposals. Arbitrary paths, scripts, direct numeric-vital effects, physiology arithmetic, wall-clock timers, and disease-specific branches are prohibited. Rules change explicit Patient State codes; the pinned V2-004 observation definition then projects monitor values and rhythm descriptors.
@@ -131,6 +135,7 @@ npm run test:v2-006
 npm run test:assessment-engine
 npm run test:v2-007a
 npm run test:v2-007
+npm run test:diagnostic-contract
 npm run test:playwright
 npm run test:portability-guard
 npm run verify

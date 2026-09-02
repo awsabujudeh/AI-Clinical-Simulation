@@ -62,6 +62,7 @@ const diseaseSpecificTerms = /\b(?:STEMI|anaphylaxis)\b/iu;
 const runtimeNondeterminism = /\b(?:Math\.random|Date\.now|performance\.now|setTimeout|setInterval|crypto\.getRandomValues|crypto\.randomUUID|localeCompare)\s*\(/u;
 const duplicateObservationContractAuthority = /\b(?:export\s+)?const\s+(?:ObservationProjectionDefinitionSchema|ObservationProjectionSchema|RhythmObservationDefinitionSchema|RhythmObservationMappingsSchema|RhythmObservationSchema)\s*=/u;
 const duplicateRuleContractAuthority = /\b(?:export\s+)?const\s+(?:TransitionRuleSchema|RuleEffectSchema|RuleConditionSchema|SchedulerStateSchema|ScheduledItemSchema|ClinicalEventProposalSchema|TransitionTraceSchema)\s*=/u;
+const duplicateDiagnosticContractAuthority = /\b(?:export\s+)?const\s+(?:InvestigationDefinitionSchema|DiagnosticResultSchema|DiagnosticMilestoneSchema|DiagnosticComponentVisibilitySchema)\s*=/u;
 const clinicalEngineViolations = [];
 
 for (const fileUrl of clinicalEngineSourceFiles) {
@@ -78,6 +79,9 @@ for (const fileUrl of clinicalEngineSourceFiles) {
   }
   if (duplicateRuleContractAuthority.test(source)) {
     clinicalEngineViolations.push(`Duplicate shared rule/effect schema authority: ${fileUrl.pathname}`);
+  }
+  if (duplicateDiagnosticContractAuthority.test(source)) {
+    clinicalEngineViolations.push(`Duplicate shared diagnostic schema authority: ${fileUrl.pathname}`);
   }
 }
 
@@ -97,6 +101,9 @@ for (const fileUrl of sessionEngineSourceFiles) {
   }
   if (runtimeNondeterminism.test(source)) {
     sessionEngineViolations.push(`Runtime nondeterminism: ${fileUrl.pathname}`);
+  }
+  if (duplicateDiagnosticContractAuthority.test(source)) {
+    sessionEngineViolations.push(`Duplicate shared diagnostic schema authority: ${fileUrl.pathname}`);
   }
 }
 if (sessionEngineViolations.length > 0) {
@@ -141,20 +148,30 @@ for (const fileUrl of caseSchemaSourceFiles) {
   if (duplicateRuleContractAuthority.test(source)) {
     throw new Error(`Case Schema must embed shared rule/effect contracts, not redefine them: ${fileUrl.pathname}`);
   }
+  if (duplicateDiagnosticContractAuthority.test(source)) {
+    throw new Error(`Case Schema must embed shared diagnostic contracts, not redefine them: ${fileUrl.pathname}`);
+  }
 }
 
 const sharedContractSourceFiles = await collectTypeScriptFiles(
   new URL("../packages/contracts/src/", import.meta.url)
 );
 let sharedRuleAuthorityCount = 0;
+let sharedDiagnosticAuthorityCount = 0;
 for (const fileUrl of sharedContractSourceFiles) {
   const source = await readFile(fileUrl, "utf8");
   if (/\bexport\s+const\s+TransitionRuleSchema\s*=/u.test(source)) {
     sharedRuleAuthorityCount += 1;
   }
+  if (/\bexport\s+const\s+InvestigationDefinitionSchema\s*=/u.test(source)) {
+    sharedDiagnosticAuthorityCount += 1;
+  }
 }
 if (sharedRuleAuthorityCount !== 1) {
   throw new Error(`Expected exactly one shared TransitionRuleSchema authority; found ${sharedRuleAuthorityCount}.`);
+}
+if (sharedDiagnosticAuthorityCount !== 1) {
+  throw new Error(`Expected exactly one shared InvestigationDefinitionSchema authority; found ${sharedDiagnosticAuthorityCount}.`);
 }
 
 const canonicalInstitutionTargets = [
@@ -185,6 +202,7 @@ console.log("CLINICAL_ENGINE_DISEASE_NEUTRALITY_GUARD=PASS");
 console.log("CLINICAL_ENGINE_DETERMINISM_GUARD=PASS");
 console.log("OBSERVATION_CONTRACT_AUTHORITY_GUARD=PASS");
 console.log("RULE_EFFECT_CONTRACT_AUTHORITY_GUARD=PASS count=1");
+console.log("DIAGNOSTIC_CONTRACT_AUTHORITY_GUARD=PASS count=1");
 console.log("SESSION_ENGINE_PORTABILITY_GUARD=PASS");
 console.log("SESSION_ENGINE_DETERMINISM_GUARD=PASS");
 console.log("ASSESSMENT_ENGINE_PORTABILITY_GUARD=PASS");

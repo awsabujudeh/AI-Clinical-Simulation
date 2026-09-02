@@ -26,11 +26,34 @@ const PinnedActionBaseSchema = CaseActionDefinitionSchema.pick({
   parameter_definitions: true,
   prerequisite_action_ids: true,
   confirmation_policy: true,
-  repeat_policy: true
+  repeat_policy: true,
+  investigation: true
 });
 
 export const PinnedSessionActionDefinitionSchema = PinnedActionBaseSchema.extend({
   execution_event_type: EventTypeSchema
+}).superRefine((action, context) => {
+  if (action.action_type === "INVESTIGATION" && action.investigation === undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["investigation"],
+      message: "A pinned INVESTIGATION action requires its Case-owned diagnostic definition."
+    });
+  }
+  if (action.action_type !== "INVESTIGATION" && action.investigation !== undefined) {
+    context.addIssue({
+      code: "custom",
+      path: ["investigation"],
+      message: "Only a pinned INVESTIGATION action may carry a diagnostic definition."
+    });
+  }
+  if (action.investigation?.execution_mode === "BLOCKING_PATIENT_UNAVAILABLE") {
+    context.addIssue({
+      code: "custom",
+      path: ["investigation", "execution_mode"],
+      message: "Blocking/patient-unavailable investigations are not supported by this Session runtime."
+    });
+  }
 });
 export type PinnedSessionActionDefinition = z.infer<
   typeof PinnedSessionActionDefinitionSchema
@@ -133,6 +156,9 @@ export function createPinnedSessionCaseContext(
         prerequisite_action_ids: action.prerequisite_action_ids,
         confirmation_policy: action.confirmation_policy,
         repeat_policy: action.repeat_policy,
+        ...(action.investigation === undefined
+          ? {}
+          : { investigation: action.investigation }),
         execution_event_type: executionEventTypeForActionType(action.action_type)
       }))
     });

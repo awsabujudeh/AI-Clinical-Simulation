@@ -123,6 +123,22 @@ export type VisualManifestId = z.infer<typeof VisualManifestIdSchema>;
 export const MediaAssetIdSchema = prefixedIdentifier("asset").brand<"MediaAssetId">();
 export type MediaAssetId = z.infer<typeof MediaAssetIdSchema>;
 
+export const DiagnosticResultIdSchema = prefixedIdentifier("diagnostic-result")
+  .brand<"DiagnosticResultId">();
+export type DiagnosticResultId = z.infer<typeof DiagnosticResultIdSchema>;
+
+export const DiagnosticMilestoneIdSchema = prefixedIdentifier("diagnostic-milestone")
+  .brand<"DiagnosticMilestoneId">();
+export type DiagnosticMilestoneId = z.infer<typeof DiagnosticMilestoneIdSchema>;
+
+export const DiagnosticAnalyteIdSchema = prefixedIdentifier("analyte")
+  .brand<"DiagnosticAnalyteId">();
+export type DiagnosticAnalyteId = z.infer<typeof DiagnosticAnalyteIdSchema>;
+
+export const DiagnosticMeasurementIdSchema = prefixedIdentifier("measurement")
+  .brand<"DiagnosticMeasurementId">();
+export type DiagnosticMeasurementId = z.infer<typeof DiagnosticMeasurementIdSchema>;
+
 export const AiWorkflowRunIdSchema = opaqueOperationalIdentifier("AI workflow run identifier").brand<"AiWorkflowRunId">();
 export type AiWorkflowRunId = z.infer<typeof AiWorkflowRunIdSchema>;
 

@@ -27,6 +27,7 @@
     "test:case-schema:browser": "vitest run --config vitest.config.mjs tests/browser/case-schema",
     "test:case-schema:deno": "deno test tests/deno/case_schema_test.ts",
     "test:case-schema": "npm run test:case-schema:browser && npm run test:case-schema:deno && npm run test:portability-guard",
+    "test:diagnostic-contract": "vitest run --config vitest.config.mjs tests/browser/contracts.diagnostics.browser.test.ts tests/browser/case-schema.diagnostics.browser.test.ts tests/browser/diagnostic-contract.portability.browser.test.ts && deno test tests/deno/diagnostic_contract_test.ts && npm run test:portability-guard",
     "test:clinical-engine:browser": "vitest run --config vitest.config.mjs tests/browser/clinical-engine",
     "test:clinical-engine:deno": "deno test tests/deno/clinical_engine_test.ts",
     "test:clinical-engine": "npm run test:clinical-engine:browser && npm run test:clinical-engine:deno && npm run test:portability-guard",

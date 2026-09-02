@@ -568,6 +568,597 @@ function validateReviewGate(
   }
 }
 
+type CaseAction = DraftCasePackage["action_catalogue"]["actions"][number];
+type InvestigationDefinition = NonNullable<CaseAction["investigation"]>;
+type DiagnosticResult = InvestigationDefinition["result"];
+
+const diagnosticMilestoneOrder = {
+  ORDERED: 0,
+  PERFORMED: 1,
+  RESULT_AVAILABLE: 2,
+  IMAGE_AVAILABLE: 3,
+  FORMAL_REPORT_AVAILABLE: 4
+} as const;
+
+function diagnosticAssetReferences(result: DiagnosticResult) {
+  return "asset_references" in result ? result.asset_references : [];
+}
+
+function diagnosticFindingFactIds(result: DiagnosticResult): readonly string[] {
+  return result.finding_fact_ids;
+}
+
+function diagnosticFallbackFactIds(result: DiagnosticResult): readonly string[] {
+  return "fallback_fact_ids" in result ? result.fallback_fact_ids : [];
+}
+
+function diagnosticHasFormalReport(result: DiagnosticResult): boolean {
+  return result.result_type === "TEXT_REPORT"
+    || ("formal_report_key" in result && result.formal_report_key !== undefined);
+}
+
+function validateDiagnosticMilestones(
+  action: CaseAction,
+  investigation: InvestigationDefinition,
+  issues: CaseValidationIssue[],
+  mode: ValidationMode
+): void {
+  const path = `$.action_catalogue.actions[${action.action_id}].investigation.milestones`;
+  const milestones = investigation.milestones;
+  addDuplicateIssues(
+    issues,
+    milestones.map((milestone) => milestone.diagnostic_milestone_id),
+    "DUPLICATE_DIAGNOSTIC_MILESTONE_ID",
+    "action_catalogue",
+    path,
+    "diagnostic milestone ID"
+  );
+  addDuplicateIssues(
+    issues,
+    milestones.map((milestone) => milestone.milestone_type),
+    "DUPLICATE_DIAGNOSTIC_MILESTONE_TYPE",
+    "action_catalogue",
+    path,
+    "diagnostic milestone type"
+  );
+
+  const canonical = [...milestones].sort((left, right) => {
+    if (left.offset_clinical_seconds !== right.offset_clinical_seconds) {
+      return left.offset_clinical_seconds - right.offset_clinical_seconds;
+    }
+    const typeDelta = diagnosticMilestoneOrder[left.milestone_type]
+      - diagnosticMilestoneOrder[right.milestone_type];
+    if (typeDelta !== 0) return typeDelta;
+    return left.diagnostic_milestone_id < right.diagnostic_milestone_id ? -1 : 1;
+  });
+  if (milestones.some((milestone, index) => (
+    milestone.diagnostic_milestone_id !== canonical[index]?.diagnostic_milestone_id
+  ))) {
+    issues.push(issue({
+      code: "INVALID_DIAGNOSTIC_MILESTONE_ORDER",
+      severity: "ERROR",
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id],
+      message: "Diagnostic milestones must use deterministic chronological and semantic order."
+    }));
+  }
+
+  const byType = new Map(
+    milestones.map((milestone) => [milestone.milestone_type, milestone])
+  );
+  const ordered = byType.get("ORDERED");
+  if (ordered === undefined || ordered.offset_clinical_seconds !== 0) {
+    issues.push(issue({
+      code: "DIAGNOSTIC_ORDERED_MILESTONE_INVALID",
+      severity: "ERROR",
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id],
+      message: "Every investigation requires one ORDERED milestone at relative Clinical Time zero."
+    }));
+  }
+
+  const resultAvailable = byType.get("RESULT_AVAILABLE");
+  if (resultAvailable === undefined) {
+    issues.push(issue({
+      code: "DIAGNOSTIC_RESULT_MILESTONE_MISSING",
+      severity: gateSeverity(mode),
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id, investigation.result.diagnostic_result_id],
+      message: "Publication requires a Case-owned RESULT_AVAILABLE milestone."
+    }));
+  }
+
+  const performed = byType.get("PERFORMED");
+  if (performed !== undefined) {
+    for (const milestone of milestones) {
+      if (
+        milestone.milestone_type !== "ORDERED"
+        && milestone.offset_clinical_seconds < performed.offset_clinical_seconds
+      ) {
+        issues.push(issue({
+          code: "INVALID_DIAGNOSTIC_MILESTONE_CHRONOLOGY",
+          severity: "ERROR",
+          module: "action_catalogue",
+          path,
+          relatedIds: [
+            action.action_id,
+            performed.diagnostic_milestone_id,
+            milestone.diagnostic_milestone_id
+          ],
+          message: "Diagnostic result components cannot become available before performance."
+        }));
+      }
+    }
+  }
+
+  const assetReferences = diagnosticAssetReferences(investigation.result);
+  const imageAvailable = byType.get("IMAGE_AVAILABLE");
+  if (assetReferences.length > 0 && imageAvailable === undefined) {
+    issues.push(issue({
+      code: "DIAGNOSTIC_IMAGE_MILESTONE_MISSING",
+      severity: gateSeverity(mode),
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id],
+      message: "A media-bearing investigation requires an IMAGE_AVAILABLE milestone."
+    }));
+  } else if (assetReferences.length === 0 && imageAvailable !== undefined) {
+    issues.push(issue({
+      code: "DIAGNOSTIC_IMAGE_MILESTONE_WITHOUT_ASSET",
+      severity: "ERROR",
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id, imageAvailable.diagnostic_milestone_id],
+      message: "IMAGE_AVAILABLE cannot be declared without a diagnostic asset reference."
+    }));
+  }
+
+  const formalReportAvailable = byType.get("FORMAL_REPORT_AVAILABLE");
+  if (diagnosticHasFormalReport(investigation.result) && formalReportAvailable === undefined) {
+    issues.push(issue({
+      code: "DIAGNOSTIC_FORMAL_REPORT_MILESTONE_MISSING",
+      severity: gateSeverity(mode),
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id],
+      message: "An authored formal report requires its own availability milestone."
+    }));
+  } else if (!diagnosticHasFormalReport(investigation.result) && formalReportAvailable !== undefined) {
+    issues.push(issue({
+      code: "DIAGNOSTIC_REPORT_MILESTONE_WITHOUT_REPORT",
+      severity: "ERROR",
+      module: "action_catalogue",
+      path,
+      relatedIds: [action.action_id, formalReportAvailable.diagnostic_milestone_id],
+      message: "FORMAL_REPORT_AVAILABLE cannot be declared without authored report content."
+    }));
+  }
+
+  if (
+    resultAvailable !== undefined
+    && formalReportAvailable !== undefined
+    && formalReportAvailable.offset_clinical_seconds
+      < resultAvailable.offset_clinical_seconds
+  ) {
+    issues.push(issue({
+      code: "INVALID_DIAGNOSTIC_MILESTONE_CHRONOLOGY",
+      severity: "ERROR",
+      module: "action_catalogue",
+      path,
+      relatedIds: [
+        action.action_id,
+        resultAvailable.diagnostic_milestone_id,
+        formalReportAvailable.diagnostic_milestone_id
+      ],
+      message: "Formal report availability cannot precede result availability."
+    }));
+  }
+
+  if (
+    imageAvailable !== undefined
+    && formalReportAvailable !== undefined
+    && formalReportAvailable.offset_clinical_seconds
+      < imageAvailable.offset_clinical_seconds
+  ) {
+    issues.push(issue({
+      code: "INVALID_DIAGNOSTIC_MILESTONE_CHRONOLOGY",
+      severity: "ERROR",
+      module: "action_catalogue",
+      path,
+      relatedIds: [
+        action.action_id,
+        imageAvailable.diagnostic_milestone_id,
+        formalReportAvailable.diagnostic_milestone_id
+      ],
+      message: "Formal report availability cannot precede diagnostic image availability."
+    }));
+  }
+}
+
+function validateDiagnosticContracts(
+  casePackage: DraftCasePackage,
+  issues: CaseValidationIssue[],
+  mode: ValidationMode,
+  facts: ReadonlySet<string>,
+  sources: ReadonlySet<string>
+): void {
+  const diagnosticActions = casePackage.action_catalogue.actions.filter(
+    (action) => action.action_type === "INVESTIGATION"
+  );
+  const resultIds = diagnosticActions.flatMap((action) =>
+    action.investigation === undefined
+      ? []
+      : [action.investigation.result.diagnostic_result_id]
+  );
+  addDuplicateIssues(
+    issues,
+    resultIds,
+    "DUPLICATE_DIAGNOSTIC_RESULT_ID",
+    "action_catalogue",
+    "$.action_catalogue.actions.investigation.result",
+    "diagnostic result ID"
+  );
+
+  const assetsById = new Map(
+    casePackage.visual_manifest.media_assets.map((asset) => [asset.media_asset_id, asset])
+  );
+  const sourcesById = new Map(
+    casePackage.validation.sources.map((source) => [source.source_id, source])
+  );
+  const reviewsById = new Map(
+    casePackage.validation.reviews.map((review) => [review.review_id, review])
+  );
+  const governanceChecked = new Set<string>();
+
+  for (const action of casePackage.action_catalogue.actions) {
+    const actionPath = `$.action_catalogue.actions[${action.action_id}]`;
+    if (action.action_type !== "INVESTIGATION") {
+      if (action.investigation !== undefined) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_DEFINITION_ACTION_TYPE_MISMATCH",
+          severity: "ERROR",
+          module: "action_catalogue",
+          path: `${actionPath}.investigation`,
+          relatedIds: [action.action_id],
+          message: "Only INVESTIGATION actions may carry a diagnostic definition."
+        }));
+      }
+      continue;
+    }
+
+    const investigation = action.investigation;
+    if (investigation === undefined) {
+      issues.push(issue({
+        code: "INVESTIGATION_DEFINITION_MISSING",
+        severity: gateSeverity(mode),
+        module: "action_catalogue",
+        path: `${actionPath}.investigation`,
+        relatedIds: [action.action_id],
+        message: "An INVESTIGATION action requires reviewed diagnostic result and timing policy for publication."
+      }));
+      continue;
+    }
+
+    if (investigation.execution_mode === "BLOCKING_PATIENT_UNAVAILABLE") {
+      issues.push(issue({
+        code: "DIAGNOSTIC_EXECUTION_MODE_UNSUPPORTED",
+        severity: gateSeverity(mode),
+        module: "action_catalogue",
+        path: `${actionPath}.investigation.execution_mode`,
+        relatedIds: [action.action_id, investigation.execution_mode],
+        message: "Blocking/patient-unavailable diagnostic execution is representable but not publishable until Session Engine support exists."
+      }));
+    }
+
+    validateDiagnosticMilestones(action, investigation, issues, mode);
+    const result = investigation.result;
+    const resultPath = `${actionPath}.investigation.result`;
+
+    if (result.source_ids.length === 0) {
+      issues.push(issue({
+        code: "DIAGNOSTIC_RESULT_SOURCE_MISSING",
+        severity: gateSeverity(mode),
+        module: "action_catalogue",
+        path: `${resultPath}.source_ids`,
+        relatedIds: [action.action_id, result.diagnostic_result_id],
+        message: "Publication requires diagnostic result provenance through an approved Case source."
+      }));
+    }
+    addDanglingIssues(
+      issues,
+      result.source_ids,
+      sources,
+      "DANGLING_SOURCE_REFERENCE",
+      "action_catalogue",
+      `${resultPath}.source_ids`,
+      "Source ID"
+    );
+    for (const sourceId of result.source_ids) {
+      const source = sourcesById.get(sourceId);
+      if (source !== undefined && source.status !== "APPROVED") {
+        issues.push(issue({
+          code: "DIAGNOSTIC_RESULT_SOURCE_UNAPPROVED",
+          severity: gateSeverity(mode),
+          module: "action_catalogue",
+          path: `${resultPath}.source_ids`,
+          relatedIds: [action.action_id, result.diagnostic_result_id, sourceId],
+          message: "Publication requires every diagnostic result source to be approved."
+        }));
+      }
+    }
+
+    const findingFactIds = diagnosticFindingFactIds(result);
+    const fallbackFactIds = diagnosticFallbackFactIds(result);
+    addDanglingIssues(
+      issues,
+      findingFactIds,
+      facts,
+      "DANGLING_DIAGNOSTIC_FACT_REFERENCE",
+      "action_catalogue",
+      `${resultPath}.finding_fact_ids`,
+      "diagnostic Fact ID"
+    );
+    addDanglingIssues(
+      issues,
+      fallbackFactIds,
+      facts,
+      "DANGLING_DIAGNOSTIC_FALLBACK_REFERENCE",
+      "action_catalogue",
+      `${resultPath}.fallback_fact_ids`,
+      "diagnostic fallback Fact ID"
+    );
+    for (const fallbackFactId of fallbackFactIds) {
+      if (!findingFactIds.includes(fallbackFactId)) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_FALLBACK_NOT_RESULT_FINDING",
+          severity: "ERROR",
+          module: "action_catalogue",
+          path: `${resultPath}.fallback_fact_ids`,
+          relatedIds: [action.action_id, fallbackFactId],
+          message: "A diagnostic fallback must reference Case-authored clinical truth from the same result."
+        }));
+      }
+    }
+
+    if (result.result_type === "STRUCTURED_LAB") {
+      addDuplicateIssues(
+        issues,
+        result.analytes.map((analyte) => analyte.analyte_id),
+        "DUPLICATE_DIAGNOSTIC_ANALYTE_ID",
+        "action_catalogue",
+        `${resultPath}.analytes`,
+        "diagnostic analyte ID"
+      );
+    } else if (result.result_type === "ECG" || result.result_type === "ULTRASOUND") {
+      addDuplicateIssues(
+        issues,
+        result.structured_measurements.map((measurement) => measurement.measurement_id),
+        "DUPLICATE_DIAGNOSTIC_MEASUREMENT_ID",
+        "action_catalogue",
+        `${resultPath}.structured_measurements`,
+        "diagnostic measurement ID"
+      );
+    }
+
+    const assetReferences = diagnosticAssetReferences(result);
+    addDuplicateIssues(
+      issues,
+      assetReferences.map((reference) => reference.media_asset_id),
+      "DUPLICATE_DIAGNOSTIC_ASSET_REFERENCE",
+      "action_catalogue",
+      `${resultPath}.asset_references`,
+      "diagnostic asset reference"
+    );
+
+    if (assetReferences.length > 0 && fallbackFactIds.length === 0) {
+      issues.push(issue({
+        code: "DIAGNOSTIC_FALLBACK_MISSING",
+        severity: gateSeverity(mode),
+        module: "action_catalogue",
+        path: `${resultPath}.fallback_fact_ids`,
+        relatedIds: [action.action_id, result.diagnostic_result_id],
+        message: "Media-bearing diagnostic results must have a reviewed non-media fallback."
+      }));
+    }
+
+    const visibility = investigation.learner_visibility;
+    if (assetReferences.length === 0 && visibility.media !== "NEVER") {
+      issues.push(issue({
+        code: "DIAGNOSTIC_VISIBILITY_COMPONENT_MISSING",
+        severity: "ERROR",
+        module: "action_catalogue",
+        path: `${actionPath}.investigation.learner_visibility.media`,
+        relatedIds: [action.action_id],
+        message: "Media visibility must be NEVER when the result has no media component."
+      }));
+    }
+    if (
+      (result.result_type !== "ECG" || result.machine_interpretation_key === undefined)
+      && visibility.machine_interpretation !== "NEVER"
+    ) {
+      issues.push(issue({
+        code: "DIAGNOSTIC_VISIBILITY_COMPONENT_MISSING",
+        severity: "ERROR",
+        module: "action_catalogue",
+        path: `${actionPath}.investigation.learner_visibility.machine_interpretation`,
+        relatedIds: [action.action_id],
+        message: "Machine-interpretation visibility requires authored machine-interpretation content."
+      }));
+    }
+    if (!diagnosticHasFormalReport(result) && visibility.formal_report !== "NEVER") {
+      issues.push(issue({
+        code: "DIAGNOSTIC_VISIBILITY_COMPONENT_MISSING",
+        severity: "ERROR",
+        module: "action_catalogue",
+        path: `${actionPath}.investigation.learner_visibility.formal_report`,
+        relatedIds: [action.action_id],
+        message: "Formal-report visibility requires authored formal report content."
+      }));
+    }
+
+    for (const reference of assetReferences) {
+      const asset = assetsById.get(reference.media_asset_id);
+      if (asset === undefined) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_REFERENCE_UNKNOWN",
+          severity: "ERROR",
+          module: "action_catalogue",
+          path: `${resultPath}.asset_references`,
+          relatedIds: [action.action_id, reference.media_asset_id],
+          message: "Diagnostic result references an unknown Case-owned Media Asset ID."
+        }));
+        continue;
+      }
+
+      const governance = asset.diagnostic_governance;
+      if (governance === undefined) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_GOVERNANCE_MISSING",
+          severity: gateSeverity(mode),
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets",
+          relatedIds: [asset.media_asset_id],
+          message: "A referenced diagnostic asset requires provenance, rights, identity, and Clinical Review governance."
+        }));
+        continue;
+      }
+
+      if (governance.diagnostic_modality !== result.modality) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_MODALITY_MISMATCH",
+          severity: "ERROR",
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets.diagnostic_governance.diagnostic_modality",
+          relatedIds: [action.action_id, asset.media_asset_id, result.modality],
+          message: "Diagnostic asset modality does not match the Case-authored result modality."
+        }));
+      }
+
+      const allowedRoles = result.result_type === "ECG"
+        ? new Set(["TRACING"])
+        : result.result_type === "IMAGING"
+          ? new Set(["PRIMARY_IMAGE", "SECONDARY_IMAGE"])
+          : result.result_type === "ULTRASOUND"
+            ? new Set(["STILL", "LOOP"])
+            : new Set<string>();
+      if (!allowedRoles.has(reference.asset_role)) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_ROLE_MISMATCH",
+          severity: "ERROR",
+          module: "action_catalogue",
+          path: `${resultPath}.asset_references`,
+          relatedIds: [action.action_id, asset.media_asset_id, reference.asset_role],
+          message: "Diagnostic asset role is incompatible with the result discriminator."
+        }));
+      }
+
+      const expectedMediaKind = reference.asset_role === "LOOP"
+        ? "VIDEO"
+        : "STATIC_IMAGE";
+      if (asset.media_kind !== expectedMediaKind) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_MEDIA_KIND_MISMATCH",
+          severity: "ERROR",
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets.media_kind",
+          relatedIds: [action.action_id, asset.media_asset_id, reference.asset_role],
+          message: "Diagnostic asset media kind is incompatible with its declared role."
+        }));
+      }
+
+      if (governanceChecked.has(asset.media_asset_id)) continue;
+      governanceChecked.add(asset.media_asset_id);
+
+      if (governance.asset_version === undefined || governance.content_hash === undefined) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_IDENTITY_INCOMPLETE",
+          severity: gateSeverity(mode),
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets.diagnostic_governance",
+          relatedIds: [asset.media_asset_id],
+          message: "Publication requires an exact diagnostic asset version and content hash."
+        }));
+      }
+      if (
+        governance.provenance_source_ids === undefined
+        || governance.provenance_source_ids.length === 0
+      ) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_PROVENANCE_MISSING",
+          severity: gateSeverity(mode),
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets.diagnostic_governance.provenance_source_ids",
+          relatedIds: [asset.media_asset_id],
+          message: "Publication requires diagnostic asset provenance."
+        }));
+      } else {
+        addDanglingIssues(
+          issues,
+          governance.provenance_source_ids,
+          sources,
+          "DANGLING_SOURCE_REFERENCE",
+          "visual_manifest",
+          "$.visual_manifest.media_assets.diagnostic_governance.provenance_source_ids",
+          "Source ID"
+        );
+        for (const sourceId of governance.provenance_source_ids) {
+          const source = sourcesById.get(sourceId);
+          if (source !== undefined && source.status !== "APPROVED") {
+            issues.push(issue({
+              code: "DIAGNOSTIC_ASSET_PROVENANCE_UNAPPROVED",
+              severity: gateSeverity(mode),
+              module: "visual_manifest",
+              path: "$.visual_manifest.media_assets.diagnostic_governance.provenance_source_ids",
+              relatedIds: [asset.media_asset_id, sourceId],
+              message: "Publication requires every diagnostic asset provenance source to be approved."
+            }));
+          }
+        }
+      }
+      if (
+        governance.rights_status !== "APPROVED"
+        || governance.rights_reference_code === undefined
+      ) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_RIGHTS_INCOMPLETE",
+          severity: gateSeverity(mode),
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets.diagnostic_governance.rights_status",
+          relatedIds: [asset.media_asset_id],
+          message: "Publication requires approved usage-rights metadata and a stable rights reference."
+        }));
+      }
+
+      const clinicalReview = governance.clinical_review_id === undefined
+        ? undefined
+        : reviewsById.get(governance.clinical_review_id);
+      if (
+        governance.clinical_review_status !== "APPROVED"
+        || governance.clinical_review_id === undefined
+        || clinicalReview?.review_type !== "CLINICAL"
+        || clinicalReview.status !== "APPROVED"
+      ) {
+        issues.push(issue({
+          code: "DIAGNOSTIC_ASSET_REVIEW_INCOMPLETE",
+          severity: gateSeverity(mode),
+          module: "visual_manifest",
+          path: "$.visual_manifest.media_assets.diagnostic_governance.clinical_review_id",
+          relatedIds: [
+            asset.media_asset_id,
+            ...(governance.clinical_review_id === undefined
+              ? []
+              : [governance.clinical_review_id])
+          ],
+          message: "Publication requires a referenced approved Clinical Review for diagnostic media."
+        }));
+      }
+    }
+  }
+}
+
 function validateParsedCase(
   casePackage: DraftCasePackage,
   mode: ValidationMode,
@@ -963,6 +1554,8 @@ function validateParsedCase(
       }
     }
   }
+
+  validateDiagnosticContracts(casePackage, issues, mode, facts, sources);
 
   for (const rule of casePackage.rules.rules) {
     addDanglingIssues(issues, ruleActionReferences(rule), actions, "DANGLING_ACTION_REFERENCE", "rules", "$.rules.rules", "Action ID");

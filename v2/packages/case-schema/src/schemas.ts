@@ -12,10 +12,12 @@ import {
   CaseReviewTypeSchema,
   CaseVersionIdSchema,
   CurriculumObjectiveIdSchema,
+  DiagnosticAssetModalitySchema,
   EventTypeSchema,
   FactIdSchema,
   InstitutionIdSchema,
   InstitutionMetadataSchema,
+  InvestigationDefinitionSchema,
   InterruptingEventTypesSchema,
   JsonValueSchema,
   LocalizationKeySchema,
@@ -283,7 +285,8 @@ export const CaseActionDefinitionSchema = z.strictObject({
     "CASE_DEFINED"
   ]),
   repeat_policy: z.enum(["NOT_REPEATABLE", "REPEATABLE", "CASE_DEFINED"]),
-  source_ids: z.array(SourceIdSchema).max(16)
+  source_ids: z.array(SourceIdSchema).max(16),
+  investigation: InvestigationDefinitionSchema.optional()
 });
 
 export const ActionCatalogueModuleSchema = z.strictObject({
@@ -497,11 +500,26 @@ export const DialoguePolicyModuleSchema = z.strictObject({
 });
 export type DialoguePolicyModule = z.infer<typeof DialoguePolicyModuleSchema>;
 
+export const DiagnosticAssetGovernanceSchema = z.strictObject({
+  diagnostic_modality: DiagnosticAssetModalitySchema,
+  asset_version: SemanticVersionSchema.optional(),
+  content_hash: HashDigestSchema.optional(),
+  provenance_source_ids: z.array(SourceIdSchema).max(16).optional(),
+  rights_status: z.enum(["APPROVED", "UNRESOLVED"]).optional(),
+  rights_reference_code: CaseControlledValueSchema.optional(),
+  clinical_review_status: z.enum(["APPROVED", "UNRESOLVED"]).optional(),
+  clinical_review_id: ReviewIdSchema.optional()
+});
+export type DiagnosticAssetGovernance = z.infer<
+  typeof DiagnosticAssetGovernanceSchema
+>;
+
 export const MediaAssetDefinitionSchema = z.strictObject({
   media_asset_id: MediaAssetIdSchema,
   media_kind: z.enum(["STATIC_IMAGE", "VIDEO", "AUDIO", "OVERLAY"]),
   required: z.boolean(),
-  static_fallback: z.boolean()
+  static_fallback: z.boolean(),
+  diagnostic_governance: DiagnosticAssetGovernanceSchema.optional()
 });
 
 export const VisualRecipeSchema = z.strictObject({
