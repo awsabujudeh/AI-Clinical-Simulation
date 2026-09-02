@@ -7,6 +7,7 @@ export * from "./commands/process-external-command.ts";
 export * from "./coordinator/session-coordinator.ts";
 export * from "./context/pinned-session-case.ts";
 export * from "./events/commit-events.ts";
+export * from "./assessment/project-assessment-evidence.ts";
 export * from "./session/in-memory-session.ts";
 export * from "./time/advance-clinical-time.ts";
 export * from "./time/synchronize-trusted-time.ts";

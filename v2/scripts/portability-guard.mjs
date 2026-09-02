@@ -3,12 +3,14 @@ import { extname } from "node:path";
 
 const clinicalEngineSourceRoot = new URL("../packages/clinical-engine/src/", import.meta.url);
 const sessionEngineSourceRoot = new URL("../packages/session-engine/src/", import.meta.url);
+const assessmentEngineSourceRoot = new URL("../packages/assessment-engine/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
   new URL("../packages/case-schema/src/", import.meta.url),
   clinicalEngineSourceRoot,
-  sessionEngineSourceRoot
+  sessionEngineSourceRoot,
+  assessmentEngineSourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -103,6 +105,28 @@ if (sessionEngineViolations.length > 0) {
   );
 }
 
+const assessmentEngineSourceFiles = await collectTypeScriptFiles(assessmentEngineSourceRoot);
+const assessmentEngineViolations = [];
+const assessmentSessionEngineDependency = /(?:from\s+|import\s*(?:\(\s*)?)["'][^"']*session-engine[^"']*["']/u;
+for (const fileUrl of assessmentEngineSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+
+  if (diseaseSpecificTerms.test(source)) {
+    assessmentEngineViolations.push(`Disease-specific source term: ${fileUrl.pathname}`);
+  }
+  if (runtimeNondeterminism.test(source)) {
+    assessmentEngineViolations.push(`Runtime nondeterminism: ${fileUrl.pathname}`);
+  }
+  if (assessmentSessionEngineDependency.test(source)) {
+    assessmentEngineViolations.push(`Assessment Engine must consume the shared authoritative evidence projection, not Session internals: ${fileUrl.pathname}`);
+  }
+}
+if (assessmentEngineViolations.length > 0) {
+  throw new Error(
+    `Assessment Engine foundation violations:\n${assessmentEngineViolations.join("\n")}`
+  );
+}
+
 const caseSchemaSourceFiles = await collectTypeScriptFiles(
   new URL("../packages/case-schema/src/", import.meta.url)
 );
@@ -163,3 +187,5 @@ console.log("OBSERVATION_CONTRACT_AUTHORITY_GUARD=PASS");
 console.log("RULE_EFFECT_CONTRACT_AUTHORITY_GUARD=PASS count=1");
 console.log("SESSION_ENGINE_PORTABILITY_GUARD=PASS");
 console.log("SESSION_ENGINE_DETERMINISM_GUARD=PASS");
+console.log("ASSESSMENT_ENGINE_PORTABILITY_GUARD=PASS");
+console.log("ASSESSMENT_ENGINE_DETERMINISM_GUARD=PASS");

@@ -55,13 +55,16 @@ function moduleFromPath(path: readonly PropertyKey[]): CaseModuleName | undefine
 function schemaIssues(error: z.ZodError): CaseValidationIssue[] {
   return error.issues.map((issue) => {
     const moduleName = moduleFromPath(issue.path);
+    const message = `Schema validation failed: ${issue.message}`;
     return CaseValidationIssueSchema.parse({
       code: "SCHEMA_INVALID",
       severity: "ERROR",
       ...(moduleName === undefined ? {} : { module: moduleName }),
       path: pathText(issue.path),
       related_ids: [],
-      message: `Schema validation failed: ${issue.message}`
+      message: message.length <= 500
+        ? message
+        : `${message.slice(0, 497)}...`
     });
   });
 }
@@ -1083,11 +1086,24 @@ function validateParsedCase(
 
   addDanglingIssues(issues, casePackage.assessment_rubric.source_ids, sources, "DANGLING_SOURCE_REFERENCE", "assessment_rubric", "$.assessment_rubric.source_ids", "Source ID");
   const rubricEvidence = [
-    ...casePackage.assessment_rubric.domains.flatMap((domain) => domain.evidence),
+    ...casePackage.assessment_rubric.domains.flatMap((domain) =>
+      domain.criteria.map((criterion) => criterion.evidence)
+    ),
     ...casePackage.assessment_rubric.critical_items.map((item) => item.evidence)
   ];
   for (const evidence of rubricEvidence) {
     addDanglingIssues(issues, evidence.action_ids, actions, "DANGLING_ACTION_REFERENCE", "assessment_rubric", "$.assessment_rubric", "Action ID");
+    if (evidence.sequence_constraint !== undefined) {
+      addDanglingIssues(
+        issues,
+        evidence.sequence_constraint.reference.action_ids,
+        actions,
+        "DANGLING_ACTION_REFERENCE",
+        "assessment_rubric",
+        "$.assessment_rubric",
+        "Action ID"
+      );
+    }
     if (evidence.timing_window_id !== undefined) {
       addDanglingIssues(issues, [evidence.timing_window_id], timingWindows, "DANGLING_TIMING_WINDOW_REFERENCE", "assessment_rubric", "$.assessment_rubric", "timing-window ID");
     }

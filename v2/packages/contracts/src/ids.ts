@@ -86,6 +86,12 @@ export type TimingWindowId = z.infer<typeof TimingWindowIdSchema>;
 export const RubricIdSchema = prefixedIdentifier("rubric").brand<"RubricId">();
 export type RubricId = z.infer<typeof RubricIdSchema>;
 
+export const RubricItemIdSchema = prefixedIdentifier("rubric-item").brand<"RubricItemId">();
+export type RubricItemId = z.infer<typeof RubricItemIdSchema>;
+
+export const AssessmentDomainIdSchema = prefixedIdentifier("domain").brand<"AssessmentDomainId">();
+export type AssessmentDomainId = z.infer<typeof AssessmentDomainIdSchema>;
+
 export const AssessmentIdSchema = opaqueOperationalIdentifier("assessment identifier").brand<"AssessmentId">();
 export type AssessmentId = z.infer<typeof AssessmentIdSchema>;
 

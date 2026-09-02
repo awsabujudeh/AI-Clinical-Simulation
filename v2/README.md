@@ -22,6 +22,16 @@ V2-006C closes the in-memory Session boundary with one `SessionCoordinator`. It 
 
 Trusted-time synchronization receives explicit UTC authority and never reads a live clock. RUNNING sessions advance elapsed whole seconds through the pinned ratio and V2-006A chronological scheduler path, so browser-sleep catch-up cannot skip Case work. An interrupt commits only the reached interval and advances the real-time anchor proportionally; PAUSED sessions never catch up, and resume establishes a new anchor. Normal sync/catch-up remains distinct from Case-owned action-duration advancement. Pause/resume produce generic committed lifecycle events but no clinical effects. Run `npm run test:v2-006` for the complete portable V2-006 closure suite.
 
+V2-007A adds only the deterministic Assessment core under `packages/assessment-engine/`. The Session Engine projects a strict complete committed-timeline evidence value; raw Action Requests, rejected intent, Clinical proposals, UI state, real-time waiting, and runtime rubric sidecars are not accepted as scoring evidence. Assessment derives one pinned rubric context from the same compiled Case Package identity/hash as the Session and records rubric/module provenance in every result.
+
+The Case-owned rubric contains exactly six distinct `domain.*` identities; their reviewed labels remain Case localization data because the frozen Architecture intentionally defers universal domain labels. Domain weights total 10,000 basis points. Positive and penalty criteria use committed event/action matchers, absolute inclusive/exclusive Clinical-Time windows, optional authoritative-sequence constraints, and explicit once-only or bounded-repeat policy. Critical action/error items may cap the overall score, zero a domain, deduct fixed overall basis points, or mark the result unsafe. The generic engine contains no medical criteria.
+
+Raw points are integers. Domain percentages and weighted contributions use integer half-up rounding to basis points. Zero-domain effects are applied before weighting, then fixed overall deductions, then the minimum applicable cap; `MARK_UNSAFE` is orthogonal. Every criterion emits deterministic evidence IDs, committed Event IDs/sequence/Clinical Time where matched, or an explicit absence record. Results are internal scoring truth only; V2-007B owns any mode-aware learner reveal/debrief projection. Run `npm run test:assessment-engine` for Browser/Deno equality or `npm run test:v2-007a` for the affected regression set.
+
+V2-007B preserves that internal scoring truth and adds explicit `LIVE` versus `FINAL` evaluation. Missing evidence remains `PENDING` while a Case-owned opportunity is still open; finalization requires trusted Session authority bound to the exact Session, pinned package/rubric, committed event sequence, and Clinical Time. Re-evaluating that same boundary is byte-deterministic, while mismatched or late evidence fails closed.
+
+Learner disclosure is a separate pure projection. Active `ASSESSMENT` receives only neutral withheld status; active `PRACTICE_DEMO` receives structured findings only for behavior that is already resolved, never future rubric criteria or answer keys. Final debrief exposes the complete deterministic result and authoritative evidence package without generated prose, AI conclusions, RAG citations, or score mutation. Later Session/API code must supply trusted disclosure/finalization authority; no client `show_answers` flag exists. Run `npm run test:v2-007` for the complete V2-007 regression set.
+
 ## V2-005 rule transitions and Clinical Scheduler
 
 Rules use a small strict `1.0` vocabulary: bounded triggers and conditions; allowlisted Patient State changes; typed pain, intervention, complication, and outcome changes; relative or absolute Clinical-Time schedules; stable cancellation; and deterministic event proposals. Arbitrary paths, scripts, direct numeric-vital effects, physiology arithmetic, wall-clock timers, and disease-specific branches are prohibited. Rules change explicit Patient State codes; the pinned V2-004 observation definition then projects monitor values and rhythm descriptors.
@@ -118,6 +128,9 @@ npm run test:v2-005
 npm run test:session-engine
 npm run test:v2-006b
 npm run test:v2-006
+npm run test:assessment-engine
+npm run test:v2-007a
+npm run test:v2-007
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -133,7 +146,7 @@ npm exec playwright install chromium
 
 ## Portable package rules
 
-Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, `packages/clinical-engine/src/`, and `packages/session-engine/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, UI frameworks, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
+Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, `packages/clinical-engine/src/`, `packages/session-engine/src/`, and `packages/assessment-engine/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, UI frameworks, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
 
 ## Source of Truth and rollback
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   ActionIdSchema,
   ActionTypeSchema,
+  AssessmentDomainIdSchema,
   AuthoredLocaleSchema,
   CaseControlledValueSchema,
   CaseIdSchema,
@@ -26,6 +27,7 @@ import {
   RULE_SCHEMA_VERSION,
   RuleIdSchema,
   RubricIdSchema,
+  RubricItemIdSchema,
   SchemaVersionSchema,
   SemanticVersionSchema,
   Sha256DigestSchema,
@@ -89,9 +91,6 @@ export type VisualRecipeId = z.infer<typeof VisualRecipeIdSchema>;
 
 export const PreloadGroupIdSchema = caseScopedIdentifier("preload").brand<"PreloadGroupId">();
 export type PreloadGroupId = z.infer<typeof PreloadGroupIdSchema>;
-
-export const RubricItemIdSchema = caseScopedIdentifier("rubric-item").brand<"RubricItemId">();
-export type RubricItemId = z.infer<typeof RubricItemIdSchema>;
 
 export const CurriculumMappingIdSchema = caseScopedIdentifier("mapping").brand<"CurriculumMappingId">();
 export type CurriculumMappingId = z.infer<typeof CurriculumMappingIdSchema>;
@@ -307,9 +306,12 @@ export const TimingWindowSchema = z.strictObject({
   timing_window_id: TimingWindowIdSchema,
   starts_at_clinical_seconds: z.number().finite().nonnegative(),
   ends_at_clinical_seconds: z.number().finite().nonnegative(),
+  start_inclusive: z.boolean(),
+  end_inclusive: z.boolean(),
   reference_event_type: EventTypeSchema.optional(),
   reference_action_id: ActionIdSchema.optional()
 });
+export type TimingWindow = z.infer<typeof TimingWindowSchema>;
 
 export const TimelinePolicyModuleSchema = z.strictObject({
   ...moduleBaseShape,
@@ -325,32 +327,162 @@ export const TimelinePolicyModuleSchema = z.strictObject({
 });
 export type TimelinePolicyModule = z.infer<typeof TimelinePolicyModuleSchema>;
 
-export const RubricEvidenceSchema = z.strictObject({
+export const ASSESSMENT_RUBRIC_SCHEMA_VERSION = "1.0" as const;
+
+export const RubricEvidenceAuthoritySchema = z.enum([
+  "COMMITTED_LEARNER_EXECUTION",
+  "ANY_COMMITTED_EVENT"
+]);
+
+export const RubricEventMatcherSchema = z.strictObject({
+  authority: RubricEvidenceAuthoritySchema,
   action_ids: z.array(ActionIdSchema).max(32),
-  event_types: z.array(EventTypeSchema).max(32),
-  timing_window_id: TimingWindowIdSchema.optional()
+  event_types: z.array(EventTypeSchema).max(32)
+}).superRefine((value, context) => {
+  if (value.action_ids.length === 0 && value.event_types.length === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["event_types"],
+      message: "Rubric event matching requires an Action ID or committed event type."
+    });
+  }
+  if (value.authority === "COMMITTED_LEARNER_EXECUTION" && value.action_ids.length === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["action_ids"],
+      message: "Learner-execution evidence must identify a Case-owned action."
+    });
+  }
+});
+export type RubricEventMatcher = z.infer<typeof RubricEventMatcherSchema>;
+
+export const RubricSequenceConstraintSchema = z.strictObject({
+  relation: z.enum(["BEFORE", "AFTER"]),
+  reference: RubricEventMatcherSchema
 });
 
-export const RubricDomainSchema = z.strictObject({
-  domain_code: CaseControlledValueSchema,
-  title_key: LocalizationKeySchema,
-  evidence: z.array(RubricEvidenceSchema).max(64)
+export const RubricEvidenceSchema = RubricEventMatcherSchema.safeExtend({
+  sequence_constraint: RubricSequenceConstraintSchema.optional(),
+  timing_window_id: TimingWindowIdSchema.optional()
 });
+export type RubricEvidence = z.infer<typeof RubricEvidenceSchema>;
+
+export const RubricRepeatPolicySchema = z.discriminatedUnion("mode", [
+  z.strictObject({ mode: z.literal("ONCE") }),
+  z.strictObject({
+    mode: z.literal("BOUNDED"),
+    maximum_occurrences: z.number().int().min(1).max(32)
+  })
+]);
+
+export const ScoredRubricCriterionSchema = z.strictObject({
+  rubric_item_id: RubricItemIdSchema,
+  kind: z.enum(["AWARD", "PENALTY"]),
+  points: z.number().int().min(1).max(10_000),
+  evidence: RubricEvidenceSchema,
+  repeat_policy: RubricRepeatPolicySchema
+});
+export type ScoredRubricCriterion = z.infer<typeof ScoredRubricCriterionSchema>;
+
+export const RubricDomainSchema = z.strictObject({
+  domain_code: AssessmentDomainIdSchema,
+  title_key: LocalizationKeySchema,
+  weight_basis_points: z.number().int().min(1).max(10_000),
+  criteria: z.array(ScoredRubricCriterionSchema).min(1).max(64)
+});
+
+export const CriticalRubricEffectSchema = z.discriminatedUnion("effect_type", [
+  z.strictObject({
+    effect_type: z.literal("CAP_OVERALL_SCORE"),
+    cap_basis_points: z.number().int().min(0).max(10_000)
+  }),
+  z.strictObject({
+    effect_type: z.literal("ZERO_DOMAIN_SCORE"),
+    domain_id: AssessmentDomainIdSchema
+  }),
+  z.strictObject({
+    effect_type: z.literal("DEDUCT_OVERALL_SCORE"),
+    penalty_basis_points: z.number().int().min(1).max(10_000)
+  }),
+  z.strictObject({ effect_type: z.literal("MARK_UNSAFE") })
+]);
 
 export const CriticalRubricItemSchema = z.strictObject({
   rubric_item_id: RubricItemIdSchema,
   kind: z.enum(["CRITICAL_ACTION", "CRITICAL_ERROR"]),
   evidence: RubricEvidenceSchema,
-  cap_value: z.number().finite().optional(),
-  penalty_value: z.number().finite().optional()
+  effect: CriticalRubricEffectSchema
 });
+export type CriticalRubricItem = z.infer<typeof CriticalRubricItemSchema>;
 
 export const AssessmentRubricModuleSchema = z.strictObject({
   ...moduleBaseShape,
+  assessment_schema_version: z.literal(ASSESSMENT_RUBRIC_SCHEMA_VERSION),
   rubric_id: RubricIdSchema,
+  rubric_version: SemanticVersionSchema,
   domains: z.array(RubricDomainSchema).length(6),
   critical_items: z.array(CriticalRubricItemSchema).max(128),
   source_ids: z.array(SourceIdSchema).min(1).max(32)
+}).superRefine((value, context) => {
+  const domainIds = new Set<string>();
+  const rubricItemIds = new Set<string>();
+  let weightTotal = 0;
+
+  for (const [domainIndex, domain] of value.domains.entries()) {
+    weightTotal += domain.weight_basis_points;
+    if (domainIds.has(domain.domain_code)) {
+      context.addIssue({
+        code: "custom",
+        path: ["domains", domainIndex, "domain_code"],
+        message: "The six assessment domain identities must be unique."
+      });
+    }
+    domainIds.add(domain.domain_code);
+    if (!domain.criteria.some((criterion) => criterion.kind === "AWARD")) {
+      context.addIssue({
+        code: "custom",
+        path: ["domains", domainIndex, "criteria"],
+        message: "Each assessment domain requires at least one positive award criterion."
+      });
+    }
+    for (const [criterionIndex, criterion] of domain.criteria.entries()) {
+      if (rubricItemIds.has(criterion.rubric_item_id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["domains", domainIndex, "criteria", criterionIndex, "rubric_item_id"],
+          message: "Rubric item identities must be unique across the complete rubric."
+        });
+      }
+      rubricItemIds.add(criterion.rubric_item_id);
+    }
+  }
+
+  if (weightTotal !== 10_000) {
+    context.addIssue({
+      code: "custom",
+      path: ["domains"],
+      message: "Six-domain assessment weights must total exactly 10000 basis points."
+    });
+  }
+
+  for (const [itemIndex, item] of value.critical_items.entries()) {
+    if (rubricItemIds.has(item.rubric_item_id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["critical_items", itemIndex, "rubric_item_id"],
+        message: "Rubric item identities must be unique across the complete rubric."
+      });
+    }
+    rubricItemIds.add(item.rubric_item_id);
+    if (item.effect.effect_type === "ZERO_DOMAIN_SCORE"
+      && !domainIds.has(item.effect.domain_id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["critical_items", itemIndex, "effect", "domain_id"],
+        message: "Critical zero-domain effects must reference one of the six rubric domains."
+      });
+    }
+  }
 });
 export type AssessmentRubricModule = z.infer<typeof AssessmentRubricModuleSchema>;
 

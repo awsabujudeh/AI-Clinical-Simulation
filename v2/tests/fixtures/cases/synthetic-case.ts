@@ -271,6 +271,8 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
         timing_window_id: "window.synthetic.response",
         starts_at_clinical_seconds: 0,
         ends_at_clinical_seconds: 60,
+        start_inclusive: true,
+        end_inclusive: true,
         reference_event_type: "EXAM_PERFORMED",
         reference_action_id: "examination.synthetic-check"
       }
@@ -281,27 +283,48 @@ export const MINIMAL_DRAFT_CASE = DraftCasePackageSchema.parse({
   },
   assessment_rubric: {
     module_schema_version: "2.0",
+    assessment_schema_version: "1.0",
     rubric_id: "rubric.synthetic.001",
+    rubric_version: "1.0.0",
     domains: [
-      "history",
-      "examination",
-      "investigations",
-      "treatment",
-      "diagnosis",
-      "disposition"
-    ].map((domain) => ({
-      domain_code: `domain.${domain}`,
+      { code: "history", weight: 1667 },
+      { code: "examination", weight: 1667 },
+      { code: "investigations", weight: 1667 },
+      { code: "treatment", weight: 1667 },
+      { code: "diagnosis", weight: 1666 },
+      { code: "disposition", weight: 1666 }
+    ].map(({ code, weight }) => ({
+      domain_code: `domain.${code}`,
       title_key: "domain.synthetic.title",
-      evidence: []
+      weight_basis_points: weight,
+      criteria: [
+        {
+          rubric_item_id: `rubric-item.synthetic.${code}`,
+          kind: "AWARD",
+          points: 10,
+          evidence: {
+            authority: "COMMITTED_LEARNER_EXECUTION",
+            action_ids: ["examination.synthetic-check"],
+            event_types: ["EXAM_PERFORMED"],
+            timing_window_id: "window.synthetic.response"
+          },
+          repeat_policy: { mode: "ONCE" }
+        }
+      ]
     })),
     critical_items: [
       {
         rubric_item_id: "rubric-item.synthetic.check",
         kind: "CRITICAL_ACTION",
         evidence: {
+          authority: "COMMITTED_LEARNER_EXECUTION",
           action_ids: ["examination.synthetic-check"],
           event_types: ["EXAM_PERFORMED"],
           timing_window_id: "window.synthetic.response"
+        },
+        effect: {
+          effect_type: "CAP_OVERALL_SCORE",
+          cap_basis_points: 5000
         }
       }
     ],

@@ -1,0 +1,14 @@
+{
+  "name": "@ai-clinical-simulation/assessment-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ai-clinical-simulation/case-schema": "0.1.0",
+    "@ai-clinical-simulation/contracts": "0.1.0",
+    "zod": "4.5.4"
+  }
+}
