@@ -193,6 +193,7 @@ export function createSyntheticPinnedPolicy(
 ) {
   return PinnedClinicalPolicyEnvelopeSchema.parse({
     policy_schema_version: PINNED_CLINICAL_POLICY_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     case_package_id: "case-package.synthetic.001",
     case_version_id: "case-version.synthetic.001",
     case_version: "2.0.0",

@@ -29,12 +29,27 @@ export type ExternalLearnerActionRequest = z.infer<
   typeof ExternalLearnerActionRequestSchema
 >;
 
-export const ExpectedPinnedCaseIdentitySchema = z.strictObject({
+const expectedPinnedCaseCommonShape = {
   case_package_id: CasePackageIdSchema,
   case_version_id: CaseVersionIdSchema,
-  case_version: SemanticVersionSchema,
-  package_hash: Sha256DigestSchema
-});
+  case_version: SemanticVersionSchema
+} as const;
+
+export const ExpectedPinnedCaseIdentitySchema = z.discriminatedUnion(
+  "execution_authority",
+  [
+    z.strictObject({
+      ...expectedPinnedCaseCommonShape,
+      execution_authority: z.literal("PUBLISHED_PRODUCTION"),
+      package_hash: Sha256DigestSchema
+    }),
+    z.strictObject({
+      ...expectedPinnedCaseCommonShape,
+      execution_authority: z.literal("REVIEW_ONLY"),
+      review_execution_hash: Sha256DigestSchema
+    })
+  ]
+);
 export type ExpectedPinnedCaseIdentity = z.infer<
   typeof ExpectedPinnedCaseIdentitySchema
 >;

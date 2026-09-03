@@ -2113,6 +2113,123 @@ export async function validateForPublicationCandidate(
   }
 }
 
+// Human governance gates remain visible but non-blocking for the trusted
+// review harness. Structural/runtime safety gates are never downgraded here.
+const REVIEW_EXECUTION_NON_BLOCKING_CODES = new Set([
+  "CLINICAL_REVIEW_MISSING",
+  "CURRICULUM_MAPPING_UNRESOLVED",
+  "DIAGNOSTIC_ASSET_GOVERNANCE_MISSING",
+  "DIAGNOSTIC_ASSET_IDENTITY_INCOMPLETE",
+  "DIAGNOSTIC_ASSET_PROVENANCE_MISSING",
+  "DIAGNOSTIC_ASSET_PROVENANCE_UNAPPROVED",
+  "DIAGNOSTIC_ASSET_REVIEW_INCOMPLETE",
+  "DIAGNOSTIC_ASSET_RIGHTS_INCOMPLETE",
+  "DIAGNOSTIC_RESULT_SOURCE_UNAPPROVED",
+  "INVALID_VISUAL_FALLBACK",
+  "MISSING_VISUAL_FALLBACK",
+  "MODULE_NOT_APPROVED",
+  "SOURCE_UNRESOLVED",
+  "TECHNICAL_REVIEW_MISSING",
+  "VALIDATION_APPROVAL_INCOMPLETE",
+  "VALIDATION_REVIEW_INCOMPLETE"
+]);
+
+/**
+ * Proves deterministic technical executability without treating that proof as
+ * Clinical Review, exact-package approval, or publication authority.
+ */
+export async function validateForReviewExecution(
+  input: unknown,
+  hashAdapter: HashAdapter
+): Promise<CaseValidationReport> {
+  const parsed = DraftCasePackageSchema.safeParse(input);
+  if (!parsed.success) {
+    return createValidationReport("REVIEW_EXECUTION", schemaIssues(parsed.error));
+  }
+
+  try {
+    const reviewSubjectHash = await computeReviewSubjectHash(parsed.data, hashAdapter);
+    const reachability = await reachabilityValidationContext(
+      parsed.data,
+      reviewSubjectHash,
+      hashAdapter
+    );
+    const issues = validateParsedCase(
+      parsed.data,
+      "CANDIDATE",
+      reviewSubjectHash,
+      reachability.analysis,
+      reachability.expectedEvidenceHash
+    ).map((validationIssue) =>
+      REVIEW_EXECUTION_NON_BLOCKING_CODES.has(validationIssue.code)
+        ? CaseValidationIssueSchema.parse({ ...validationIssue, severity: "WARNING" })
+        : validationIssue
+    );
+
+    if (parsed.data.manifest.status !== "UNDER_REVIEW") {
+      issues.push(issue({
+        code: "REVIEW_EXECUTION_SOURCE_LIFECYCLE_INVALID",
+        severity: "ERROR",
+        module: "manifest",
+        path: "$.manifest.status",
+        relatedIds: [parsed.data.manifest.status],
+        message: "Review execution artifacts accept only an UNDER_REVIEW source Case Version."
+      }));
+    }
+    const nonReviewModules = parsed.data.manifest.modules.filter(
+      (declaration) => declaration.approval_status !== "UNDER_REVIEW"
+    );
+    if (nonReviewModules.length > 0) {
+      issues.push(issue({
+        code: "REVIEW_EXECUTION_MODULE_STATUS_INVALID",
+        severity: "ERROR",
+        module: "manifest",
+        path: "$.manifest.modules",
+        relatedIds: nonReviewModules.map((declaration) => declaration.module_name),
+        message: "Review execution requires every exact module snapshot to be UNDER_REVIEW."
+      }));
+    }
+    if (
+      parsed.data.validation.review_status !== "UNDER_REVIEW"
+      || parsed.data.validation.approval_status !== "UNDER_REVIEW"
+    ) {
+      issues.push(issue({
+        code: "REVIEW_EXECUTION_GOVERNANCE_STATUS_INVALID",
+        severity: "ERROR",
+        module: "validation",
+        path: "$.validation",
+        relatedIds: [
+          parsed.data.validation.review_status,
+          parsed.data.validation.approval_status
+        ],
+        message: "Review execution preserves UNDER_REVIEW governance status without approval."
+      }));
+    }
+
+    const approvedClinicalReviews = parsed.data.validation.reviews
+      .filter((review) => review.review_type === "CLINICAL" && review.status === "APPROVED");
+    if (approvedClinicalReviews.length > 0) {
+      issues.push(issue({
+        code: "REVIEW_EXECUTION_CLINICAL_REVIEW_ALREADY_APPROVED",
+        severity: "ERROR",
+        module: "validation",
+        path: "$.validation.reviews",
+        relatedIds: approvedClinicalReviews.map((review) => review.review_id),
+        message: "This review-only artifact lane requires Clinical Review to remain pending."
+      }));
+    }
+
+    return createValidationReport("REVIEW_EXECUTION", issues);
+  } catch {
+    return createValidationReport("REVIEW_EXECUTION", [issue({
+      code: "HASH_ADAPTER_FAILURE",
+      severity: "ERROR",
+      path: "$",
+      message: "The supplied hash adapter could not produce valid review execution hashes."
+    })]);
+  }
+}
+
 function validateApprovalRecord(
   casePackage: DraftCasePackage,
   candidate: PublicationCandidate,

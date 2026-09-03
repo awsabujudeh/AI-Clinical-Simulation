@@ -42,7 +42,16 @@ export function projectAssessmentEvidenceFromSession(
     case_package_id: session.data.pinned_case.case_package_id,
     case_version_id: session.data.pinned_case.case_version_id,
     case_version: session.data.pinned_case.case_version,
-    package_hash: session.data.pinned_case.package_hash,
+    ...(session.data.pinned_case.execution_authority === "PUBLISHED_PRODUCTION"
+      ? {
+          execution_authority: "PUBLISHED_PRODUCTION" as const,
+          package_hash: session.data.pinned_case.package_hash
+        }
+      : {
+          execution_authority: "REVIEW_ONLY" as const,
+          review_execution_hash: session.data.pinned_case.review_execution_hash,
+          review_subject_hash: session.data.pinned_case.review_subject_hash
+        }),
     assessed_through_clinical_time: session.data.patient_state.clinical_time,
     committed_events: session.data.committed_events
   });

@@ -52,6 +52,7 @@ test("inconsistent final sequence, time, identity, and rubric provenance fail cl
   ]) {
     const evaluated = evaluateAssessment({
       evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+      execution_authority: "PUBLISHED_PRODUCTION",
       evaluation_phase: "FINAL",
       assessment_id: "assessment.synthetic.001",
       compiled_case_package: casePackage,
@@ -125,6 +126,7 @@ test("a final request cannot include evidence after its claimed boundary", async
   };
   const result = evaluateAssessment({
     evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     evaluation_phase: "FINAL",
     assessment_id: "assessment.synthetic.001",
     compiled_case_package: casePackage,

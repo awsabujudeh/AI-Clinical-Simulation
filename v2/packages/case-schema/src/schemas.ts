@@ -661,6 +661,84 @@ export const DraftCasePackageSchema = z.strictObject({
 });
 export type DraftCasePackage = z.infer<typeof DraftCasePackageSchema>;
 
+export const REVIEW_EXECUTION_ARTIFACT_SCHEMA_VERSION = "1.0" as const;
+
+export const ReviewExecutionSourceCaseSchema = DraftCasePackageSchema.extend({
+  manifest: CaseManifestSchema.extend({ status: z.literal("UNDER_REVIEW") }),
+  initial_state: PublishedInitialStateModuleSchema
+});
+export type ReviewExecutionSourceCase = z.infer<typeof ReviewExecutionSourceCaseSchema>;
+
+/**
+ * An immutable executable snapshot for trusted review. It remains structurally
+ * distinct from a compiled/published package and preserves its UNDER_REVIEW
+ * source lifecycle without fabricating human approval evidence.
+ */
+export const ReviewExecutionArtifactSchema = z.strictObject({
+  artifact_kind: z.literal("REVIEW_EXECUTION_ARTIFACT"),
+  artifact_schema_version: z.literal(REVIEW_EXECUTION_ARTIFACT_SCHEMA_VERSION),
+  execution_authority: z.literal("REVIEW_ONLY"),
+  hash_algorithm: z.literal("SHA-256"),
+  source_identity: z.strictObject({
+    case_package_id: CasePackageIdSchema,
+    case_version_id: CaseVersionIdSchema,
+    case_version: SemanticVersionSchema,
+    case_schema_version: SchemaVersionSchema,
+    source_lifecycle: z.literal("UNDER_REVIEW")
+  }),
+  module_hashes: z.record(CaseModuleNameSchema, HashDigestSchema),
+  review_subject_hash: HashDigestSchema,
+  review_execution_hash: HashDigestSchema,
+  source_case: ReviewExecutionSourceCaseSchema
+}).superRefine((artifact, context) => {
+  const manifest = artifact.source_case.manifest;
+  const comparisons = [
+    ["case_package_id", artifact.source_identity.case_package_id, manifest.case_package_id],
+    ["case_version_id", artifact.source_identity.case_version_id, manifest.case_version_id],
+    ["case_version", artifact.source_identity.case_version, manifest.case_version],
+    ["case_schema_version", artifact.source_identity.case_schema_version, manifest.schema_version],
+    ["source_lifecycle", artifact.source_identity.source_lifecycle, manifest.status]
+  ] as const;
+  for (const [field, bound, actual] of comparisons) {
+    if (bound !== actual) {
+      context.addIssue({
+        code: "custom",
+        path: ["source_identity", field],
+        message: `Review artifact ${field} must match its exact source Case.`
+      });
+    }
+  }
+  if (artifact.source_case.validation.reviews.some(
+    (review) => review.review_type === "CLINICAL" && review.status === "APPROVED"
+  )) {
+    context.addIssue({
+      code: "custom",
+      path: ["source_case", "validation", "reviews"],
+      message: "A review execution artifact cannot carry an approved Clinical Review."
+    });
+  }
+  if (artifact.source_case.manifest.modules.some(
+    (declaration) => declaration.approval_status !== "UNDER_REVIEW"
+  )) {
+    context.addIssue({
+      code: "custom",
+      path: ["source_case", "manifest", "modules"],
+      message: "Every review execution module snapshot must remain UNDER_REVIEW."
+    });
+  }
+  if (
+    artifact.source_case.validation.review_status !== "UNDER_REVIEW"
+    || artifact.source_case.validation.approval_status !== "UNDER_REVIEW"
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["source_case", "validation"],
+      message: "Review artifact governance state must remain UNDER_REVIEW."
+    });
+  }
+});
+export type ReviewExecutionArtifact = z.infer<typeof ReviewExecutionArtifactSchema>;
+
 export const CompiledCaseManifestSchema = CaseManifestSchema.extend({
   status: z.literal("PUBLISHED"),
   hash_algorithm: z.literal("SHA-256"),

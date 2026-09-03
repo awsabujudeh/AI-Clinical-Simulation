@@ -59,7 +59,7 @@ function roundAssessmentRatio(numerator: number, denominator: number): number {
 export const ScoreBasisPointsSchema = z.number().int().min(0).max(10_000);
 export type ScoreBasisPoints = z.infer<typeof ScoreBasisPointsSchema>;
 
-export const AssessmentSessionEvidenceSchema = z.strictObject({
+const assessmentSessionEvidenceCommonShape = {
   evidence_schema_version: z.literal(ASSESSMENT_EVIDENCE_SCHEMA_VERSION),
   authority: z.literal("SESSION_ENGINE_COMMITTED_TIMELINE"),
   session_id: SessionIdSchema,
@@ -67,10 +67,19 @@ export const AssessmentSessionEvidenceSchema = z.strictObject({
   case_package_id: CasePackageIdSchema,
   case_version_id: CaseVersionIdSchema,
   case_version: SemanticVersionSchema,
-  package_hash: Sha256DigestSchema,
   assessed_through_clinical_time: ClinicalTimeSchema,
   committed_events: z.array(CanonicalEventEnvelopeSchema).max(4096)
-}).superRefine((value, context) => {
+} as const;
+
+function refineAssessmentSessionEvidence(
+  value: {
+    session_id: string;
+    case_version: string;
+    assessed_through_clinical_time: number;
+    committed_events: z.infer<typeof CanonicalEventEnvelopeSchema>[];
+  },
+  context: z.RefinementCtx
+): void {
   const eventIds = new Set<string>();
   for (const [index, event] of value.committed_events.entries()) {
     if (event.sequence_no !== index + 1) {
@@ -110,7 +119,25 @@ export const AssessmentSessionEvidenceSchema = z.strictObject({
       });
     }
   }
-});
+}
+
+export const ProductionAssessmentSessionEvidenceSchema = z.strictObject({
+  ...assessmentSessionEvidenceCommonShape,
+  execution_authority: z.literal("PUBLISHED_PRODUCTION"),
+  package_hash: Sha256DigestSchema
+}).superRefine(refineAssessmentSessionEvidence);
+
+export const ReviewAssessmentSessionEvidenceSchema = z.strictObject({
+  ...assessmentSessionEvidenceCommonShape,
+  execution_authority: z.literal("REVIEW_ONLY"),
+  review_execution_hash: Sha256DigestSchema,
+  review_subject_hash: Sha256DigestSchema
+}).superRefine(refineAssessmentSessionEvidence);
+
+export const AssessmentSessionEvidenceSchema = z.union([
+  ProductionAssessmentSessionEvidenceSchema,
+  ReviewAssessmentSessionEvidenceSchema
+]);
 export type AssessmentSessionEvidence = z.infer<typeof AssessmentSessionEvidenceSchema>;
 
 export const AssessmentEventEvidenceSchema = z.strictObject({
@@ -213,7 +240,7 @@ export const AppliedCriticalEffectSchema = z.discriminatedUnion("effect_type", [
 ]);
 export type AppliedCriticalEffect = z.infer<typeof AppliedCriticalEffectSchema>;
 
-export const AssessmentResultSchema = z.strictObject({
+const assessmentResultCommonShape = {
   result_schema_version: z.literal(ASSESSMENT_RESULT_SCHEMA_VERSION),
   trace_version: z.literal("1.0"),
   assessment_id: AssessmentIdSchema,
@@ -222,7 +249,6 @@ export const AssessmentResultSchema = z.strictObject({
   case_package_id: CasePackageIdSchema,
   case_version_id: CaseVersionIdSchema,
   case_version: SemanticVersionSchema,
-  package_hash: Sha256DigestSchema,
   rubric_id: RubricIdSchema,
   rubric_version: SemanticVersionSchema,
   rubric_module_schema_version: SchemaVersionSchema,
@@ -237,7 +263,25 @@ export const AssessmentResultSchema = z.strictObject({
   applied_critical_effects: z.array(AppliedCriticalEffectSchema).max(128),
   unsafe: z.boolean(),
   finalization_boundary: AssessmentFinalizationBoundarySchema.optional()
-}).superRefine((value, context) => {
+} as const;
+
+const ProductionAssessmentResultSchema = z.strictObject({
+  ...assessmentResultCommonShape,
+  execution_authority: z.literal("PUBLISHED_PRODUCTION"),
+  package_hash: Sha256DigestSchema
+});
+
+const ReviewAssessmentResultSchema = z.strictObject({
+  ...assessmentResultCommonShape,
+  execution_authority: z.literal("REVIEW_ONLY"),
+  review_execution_hash: Sha256DigestSchema,
+  review_subject_hash: Sha256DigestSchema
+});
+
+export const AssessmentResultSchema = z.union([
+  ProductionAssessmentResultSchema,
+  ReviewAssessmentResultSchema
+]).superRefine((value, context) => {
   if (value.evaluation_phase === "FINAL" && value.finalization_boundary === undefined) {
     context.addIssue({
       code: "custom",
@@ -262,7 +306,20 @@ export const AssessmentResultSchema = z.strictObject({
       message: "A final Assessment Result cannot contain unresolved criteria."
     });
   }
-  if (value.finalization_boundary !== undefined) {
+  if (
+    value.execution_authority === "REVIEW_ONLY"
+    && value.finalization_boundary !== undefined
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["finalization_boundary"],
+      message: "Review-only scoring cannot claim a production finalization boundary."
+    });
+  }
+  if (
+    value.execution_authority === "PUBLISHED_PRODUCTION"
+    && value.finalization_boundary !== undefined
+  ) {
     const boundaryComparisons = [
       ["assessment_id", value.finalization_boundary.assessment_id, value.assessment_id],
       ["session_id", value.finalization_boundary.session_id, value.session_id],

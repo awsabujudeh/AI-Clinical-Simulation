@@ -7,7 +7,7 @@ import {
   ClinicalTimeSchema,
   ClinicalTransitionSuccessSchema,
   PatientStateSchema,
-  PinnedClinicalPolicyEnvelopeSchema,
+  ExecutablePinnedClinicalPolicyEnvelopeSchema,
   PriorCommittedEventFactSchema,
   SCHEDULER_SCHEMA_VERSION,
   ScheduledItemSchema,
@@ -18,7 +18,7 @@ import {
   type ClinicalEventProposal,
   type ClinicalTransitionSuccess,
   type PatientState,
-  type PinnedClinicalPolicyEnvelope,
+  type ExecutablePinnedClinicalPolicyEnvelope,
   type RuleEffect,
   type ScheduledItem,
   type SchedulerState,
@@ -60,7 +60,7 @@ import {
 } from "./conditions.ts";
 
 const RuntimeCommonShape = {
-  policy: PinnedClinicalPolicyEnvelopeSchema,
+  policy: ExecutablePinnedClinicalPolicyEnvelopeSchema,
   state: PatientStateSchema,
   scheduler_state: SchedulerStateSchema,
   prior_event_facts: z.array(PriorCommittedEventFactSchema).max(4096)
@@ -605,7 +605,7 @@ export function patientStateFingerprint(state: PatientState): string {
 function executeStep(input: {
   state: PatientState;
   schedulerState: SchedulerState;
-  policy: PinnedClinicalPolicyEnvelope;
+  policy: ExecutablePinnedClinicalPolicyEnvelope;
   trigger: ClinicalEvaluationTrigger;
   clinicalTime: number;
   priorEvents: ConditionEvaluationContext["priorEvents"];
@@ -839,7 +839,7 @@ function buildTrace(
 function budgetFailure(
   state: PatientState,
   trigger: ClinicalEvaluationTrigger,
-  policy: PinnedClinicalPolicyEnvelope,
+  policy: ExecutablePinnedClinicalPolicyEnvelope,
   trace: TraceCollector,
   budget: EngineWorkBudget,
   cycleEvaluations: number
@@ -875,7 +875,7 @@ function budgetFailure(
 function failureResult(
   state: PatientState,
   trigger: ClinicalEvaluationTrigger,
-  policy: PinnedClinicalPolicyEnvelope,
+  policy: ExecutablePinnedClinicalPolicyEnvelope,
   trace: TraceCollector,
   issues: ClinicalTransitionIssue[],
   cycleEvaluations: number
@@ -963,7 +963,11 @@ function executeParsedRequest(request: PinnedClinicalEvaluationRequest): Clinica
   let schedulerState = scheduler;
   const proposals: ClinicalEventProposal[] = [];
   const activationKeys = new Set<string>();
-  const caseFactIds = new Set<string>(policy.approved_case_fact_ids);
+  const caseFactIds = new Set<string>(
+    policy.execution_authority === "PUBLISHED_PRODUCTION"
+      ? policy.approved_case_fact_ids
+      : policy.case_fact_ids
+  );
   let cycleEvaluations = 0;
 
   if (request.operation === "PROCESS_DUE") {

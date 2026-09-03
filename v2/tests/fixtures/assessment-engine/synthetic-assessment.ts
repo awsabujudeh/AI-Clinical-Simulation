@@ -213,6 +213,7 @@ export function evaluateSyntheticAssessment(input: {
   const evaluationPhase = input.evaluationPhase ?? "FINAL";
   return evaluateAssessment({
     evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     assessment_id: "assessment.synthetic.001",
     compiled_case_package: input.casePackage,
     session_evidence: evidence,
@@ -239,6 +240,9 @@ export async function createV2007APortabilitySnapshot() {
   });
   if (!evaluated.success) {
     throw new Error(`Assessment portability fixture failed: ${JSON.stringify(evaluated.issues)}`);
+  }
+  if (evaluated.result.execution_authority !== "PUBLISHED_PRODUCTION") {
+    throw new Error("Production assessment fixture returned non-production authority.");
   }
   return {
     overall_score_basis_points: evaluated.result.overall_score_basis_points,

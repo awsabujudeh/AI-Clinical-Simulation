@@ -4,6 +4,7 @@ import {
   ASSESSMENT_RESULT_SCHEMA_VERSION,
   AssessmentFinalizationBoundarySchema,
   AssessmentIdSchema,
+  ReviewAssessmentSessionEvidenceSchema,
   AssessmentResultSchema,
   AssessmentSessionEvidenceSchema,
   ScoringEvidenceRefIdSchema,
@@ -17,13 +18,16 @@ import {
 } from "../../../contracts/src/index.ts";
 import {
   CompiledCasePackageSchema,
+  ReviewExecutionArtifactSchema,
   type CriticalRubricItem,
   type ScoredRubricCriterion
 } from "../../../case-schema/src/index.ts";
 
 import {
   createPinnedAssessmentContext,
-  type PinnedAssessmentContext
+  createPinnedReviewAssessmentContext,
+  type PinnedAssessmentContext,
+  type PinnedReviewAssessmentContext
 } from "../context/pinned-assessment.ts";
 import { resolveRubricEvidence } from "../evidence/match-evidence.ts";
 import {
@@ -37,6 +41,7 @@ export const ASSESSMENT_EVALUATION_SCHEMA_VERSION = "1.0" as const;
 
 const assessmentEvaluationRequestShape = {
   evaluation_schema_version: z.literal(ASSESSMENT_EVALUATION_SCHEMA_VERSION),
+  execution_authority: z.literal("PUBLISHED_PRODUCTION"),
   assessment_id: AssessmentIdSchema,
   compiled_case_package: CompiledCasePackageSchema,
   session_evidence: AssessmentSessionEvidenceSchema
@@ -60,6 +65,29 @@ export const AssessmentEvaluationRequestSchema = z.discriminatedUnion(
 export type AssessmentEvaluationRequest = z.infer<
   typeof AssessmentEvaluationRequestSchema
 >;
+
+export const ReviewAssessmentEvaluationRequestSchema = z.strictObject({
+  evaluation_schema_version: z.literal(ASSESSMENT_EVALUATION_SCHEMA_VERSION),
+  execution_authority: z.literal("REVIEW_ONLY"),
+  evaluation_phase: z.literal("LIVE"),
+  assessment_id: AssessmentIdSchema,
+  review_execution_artifact: ReviewExecutionArtifactSchema,
+  session_evidence: ReviewAssessmentSessionEvidenceSchema
+});
+export type ReviewAssessmentEvaluationRequest = z.infer<
+  typeof ReviewAssessmentEvaluationRequestSchema
+>;
+
+const ExecutableAssessmentEvaluationRequestSchema = z.union([
+  AssessmentEvaluationRequestSchema,
+  ReviewAssessmentEvaluationRequestSchema
+]);
+type ExecutableAssessmentEvaluationRequest = z.infer<
+  typeof ExecutableAssessmentEvaluationRequestSchema
+>;
+type ExecutablePinnedAssessmentContext =
+  | PinnedAssessmentContext
+  | PinnedReviewAssessmentContext;
 
 export type AssessmentEvaluationResult =
   | { success: true; issues: []; result: AssessmentResult }
@@ -136,7 +164,7 @@ function traceForResolution(input: {
 function evidenceOpportunityClosed(input: {
   evidence: ScoredRubricCriterion["evidence"] | CriticalRubricItem["evidence"];
   assessedThroughClinicalTime: number;
-  context: PinnedAssessmentContext;
+  context: ExecutablePinnedAssessmentContext;
 }): boolean {
   if (input.evidence.sequence_constraint !== undefined) return false;
   if (input.evidence.timing_window_id === undefined) return false;
@@ -154,7 +182,7 @@ function evaluateScoredCriterion(input: {
   criterion: ScoredRubricCriterion;
   domainId: string;
   events: readonly CanonicalEventEnvelope[];
-  context: PinnedAssessmentContext;
+  context: ExecutablePinnedAssessmentContext;
   evaluationPhase: AssessmentEvaluationPhase;
   assessedThroughClinicalTime: number;
 }): CriterionEvaluation | AssessmentIssue {
@@ -232,7 +260,7 @@ function evaluateScoredCriterion(input: {
 function evaluateCriticalItem(input: {
   item: CriticalRubricItem;
   events: readonly CanonicalEventEnvelope[];
-  context: PinnedAssessmentContext;
+  context: ExecutablePinnedAssessmentContext;
   evaluationPhase: AssessmentEvaluationPhase;
   assessedThroughClinicalTime: number;
 }): {
@@ -299,17 +327,17 @@ function evaluateCriticalItem(input: {
 }
 
 function pinnedIdentityIssues(
-  request: AssessmentEvaluationRequest,
-  context: PinnedAssessmentContext
+  request: ExecutableAssessmentEvaluationRequest,
+  context: ExecutablePinnedAssessmentContext
 ): AssessmentIssue[] {
   const evidence = request.session_evidence;
   const comparisons = [
     ["case_package_id", evidence.case_package_id, context.case_package_id],
     ["case_version_id", evidence.case_version_id, context.case_version_id],
     ["case_version", evidence.case_version, context.case_version],
-    ["package_hash", evidence.package_hash, context.package_hash]
+    ["execution_authority", evidence.execution_authority, context.execution_authority]
   ] as const;
-  return comparisons.flatMap(([field, actual, expected]) => actual === expected
+  const issues = comparisons.flatMap(([field, actual, expected]) => actual === expected
     ? []
     : [assessmentIssue({
         code: "PINNED_ASSESSMENT_MISMATCH",
@@ -317,6 +345,34 @@ function pinnedIdentityIssues(
         message: "Session assessment evidence must match the exact compiled Case Package.",
         related_ids: [String(actual), String(expected)]
       })]);
+  if (
+    evidence.execution_authority === "PUBLISHED_PRODUCTION"
+    && context.execution_authority === "PUBLISHED_PRODUCTION"
+    && evidence.package_hash !== context.package_hash
+  ) {
+    issues.push(assessmentIssue({
+      code: "PINNED_ASSESSMENT_MISMATCH",
+      path: "$.session_evidence.package_hash",
+      message: "Session evidence must match the exact compiled Case Package.",
+      related_ids: [evidence.package_hash, context.package_hash]
+    }));
+  }
+  if (
+    evidence.execution_authority === "REVIEW_ONLY"
+    && context.execution_authority === "REVIEW_ONLY"
+    && (
+      evidence.review_execution_hash !== context.review_execution_hash
+      || evidence.review_subject_hash !== context.review_subject_hash
+    )
+  ) {
+    issues.push(assessmentIssue({
+      code: "PINNED_ASSESSMENT_MISMATCH",
+      path: "$.session_evidence.review_execution_hash",
+      message: "Session evidence must match the exact review execution artifact.",
+      related_ids: [evidence.review_execution_hash, context.review_execution_hash]
+    }));
+  }
+  return issues;
 }
 
 function finalizationBoundaryIssues(input: {
@@ -366,14 +422,46 @@ export function evaluateAssessment(input: unknown): AssessmentEvaluationResult {
     };
   }
 
+  return evaluateExecutableAssessment(request.data);
+}
+
+/** Scores a trusted review Session without granting production authority. */
+export function evaluateReviewAssessment(input: unknown): AssessmentEvaluationResult {
+  const request = ReviewAssessmentEvaluationRequestSchema.safeParse(input);
+  if (!request.success) {
+    return {
+      success: false,
+      issues: assessmentIssuesFromZodError("$.assessment", request.error)
+    };
+  }
+  return evaluateExecutableAssessment(request.data);
+}
+
+function evaluateExecutableAssessment(
+  requestData: ExecutableAssessmentEvaluationRequest
+): AssessmentEvaluationResult {
+  const request = ExecutableAssessmentEvaluationRequestSchema.safeParse(requestData);
+  if (!request.success) {
+    return {
+      success: false,
+      issues: assessmentIssuesFromZodError("$.assessment", request.error)
+    };
+  }
+
   try {
-    const pinned = createPinnedAssessmentContext(request.data.compiled_case_package);
+    const pinned = request.data.execution_authority === "PUBLISHED_PRODUCTION"
+      ? createPinnedAssessmentContext(request.data.compiled_case_package)
+      : createPinnedReviewAssessmentContext(request.data.review_execution_artifact);
     if (!pinned.success) return pinned;
     const identityIssues = pinnedIdentityIssues(request.data, pinned.context);
     if (identityIssues.length > 0) {
       return { success: false, issues: sortAssessmentIssues(identityIssues) };
     }
-    if (request.data.evaluation_phase === "FINAL") {
+    if (
+      request.data.execution_authority === "PUBLISHED_PRODUCTION"
+      && pinned.context.execution_authority === "PUBLISHED_PRODUCTION"
+      && request.data.evaluation_phase === "FINAL"
+    ) {
       const boundaryIssues = finalizationBoundaryIssues({
         boundary: request.data.finalization_boundary,
         assessmentId: request.data.assessment_id,
@@ -498,7 +586,16 @@ export function evaluateAssessment(input: unknown): AssessmentEvaluationResult {
       case_package_id: pinned.context.case_package_id,
       case_version_id: pinned.context.case_version_id,
       case_version: pinned.context.case_version,
-      package_hash: pinned.context.package_hash,
+      ...(pinned.context.execution_authority === "PUBLISHED_PRODUCTION"
+        ? {
+            execution_authority: "PUBLISHED_PRODUCTION" as const,
+            package_hash: pinned.context.package_hash
+          }
+        : {
+            execution_authority: "REVIEW_ONLY" as const,
+            review_execution_hash: pinned.context.review_execution_hash,
+            review_subject_hash: pinned.context.review_subject_hash
+          }),
       rubric_id: pinned.context.rubric_id,
       rubric_version: pinned.context.rubric_version,
       rubric_module_schema_version: pinned.context.rubric_module_schema_version,

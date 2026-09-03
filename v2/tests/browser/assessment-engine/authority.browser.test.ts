@@ -29,6 +29,7 @@ test("compiled Case pinning is required and a runtime rubric sidecar is rejected
   );
   const mismatched = evaluateAssessment({
     evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     assessment_id: "assessment.synthetic.mismatch",
     compiled_case_package: casePackage,
     session_evidence: {
@@ -46,6 +47,7 @@ test("compiled Case pinning is required and a runtime rubric sidecar is rejected
 
   const sidecar = evaluateAssessment({
     evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     assessment_id: "assessment.synthetic.sidecar",
     compiled_case_package: casePackage,
     session_evidence: evidence,
@@ -107,6 +109,7 @@ test("raw ActionRequest and uncommitted Clinical proposals cannot become evidenc
   for (const invalidEvidence of [actionRequest, proposal]) {
     const result = evaluateAssessment({
       evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+      execution_authority: "PUBLISHED_PRODUCTION",
       assessment_id: "assessment.synthetic.invalid-evidence",
       compiled_case_package: casePackage,
       session_evidence: invalidEvidence,
@@ -135,6 +138,7 @@ test("Practice and Assessment modes do not change internal deterministic truth",
   const evidence = createAssessmentEvidenceFromCompiledCase(casePackage, [event]);
   const assessment = evaluateAssessment({
     evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     assessment_id: "assessment.synthetic.mode-independent",
     compiled_case_package: casePackage,
     session_evidence: evidence,
@@ -142,6 +146,7 @@ test("Practice and Assessment modes do not change internal deterministic truth",
   });
   const practice = evaluateAssessment({
     evaluation_schema_version: ASSESSMENT_EVALUATION_SCHEMA_VERSION,
+    execution_authority: "PUBLISHED_PRODUCTION",
     assessment_id: "assessment.synthetic.mode-independent",
     compiled_case_package: casePackage,
     session_evidence: { ...evidence, session_mode: "PRACTICE_DEMO" },

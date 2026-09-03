@@ -70,6 +70,14 @@ V2-004 publication validation proves only initial-state projection coverage. Whe
 
 ## V2-003 Case Schema validator/compiler
 
+### Review-only executable artifacts
+
+`prepareReviewExecutionArtifact` derives a strict, immutable `REVIEW_ONLY` artifact from a technically executable `UNDER_REVIEW` Case. Its `review_execution_hash` binds the exact 16-module source snapshot, all module hashes, the Case identity/version, and `review_subject_hash`; it never creates Clinical Approval, an Approval Record, a published package, or a lifecycle transition.
+
+Technical review execution fails closed for schema/reference defects, unsupported runtime or diagnostic semantics, reachability/liveness failures, stale mandatory evidence, and reachable observation-projection gaps. Pending human Clinical, curriculum, visual, or media approval remains visible but does not masquerade as a technical failure when Case-authored structured fallback permits deterministic execution.
+
+Production and review authority use separate pinning functions for Clinical, Session, and Assessment contexts. Production constructors still accept only `CompiledCasePackage`; review constructors accept only `ReviewExecutionArtifact` and preserve its `REVIEW_ONLY` authority. A review artifact cannot satisfy the minimal production-playability boundary, and no runtime policy/action sidecar is accepted.
+
 Draft validation requires strict schema and reference integrity while reporting unresolved approval, source, curriculum, fallback, and review gates as warnings. `preparePublicationCandidate` accepts only an eligible `UNDER_REVIEW` or `APPROVED` source, applies every candidate-readiness gate, and projects it without mutation onto the exact target `PUBLISHED` artifact. This target status describes the would-be immutable package; it does not claim that persistence or publication has occurred. The same unchanged source content/evidence therefore produces the same candidate after `UNDER_REVIEW` becomes `APPROVED`.
 
 Final publication validation requires an `APPROVED` source plus an external exact-package Approval Record whose Case Version identity, semantic version, required Clinical/Technical review references, and `approved_package_hash` match the recomputed candidate. The record remains outside Case Package bytes, matching the separate `case_approvals` and `case_packages` governance boundary. Candidate preparation and final compilation are pure: neither persists data nor mutates lifecycle state.
@@ -136,6 +144,7 @@ npm run test:assessment-engine
 npm run test:v2-007a
 npm run test:v2-007
 npm run test:diagnostic-contract
+npm run test:review-execution-artifact
 npm run test:playwright
 npm run test:portability-guard
 npm run verify

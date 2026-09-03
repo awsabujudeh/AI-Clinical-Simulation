@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { CaseModuleNameSchema } from "./schemas.ts";
 
-export const ValidationModeSchema = z.enum(["DRAFT", "CANDIDATE", "PUBLICATION"]);
+export const ValidationModeSchema = z.enum([
+  "DRAFT",
+  "REVIEW_EXECUTION",
+  "CANDIDATE",
+  "PUBLICATION"
+]);
 export type ValidationMode = z.infer<typeof ValidationModeSchema>;
 
 export const ValidationIssueSeveritySchema = z.enum(["ERROR", "WARNING", "INFO"]);

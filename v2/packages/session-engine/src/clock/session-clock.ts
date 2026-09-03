@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import {
   ElapsedRealSecondsSchema,
-  PinnedClinicalPolicyEnvelopeSchema,
+  ExecutablePinnedClinicalPolicyEnvelopeSchema,
   SESSION_CLOCK_SCHEMA_VERSION,
   SessionClinicalClockSchema,
   type SessionClinicalClock
@@ -42,7 +42,7 @@ export type SessionClockResult = SessionClockFailure | SessionClockSuccess;
 
 export const NormalClockAdvanceRequestSchema = z.strictObject({
   clock: SessionClinicalClockSchema,
-  policy: PinnedClinicalPolicyEnvelopeSchema,
+  policy: ExecutablePinnedClinicalPolicyEnvelopeSchema,
   elapsed_real_seconds: ElapsedRealSecondsSchema
 });
 export type NormalClockAdvanceRequest = z.infer<

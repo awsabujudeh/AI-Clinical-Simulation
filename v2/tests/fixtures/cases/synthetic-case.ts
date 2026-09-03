@@ -531,6 +531,36 @@ export async function createCandidateReadyUnderReviewCase(
   return DraftCasePackageSchema.parse(casePackage);
 }
 
+/** Synthetic, medically neutral source for the trusted REVIEW_ONLY lane. */
+export async function createReviewExecutableUnderReviewCase(
+  hashAdapter: HashAdapter = TEST_HASH_ADAPTER
+): Promise<DraftCasePackage> {
+  const casePackage = cloneCase(MINIMAL_DRAFT_CASE);
+  casePackage.manifest.status = "UNDER_REVIEW";
+  for (const declaration of casePackage.manifest.modules) {
+    declaration.approval_status = "UNDER_REVIEW";
+  }
+  casePackage.validation.review_status = "UNDER_REVIEW";
+  casePackage.validation.approval_status = "UNDER_REVIEW";
+  casePackage.validation.reviews = [];
+  casePackage.validation.deferred_checks = [
+    ValidationEvidenceSchema.parse({
+      validation_code: RULE_REACHABILITY_VALIDATION_CODE,
+      status: "PASSED",
+      required_for_publication: true,
+      validator_id: "validator.rule-reachability.v1",
+      validator_version: "1.1.0",
+      evidence_hash: "0".repeat(64),
+      validated_case_version_id: casePackage.manifest.case_version_id,
+      validated_case_version: casePackage.manifest.case_version,
+      validated_review_subject_hash: "0".repeat(64),
+      completed_at_utc: "2026-08-30T12:03:00Z"
+    })
+  ];
+  await bindSyntheticReviewAndReachabilityEvidence(casePackage, hashAdapter);
+  return DraftCasePackageSchema.parse(casePackage);
+}
+
 export async function createApprovedSourceCase(
   hashAdapter: HashAdapter = TEST_HASH_ADAPTER
 ): Promise<DraftCasePackage> {

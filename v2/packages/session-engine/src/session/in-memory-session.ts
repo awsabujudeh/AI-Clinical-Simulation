@@ -16,7 +16,10 @@ import {
   Sha256DigestSchema,
   StateVersionSchema
 } from "../../../contracts/src/index.ts";
-import { CompiledCasePackageSchema } from "../../../case-schema/src/index.ts";
+import {
+  CompiledCasePackageSchema,
+  ReviewExecutionArtifactSchema
+} from "../../../case-schema/src/index.ts";
 import {
   initializeClinicalScheduler,
   initializePatientState
@@ -24,8 +27,10 @@ import {
 
 import { initializeSessionClinicalClock } from "../clock/session-clock.ts";
 import {
-  PinnedSessionCaseContextSchema,
-  createPinnedSessionCaseContext
+  ExecutablePinnedSessionCaseContextSchema,
+  createPinnedReviewSessionCaseContext,
+  createPinnedSessionCaseContext,
+  type ExecutablePinnedSessionCaseContext
 } from "../context/pinned-session-case.ts";
 import {
   createSessionCommandIssue,
@@ -70,7 +75,7 @@ export const InMemorySessionAggregateSchema = z.strictObject({
   status: z.literal("ACTIVE"),
   session_id: SessionIdSchema,
   mode: SessionModeSchema,
-  pinned_case: PinnedSessionCaseContextSchema,
+  pinned_case: ExecutablePinnedSessionCaseContextSchema,
   patient_state: PatientStateSchema,
   scheduler_state: SchedulerStateSchema,
   clinical_clock: SessionClinicalClockSchema,
@@ -208,43 +213,34 @@ export type InMemorySessionInitializationResult =
   | { success: true; issues: []; session: InMemorySessionAggregate }
   | { success: false; issues: SessionCommandIssue[] };
 
-/** Creates a new in-memory authority only from one immutable compiled package. */
-export function initializeInMemorySession(
-  input: unknown
-): InMemorySessionInitializationResult {
-  const request = InMemorySessionInitializationRequestSchema.safeParse(input);
-  if (!request.success) {
-    return {
-      success: false,
-      issues: sessionCommandIssuesFromZodError(
-        "INVALID_SESSION_AGGREGATE",
-        "$.initialization",
-        request.error
-      )
-    };
-  }
+export const ReviewInMemorySessionInitializationRequestSchema = z.strictObject({
+  session_id: SessionIdSchema,
+  mode: SessionModeSchema,
+  review_execution_artifact: ReviewExecutionArtifactSchema,
+  trusted_real_time_anchor_utc: RealUtcTimeSchema.optional()
+});
 
-  const pinned = createPinnedSessionCaseContext(request.data.compiled_case_package);
-  const patient = initializePatientState(
-    request.data.compiled_case_package.initial_state.patient_state,
-    request.data.session_id
-  );
-  if (!pinned.success || !patient.success) {
+function initializeFromPinnedCase(input: {
+  sessionId: z.infer<typeof SessionIdSchema>;
+  mode: z.infer<typeof SessionModeSchema>;
+  pinnedCase: ExecutablePinnedSessionCaseContext;
+  initialPatientState: unknown;
+  trustedRealTimeAnchorUtc?: z.infer<typeof RealUtcTimeSchema>;
+}): InMemorySessionInitializationResult {
+  const patient = initializePatientState(input.initialPatientState, input.sessionId);
+  if (!patient.success) {
     return {
       success: false,
-      issues: sortSessionCommandIssues([
-        ...(!pinned.success ? pinned.issues : []),
-        ...(!patient.success ? patient.issues.map((issue) => createSessionCommandIssue({
-          code: "INVALID_SESSION_AGGREGATE",
-          path: issue.path,
-          message: issue.message
-        })) : [])
-      ])
+      issues: patient.issues.map((issue) => createSessionCommandIssue({
+        code: "INVALID_SESSION_AGGREGATE",
+        path: issue.path,
+        message: issue.message
+      }))
     };
   }
 
   const scheduler = initializeClinicalScheduler(
-    pinned.context.clinical_policy.timeline_policy.initial_scheduled_items
+    input.pinnedCase.clinical_policy.timeline_policy.initial_scheduled_items
   );
   const clock = initializeSessionClinicalClock(patient.state.clinical_time);
   if (!scheduler.success || !clock.success) {
@@ -268,28 +264,89 @@ export function initializeInMemorySession(
   const session = InMemorySessionAggregateSchema.safeParse({
     aggregate_schema_version: IN_MEMORY_SESSION_AGGREGATE_SCHEMA_VERSION,
     status: "ACTIVE",
-    session_id: request.data.session_id,
-    mode: request.data.mode,
-    pinned_case: pinned.context,
+    session_id: input.sessionId,
+    mode: input.mode,
+    pinned_case: input.pinnedCase,
     patient_state: patient.state,
     scheduler_state: scheduler.schedulerState,
     clinical_clock: clock.clock,
-    ...(request.data.trusted_real_time_anchor_utc === undefined
+    ...(input.trustedRealTimeAnchorUtc === undefined
       ? {}
-      : { trusted_real_time_anchor_utc: request.data.trusted_real_time_anchor_utc }),
+      : { trusted_real_time_anchor_utc: input.trustedRealTimeAnchorUtc }),
     committed_events: [],
     next_sequence_no: 1,
     idempotency_records: []
   });
-  if (!session.success) {
+  return session.success
+    ? { success: true, issues: [], session: session.data }
+    : {
+        success: false,
+        issues: sessionCommandIssuesFromZodError(
+          "INVALID_SESSION_AGGREGATE",
+          "$.session",
+          session.error
+        )
+      };
+}
+
+/** Creates a new in-memory authority only from one immutable compiled package. */
+export function initializeInMemorySession(
+  input: unknown
+): InMemorySessionInitializationResult {
+  const request = InMemorySessionInitializationRequestSchema.safeParse(input);
+  if (!request.success) {
     return {
       success: false,
       issues: sessionCommandIssuesFromZodError(
         "INVALID_SESSION_AGGREGATE",
-        "$.session",
-        session.error
+        "$.initialization",
+        request.error
       )
     };
   }
-  return { success: true, issues: [], session: session.data };
+
+  const pinned = createPinnedSessionCaseContext(request.data.compiled_case_package);
+  if (!pinned.success) {
+    return {
+      success: false,
+      issues: pinned.issues
+    };
+  }
+  return initializeFromPinnedCase({
+    sessionId: request.data.session_id,
+    mode: request.data.mode,
+    pinnedCase: pinned.context,
+    initialPatientState: request.data.compiled_case_package.initial_state.patient_state,
+    ...(request.data.trusted_real_time_anchor_utc === undefined
+      ? {}
+      : { trustedRealTimeAnchorUtc: request.data.trusted_real_time_anchor_utc })
+  });
+}
+
+/** Creates a trusted review Session without converting it to production. */
+export function initializeReviewInMemorySession(
+  input: unknown
+): InMemorySessionInitializationResult {
+  const request = ReviewInMemorySessionInitializationRequestSchema.safeParse(input);
+  if (!request.success) {
+    return {
+      success: false,
+      issues: sessionCommandIssuesFromZodError(
+        "INVALID_SESSION_AGGREGATE",
+        "$.initialization",
+        request.error
+      )
+    };
+  }
+  const pinned = createPinnedReviewSessionCaseContext(request.data.review_execution_artifact);
+  if (!pinned.success) return { success: false, issues: pinned.issues };
+  return initializeFromPinnedCase({
+    sessionId: request.data.session_id,
+    mode: request.data.mode,
+    pinnedCase: pinned.context,
+    initialPatientState: request.data.review_execution_artifact.source_case.initial_state.patient_state,
+    ...(request.data.trusted_real_time_anchor_utc === undefined
+      ? {}
+      : { trustedRealTimeAnchorUtc: request.data.trusted_real_time_anchor_utc })
+  });
 }

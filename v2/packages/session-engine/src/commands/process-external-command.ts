@@ -291,15 +291,38 @@ function matchesExpectedPinnedCase(
     ["case_package_id", command.expected_case.case_package_id, session.pinned_case.case_package_id],
     ["case_version_id", command.expected_case.case_version_id, session.pinned_case.case_version_id],
     ["case_version", command.expected_case.case_version, session.pinned_case.case_version],
-    ["package_hash", command.expected_case.package_hash, session.pinned_case.package_hash]
+    ["execution_authority", command.expected_case.execution_authority, session.pinned_case.execution_authority]
   ] as const;
-  return fields
+  const issues = fields
     .filter(([, expected, actual]) => expected !== actual)
     .map(([field]) => createSessionCommandIssue({
       code: "PINNED_CASE_MISMATCH",
       path: `$.command.expected_case.${field}`,
       message: `Command ${field} does not match the immutable pinned Session Case.`
     }));
+  if (
+    command.expected_case.execution_authority === "PUBLISHED_PRODUCTION"
+    && session.pinned_case.execution_authority === "PUBLISHED_PRODUCTION"
+    && command.expected_case.package_hash !== session.pinned_case.package_hash
+  ) {
+    issues.push(createSessionCommandIssue({
+      code: "PINNED_CASE_MISMATCH",
+      path: "$.command.expected_case.package_hash",
+      message: "Command package hash does not match the immutable pinned production Case."
+    }));
+  }
+  if (
+    command.expected_case.execution_authority === "REVIEW_ONLY"
+    && session.pinned_case.execution_authority === "REVIEW_ONLY"
+    && command.expected_case.review_execution_hash !== session.pinned_case.review_execution_hash
+  ) {
+    issues.push(createSessionCommandIssue({
+      code: "PINNED_CASE_MISMATCH",
+      path: "$.command.expected_case.review_execution_hash",
+      message: "Command review hash does not match the immutable pinned review artifact."
+    }));
+  }
+  return issues;
 }
 
 function parameterMatchesType(

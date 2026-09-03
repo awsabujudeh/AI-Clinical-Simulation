@@ -349,12 +349,11 @@ export const InterruptingEventTypesSchema = z.array(EventTypeSchema).max(64)
   });
 export type InterruptingEventTypes = z.infer<typeof InterruptingEventTypesSchema>;
 
-export const PinnedClinicalPolicyEnvelopeSchema = z.strictObject({
+const pinnedClinicalPolicyCommonShape = {
   policy_schema_version: z.literal(PINNED_CLINICAL_POLICY_SCHEMA_VERSION),
   case_package_id: CasePackageIdSchema,
   case_version_id: CaseVersionIdSchema,
   case_version: SemanticVersionSchema,
-  package_hash: Sha256DigestSchema,
   review_subject_hash: Sha256DigestSchema,
   rule_schema_version: z.literal(RULE_SCHEMA_VERSION),
   rules: z.array(TransitionRuleSchema).max(512),
@@ -367,28 +366,62 @@ export const PinnedClinicalPolicyEnvelopeSchema = z.strictObject({
     initial_scheduled_items: z.array(ScheduledItemSchema).max(128)
   }),
   observation_projection: ObservationProjectionDefinitionSchema,
-  approved_case_fact_ids: z.array(FactIdSchema).max(512),
   module_hashes: z.strictObject({
     rules: Sha256DigestSchema,
     timeline_policy: Sha256DigestSchema,
     initial_state: Sha256DigestSchema,
     clinical_facts: Sha256DigestSchema
   })
-}).superRefine((value, context) => {
+} as const;
+
+function refinePinnedClinicalFacts(
+  factIdsInput: readonly string[],
+  factPath: "approved_case_fact_ids" | "case_fact_ids",
+  context: z.RefinementCtx
+): void {
   const factIds = new Set<string>();
-  for (const factId of value.approved_case_fact_ids) {
+  for (const factId of factIdsInput) {
     if (factIds.has(factId)) {
       context.addIssue({
         code: "custom",
-        path: ["approved_case_fact_ids"],
+        path: [factPath],
         message: "Pinned Case Fact identities must be unique"
       });
     }
     factIds.add(factId);
   }
-});
+}
+
+export const PinnedClinicalPolicyEnvelopeSchema = z.strictObject({
+  ...pinnedClinicalPolicyCommonShape,
+  execution_authority: z.literal("PUBLISHED_PRODUCTION"),
+  package_hash: Sha256DigestSchema,
+  approved_case_fact_ids: z.array(FactIdSchema).max(512)
+}).superRefine((value, context) =>
+  refinePinnedClinicalFacts(value.approved_case_fact_ids, "approved_case_fact_ids", context)
+);
 export type PinnedClinicalPolicyEnvelope = z.infer<
   typeof PinnedClinicalPolicyEnvelopeSchema
+>;
+
+export const PinnedReviewClinicalPolicyEnvelopeSchema = z.strictObject({
+  ...pinnedClinicalPolicyCommonShape,
+  execution_authority: z.literal("REVIEW_ONLY"),
+  review_execution_hash: Sha256DigestSchema,
+  case_fact_ids: z.array(FactIdSchema).max(512)
+}).superRefine((value, context) =>
+  refinePinnedClinicalFacts(value.case_fact_ids, "case_fact_ids", context)
+);
+export type PinnedReviewClinicalPolicyEnvelope = z.infer<
+  typeof PinnedReviewClinicalPolicyEnvelopeSchema
+>;
+
+export const ExecutablePinnedClinicalPolicyEnvelopeSchema = z.union([
+  PinnedClinicalPolicyEnvelopeSchema,
+  PinnedReviewClinicalPolicyEnvelopeSchema
+]);
+export type ExecutablePinnedClinicalPolicyEnvelope = z.infer<
+  typeof ExecutablePinnedClinicalPolicyEnvelopeSchema
 >;
 
 export const PriorCommittedEventFactSchema = z.strictObject({

@@ -75,6 +75,7 @@ export function createSyntheticCommandSession(input?: {
   const state = PatientStateSchema.parse(input?.state ?? BASELINE_PATIENT_STATE);
   const context = PinnedSessionCaseContextSchema.parse({
     context_schema_version: "1.0",
+    execution_authority: "PUBLISHED_PRODUCTION",
     case_package_id: policy.case_package_id,
     case_version_id: policy.case_version_id,
     case_version: policy.case_version,
@@ -137,12 +138,16 @@ export function createSyntheticExternalCommand(
     expectedPackageHash?: string;
   }
 ): ExternalLearnerCommandEnvelope {
+  if (session.pinned_case.execution_authority !== "PUBLISHED_PRODUCTION") {
+    throw new Error("Synthetic production command fixture requires production authority.");
+  }
   return ExternalLearnerCommandEnvelopeSchema.parse({
     command_schema_version: "1.0",
     request_id: overrides?.requestId ?? "request.synthetic.command-001",
     correlation_id: overrides?.correlationId ?? "correlation.synthetic.command-001",
     learner_actor_id: "actor.synthetic.learner-001",
     expected_case: {
+      execution_authority: "PUBLISHED_PRODUCTION",
       case_package_id: session.pinned_case.case_package_id,
       case_version_id: session.pinned_case.case_version_id,
       case_version: session.pinned_case.case_version,
