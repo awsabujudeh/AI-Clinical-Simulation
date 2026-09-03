@@ -24,6 +24,7 @@
   },
   "include": [
     "apps/web/src",
+    "content/**/*.ts",
     "packages/*/src",
     "tests/browser/**/*.ts",
     "tests/fixtures/**/*.ts",

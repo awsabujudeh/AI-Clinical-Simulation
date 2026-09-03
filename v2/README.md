@@ -145,6 +145,7 @@ npm run test:v2-007a
 npm run test:v2-007
 npm run test:diagnostic-contract
 npm run test:review-execution-artifact
+npm run test:v2-009
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -157,6 +158,10 @@ npm exec playwright install chromium
 ```
 
 `npm run test:browser` executes the shared TypeScript smoke and focused contract tests in Vitest Browser Mode. `npm run test:deno` imports the same source files through project-local Deno. Both runtimes assert the same representative serialized results. `npm run test:contracts`, `npm run test:case-schema`, and `npm run test:clinical-engine` run their focused Browser/Deno checks plus the forbidden-import guard.
+
+## V2-009 medically reviewable STEMI case
+
+`content/cases/stemi/v2-draft/` contains the medically reviewable, explicitly `UNDER_REVIEW` Acute Inferior STEMI with right-ventricular-involvement Case source. It uses the published Case Schema, review-execution artifact, pinned Clinical/Session/Assessment paths, and deterministic Browser/Deno golden traces. Unresolved sources, specialist sign-off, curriculum mapping, and visual provenance intentionally keep publication fail-closed; this is not an approved or published Case Package. Run `npm run test:v2-009` for its focused gate.
 
 ## Portable package rules
 

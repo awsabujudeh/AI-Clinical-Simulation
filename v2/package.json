@@ -44,6 +44,7 @@
     "test:v2-007a": "npm run typecheck && npm run test:contracts:browser && npm run test:contracts:deno && npm run test:case-schema:browser && npm run test:case-schema:deno && npm run test:session-engine:browser && npm run test:session-engine:deno && npm run test:assessment-engine:browser && npm run test:assessment-engine:deno && npm run test:portability-guard",
     "test:v2-007": "npm run test:v2-007a",
     "test:review-execution-artifact": "vitest run --config vitest.config.mjs tests/browser/case-schema.review-execution.browser.test.ts tests/browser/review-execution-artifact.portability.browser.test.ts && deno test tests/deno/review_execution_artifact_test.ts && npm run test:portability-guard",
+    "test:v2-009": "vitest run --config vitest.config.mjs tests/browser/v2-009/stemi-case.browser.test.ts && deno test tests/deno/stemi_case_test.ts && npm run test:portability-guard",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
     "verify": "npm run typecheck && npm run test:portability-guard && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
