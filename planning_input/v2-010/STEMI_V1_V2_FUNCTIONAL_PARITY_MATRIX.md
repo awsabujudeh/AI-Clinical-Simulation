@@ -1,0 +1,111 @@
+# V2-010 STEMI V1 → V2 Functional Parity Matrix
+
+Status: **FUNCTIONAL PARITY AUDIT — REVIEW-ONLY CASE; NOT CLINICAL APPROVAL**
+
+This matrix reconciles every record in `planning_input/v2-008/STEMI_V1_STRUCTURED_INVENTORY.md` against the committed V2-009 Case and the V2 deterministic engine path. V1 line references and extracted wording remain authoritative in that inventory; this document adds a final functional disposition, not a new medical decision.
+
+## Classification policy
+
+- `PRESERVED`: the useful behavior or information is present with equivalent or stronger behavior.
+- `INTENTIONALLY_REPLACED`: the V1 intent remains, but approved V2-009 content represents it differently.
+- `INTENTIONALLY_REMOVED`: the V1 item is a low-value click-list entry, unsupported decoy, unsafe behavior, dead UI artifact, or deliberately excluded branch.
+- `SUPERSEDED_BY_V2`: a generic V2 subsystem now provides the useful capability and the V1 implementation concept must not return.
+- `PARITY_READY_DELIVERY_PENDING`: the Case/engine truth boundary exists, while a later UI, AI, media, API, or reliability task must deliver the experience.
+- `FUNCTIONAL_GAP`: a useful behavior has neither a V2 mapping nor an explicit removal rationale.
+
+## Accounting
+
+| Classification | Items |
+|---|---:|
+| PRESERVED | 47 |
+| INTENTIONALLY_REPLACED | 65 |
+| INTENTIONALLY_REMOVED | 134 |
+| SUPERSEDED_BY_V2 | 85 |
+| PARITY_READY_DELIVERY_PENDING | 15 |
+| FUNCTIONAL_GAP | 0 |
+| **Total** | **346** |
+
+## Capability mapping
+
+Test references use `V2-009` for `tests/browser/v2-009/stemi-case.browser.test.ts`, `V2-009-Deno` for `tests/deno/stemi_case_test.ts`, and `V2-010` for `tests/browser/v2-010/stemi-functional-parity.browser.test.ts`.
+
+| Group | V1 inventory IDs / source region | V1 behavior and quality | V2 replacement location | Final classification | Execution/test evidence | Rationale / remaining review dependency |
+|---|---|---|---|---|---|---|
+| PROFILE-PRESERVED | P-002, P-006–P-007, P-010, P-013 | Age/sex, EMS arrival, chest-pain presentation; display and truth were mixed. | `patient_profile`, `presentation`, bilingual localization | PRESERVED | V2-010 profile/presentation test | Useful presentation survives as structured Case data. |
+| PROFILE-REPLACED | P-001, P-003, P-005, P-008–P-009, P-011–P-012, P-014–P-015 | Local key, ambiguous clock, absent demographics, threshold appearance, `ar-SA` dead metadata. | Stable Case IDs; synthetic reviewed profile; T=0 handoff; explicit state; `ar-JO`/`en-US` | INTENTIONALLY_REPLACED | V2-009 identity/locale/state tests | V2-009 authoring is the approved comparison baseline; synthetic details remain review content. |
+| PROFILE-REMOVED | P-004 | Arrival badge/icon was UI decoration. | None | INTENTIONALLY_REMOVED | Matrix accounting audit | No clinical/domain capability was carried by the badge. |
+| STATE-PRESERVED | S-013 | No active intervention at start. | `initial_state.patient_state.active_interventions = []` | PRESERVED | V2-010 initial-state test | Exact useful initial condition retained. |
+| STATE-REPLACED | S-001–S-008, S-010 | Mutable V1 numbers and implicit rhythm. | Reviewed V2-009 state/projection values and explicit sinus-tachycardia code | INTENTIONALLY_REPLACED | V2-009 baseline/rhythm tests | V2-009 intentionally corrected the numeric bundle; no backward rhythm inference. |
+| STATE-SUPERSEDED | S-009, S-011–S-012, S-014–S-020 | One mutable browser object mixed truth, flags, time, clicks, score, and inferred status. | Contracts Patient State; Clinical/Session/Assessment engines; event timeline | SUPERSEDED_BY_V2 | Engine suites + V2-009 traces | Single authoritative state and separated ownership are stronger than V1. |
+| HISTORY-PRESERVED | H-002–H-006, H-008, H-011–H-012, H-014–H-016, H-034–H-037, H-039, H-041, H-044–H-048 | Core HPI, associated symptoms, PMH, family/social and relevant negatives. | Stable bilingual clinical facts and direct-question disclosure | PRESERVED | V2-010 structured truth test | Meaningful history remains available to catalogue and future Patient Agent. |
+| HISTORY-REPLACED | H-001, H-042–H-043 | Onset, home medication, and allergy data were ambiguous/contradictory. | 55-minute pre-handoff onset; exact home medicines; no chronic aspirin; explicit contraindication history | INTENTIONALLY_REPLACED | V2-010 history test | Uses approved V2-009 authored wording; still subject to specialist/source review. |
+| HISTORY-REMOVED | H-007, H-009–H-010, H-013, H-017–H-033, H-038, H-040, H-052 | Vague progression/hospitalization and low-value GI, urinary, neurologic, sputum, fatigue, and empty “other” click-list content. | Focused acute facts only | INTENTIONALLY_REMOVED | V2-010 focused-fact test | These records did not carry approved core teaching behavior and are not silently presented as facts. |
+| HISTORY-SUPERSEDED | H-049–H-051 | Button-only tracking, uneven live praise, and free-text score mismatch. | ActionRequest/committed events, deterministic evidence, disclosure policy | SUPERSEDED_BY_V2 | Session/Assessment suites; V2-010 authority test | Fact discovery cannot be proven by UI clicks or AI text alone. |
+| EXAM-PRESERVED | E-001–E-006 | Six static organ bundles contained useful cardiac, respiratory, abdominal, perfusion, neurologic, and skin findings. | Focused exam facts/actions with `after_exam` disclosure | PRESERVED | V2-010 exam test | Clinically useful information survives without forcing low-value click scoring. |
+| EXAM-SUPERSEDED | E-007–E-008 | Accordion opening equaled examination and used an in-memory set. | Stable examination actions and committed `EXAM_PERFORMED` evidence | SUPERSEDED_BY_V2 | V2-009 excellent trace; Assessment suite | Execution/evidence is explicit and auditable. |
+| DIAGNOSTIC-PRESERVED | I-001 | Standard ECG result capability. | Structured standard ECG study/result/report/fallback | PRESERVED | V2-009 diagnostic test; V2-010 journey | Preserved and strengthened; right-sided ECG is an approved V2 addition. |
+| DIAGNOSTIC-REPLACED | I-003–I-006, I-008–I-009, I-011, I-015 | V1 lab/imaging values and blocking timings were unreviewed. | Authored CBC/chemistry/coagulation/POC glucose/hs-cTnI/CXR/echo values and asynchronous milestones | INTENTIONALLY_REPLACED | V2-009 diagnostic schema/trace tests | Exact V2-009 values/timing remain specialist-review-required. |
+| DIAGNOSTIC-REMOVED | I-007, I-013–I-014, I-016–I-032 | ABG and 19 unsupported decoy/generic investigations were not selected for the approved Case catalogue. | None in this Case version | INTENTIONALLY_REMOVED | V2-010 exact catalogue test | No fabricated “normal/not relevant” result or penalty is retained; additions require a later reviewed Case version. |
+| DIAGNOSTIC-SUPERSEDED | I-012, I-033 | Synchronous reveal and generic fabricated results. | Diagnostic contract + scheduler + strict result/fallback/provenance boundaries | SUPERSEDED_BY_V2 | Diagnostic-contract suite; V2-010 async test | Independent milestones replace blocking jumps; result truth never comes from a generic handler. |
+| DIAGNOSTIC-DELIVERY | I-002, I-010 | Inline ECG/CXR JPEGs lacked provenance and review. | Diagnostic asset IDs, structured fallbacks, unresolved governance | PARITY_READY_DELIVERY_PENDING | V2-009 governance test | Clinical truth works without media; approved assets/rights remain pending. |
+| ACTION-PRESERVED | A-001–A-002 | Monitor and IV readiness. | Case-owned procedure actions and committed evidence | PRESERVED | Excellent trace / V2-010 journey | Useful actions are executable through Session authority. |
+| ACTION-REPLACED | A-003–A-004, A-007 | Unconditional oxygen, conflated Cath cure, and effect-free saline. | State-dependent oxygen; separate activation/transfer; one bounded 250 mL challenge | INTENTIONALLY_REPLACED | V2-009 clinical probes | Approved V2-009 behavior replaces direct numeric/cure semantics. |
+| ACTION-REMOVED | A-005–A-006, A-008–A-020 | Unsupported tubes, fluids, blood products, cardioversion, and invasive procedures. | None in this Case version | INTENTIONALLY_REMOVED | V2-010 exact catalogue test | V1 labels/verdicts were not approved authoring; no action is added merely for parity. |
+| ACTION-SUPERSEDED | A-021–A-022 | Universal 0.5-minute cost and display-route substring IV gate. | Case-owned repeat/timing/parameter contracts and deterministic command validation | SUPERSEDED_BY_V2 | Session/Case Schema suites | Display strings no longer authorize execution. |
+| MEDICATION-REPLACED | M-003, M-006, M-012, M-018, M-023–M-024, M-038 | V1 aspirin/clopidogrel/enoxaparin/beta blocker/nitrate/noradrenaline lacked adequate parameters or safe semantics. | Dosed aspirin/clopidogrel alternative/UFH; unsafe IV-beta and nitrate policy; draft norepinephrine rescue | INTENTIONALLY_REPLACED | V2-009 catalogue, harm, and assessment tests | Exact authored details remain specialist-review-required; norepinephrine has no invented titration/effect. |
+| MEDICATION-REMOVED | M-001–M-002, M-004–M-005, M-007–M-011, M-013–M-017, M-019–M-022, M-025–M-037 | Unsupported/decoy medications and direct numeric effects. | None in this Case version | INTENTIONALLY_REMOVED | V2-010 exact catalogue test | No drug is exposed without approved Case parameters. Opioids remain omitted because no authorized dose/effect exists. |
+| MEDICATION-SUPERSEDED | M-039–M-040 | Button execution, fixed timing, and direct vital writes. | Session command/event commit + Case rules + Patient State projection | SUPERSEDED_BY_V2 | Session/Clinical tests; V2-009 traces | Intent is not execution; observations are not directly writable truth. |
+| DIAGNOSIS-PRESERVED | D-001 | Acute inferior STEMI submission. | `diagnosis.inferior-stemi` action and committed evidence | PRESERVED | Excellent/delayed/unsafe traces | Core diagnostic submission remains executable. |
+| DIAGNOSIS-REMOVED | D-002–D-010, D-013, D-015–D-017, D-021 | Unreviewed alternatives, generic dispositions, and automatic arrest/end coupling. | Not in this review Case | INTENTIONALLY_REMOVED | V2-010 exact catalogue/governance tests | No decoy or arrest behavior is retained without approved Case semantics. |
+| DISPOSITION-REPLACED | D-012, D-014, D-018 | Cath click implied cure; ward/discharge were simple zero-score choices. | Separate Cath activation + transfer endpoint; ward/discharge unsafe cap evidence | INTENTIONALLY_REPLACED | V2-009 traces/critical-policy test | Endpoint is preparation and transfer, not instant PCI/cure. |
+| DIAGNOSIS-SUPERSEDED | D-011, D-019–D-020, D-022 | UI locking/manual completion/resolved flag mixed lifecycle and score. | Session commands, explicit events, outcome flags, deterministic Assessment finalization boundary | SUPERSEDED_BY_V2 | Session/Assessment suites | Later UI chooses controls; domain authority is already explicit. |
+| DYNAMICS-REPLACED | R-004, R-006, R-008–R-011, R-015, R-017 | Scripted nitrate/cure/linear deterioration/direct observation writes. | +1 nitrate harm; T=10/T=18 states; bounded fluid; state-dependent oxygen; declarative effects | INTENTIONALLY_REPLACED | V2-009 clinical probes and traces | V2 behavior is reviewed data, deterministic, and recoverable. |
+| DYNAMICS-REMOVED | R-005, R-012–R-014, R-016, R-022 | Automatic nitrate/threshold arrest, fabricated VT, opioid numeric effect, and absent post-arrest branch. | No arrest/VT/opioid branch in current Case | INTENTIONALLY_REMOVED | V2-009 harm/shock tests | No unsupported death or complication path is invented. |
+| DYNAMICS-SUPERSEDED | R-001–R-003, R-007, R-018–R-021 | Browser interval, jump-time, hidden flags, inferred rhythm/appearance, AI-click execution. | Clinical Time, Scheduler, events, explicit Patient State/rhythm, Session command authority | SUPERSEDED_BY_V2 | Clinical/Session portability suites | Generic V2 mechanics replace browser-global physiology. |
+| TIME-REPLACED | T-001, T-004, T-010, T-013 | Symptom/timing assumptions, diagnostic delays, nitrate crisis, ECG feedback. | 55-minute pre-handoff fact; Case milestones; +1 harm; Clinical-Time rubric windows | INTENTIONALLY_REPLACED | V2-009 timing tests/traces | V2-009 values are explicit and review-bound. |
+| TIME-REMOVED | T-002, T-005, T-007–T-009, T-011–T-012, T-015–T-016, T-020 | Ambiguous arrival clock, decoy/sugar/recovery/arrest delays, animation/layout/network narrative waits. | None as Clinical Time | INTENTIONALLY_REMOVED | Matrix audit | UI/technical waits and unsupported medical paths cannot become clinical truth. |
+| TIME-SUPERSEDED | T-003, T-006, T-014, T-017–T-019 | Callback time, universal action jumps, network coupling, synchronous reveal, sleep loss, resolved-clock inconsistency. | Trusted Clinical Time, catch-up, scheduler, pause/resume, event sequencing | SUPERSEDED_BY_V2 | Session Engine V2-006 suite | Wall time and browser scheduling no longer own medicine. |
+| ASSESSMENT-PRESERVED | Q-012, Q-014 | Deterministic integer result and once-only credit intent. | Fixed deterministic arithmetic and Case-owned repeat policy | PRESERVED | Assessment suite; V2-009 P2Y12 test | Reproducibility and anti-farming behavior are retained. |
+| ASSESSMENT-REPLACED | Q-007–Q-009, Q-011, Q-016 | Required list, generic penalties, duplicate ECG penalty, equal weights, vague timing. | Six authored domains, timing windows, criteria, penalties/caps/unsafe flags | INTENTIONALLY_REPLACED | V2-009 rubric/critical tests | Exact V2 rubric remains specialist-review-required. |
+| ASSESSMENT-REMOVED | Q-017 | V1 arrest had no explicit score policy. | No arrest branch in current Case | INTENTIONALLY_REMOVED | V2-009 no-arrest test | No score rule is invented for a deliberately absent clinical branch. |
+| ASSESSMENT-SUPERSEDED | Q-001–Q-006, Q-010, Q-013, Q-015, Q-018 | Click percentages, live answer leakage, blocked-intent feedback, mutable evidence. | Pinned rubric, committed-event evidence, disclosure policy, deterministic debrief facts | SUPERSEDED_BY_V2 | Assessment Engine suite; V2-009 disclosure test | Assessment mode withholds live correctness; intent cannot earn credit. |
+| AI-PRESERVED | AI-003–AI-004, AI-014 | Structured fact context, persona/tone, deterministic fallback intent. | `clinical_facts`, `dialogue_policy`, bilingual fallback key | PRESERVED | V2-010 dialogue test | Future Patient Agent has authoritative truth without owning it. |
+| AI-REPLACED | AI-017 | Arabic-only/`ar-SA` mismatch. | Exact `ar-JO` and `en-US` localization | INTENTIONALLY_REPLACED | V2-009 locale test | Patient language contract is explicit. |
+| AI-REMOVED | AI-001–AI-002, AI-007–AI-008, AI-018 | Client provider/model coupling, heuristic/random fallback, unused voice metadata. | None in Case/engine runtime | INTENTIONALLY_REMOVED | Source/portability guards | No provider, random dialogue, or dead voice setting is migrated. |
+| AI-SUPERSEDED | AI-005, AI-010–AI-013, AI-016 | Prompt-only safety, AI-to-button execution, scope/substrings, evidence-poor prose. | Disclosure contracts, ActionRequest validation, committed events, deterministic debrief evidence | SUPERSEDED_BY_V2 | Session/Assessment suites; V2-010 authority test | Future AI can propose or explain only; it cannot execute or score. |
+| AI-DELIVERY | AI-006, AI-009, AI-015 | Natural-language response behavior, state-aware availability, conversation history. | Structured truth/policy ready; Patient Agent and UI not implemented | PARITY_READY_DELIVERY_PENDING | V2-010 dialogue readiness test | Later AI/UI task must consume only allowed facts and remain non-authoritative. |
+| VISUAL-PRESERVED | V-011 | No in-platform media generation. | Same product boundary | PRESERVED | Dependency/source audit | Compatible with approved pre-generated library direction. |
+| VISUAL-REMOVED | V-007, V-009, V-012 | Generic avatar, dead sound row, runtime font dependency. | None | INTENTIONALLY_REMOVED | Matrix accounting audit | Dead/placeholder UI does not define clinical parity. |
+| VISUAL-SUPERSEDED | V-002–V-003, V-010 | Mutable numeric rendering, HR-derived rhythm, ungoverned inline assets. | Observation/rhythm projection and governed media/fallback IDs | SUPERSEDED_BY_V2 | V2-009 state/diagnostic governance tests | Patient State remains authoritative; rhythm is explicit. |
+| VISUAL-DELIVERY | V-001, V-004–V-006, V-008 | Monitor, diagnostic images, echo representation, visual appearance. | Domain contracts, visual manifest, fallback truth ready; rendering/assets pending | PARITY_READY_DELIVERY_PENDING | V2-010 visual readiness test | UI/media delivery belongs to later Student/Visual tasks, not this gate. |
+| FEEDBACK-PRESERVED | F-001–F-002, F-007 | Outcome/score breakdown and deterministic fallback intent. | Strict assessment result, six domains, unsafe/critical facts | PRESERVED | Assessment suite; V2-009 scores | Underlying deterministic result is stronger and AI-independent. |
+| FEEDBACK-SUPERSEDED | F-003–F-004, F-006, F-008 | Click-based missed lists, free-string errors, non-authoritative AI input, log-order mismatch. | Criterion/evidence references and authoritative event order | SUPERSEDED_BY_V2 | Assessment/debrief suites | Later presentation can project without changing evidence. |
+| FEEDBACK-DELIVERY | F-005 | Learner-facing synthesized prose. | Deterministic debrief packet available; Tutor prose later | PARITY_READY_DELIVERY_PENDING | Assessment finalization/debrief tests | No AI prose is required for clinical or scoring truth. |
+| ARCHITECTURE-SUPERSEDED | AD-001–AD-015, AD-017 | Monolith, mutable globals, direct writes, browser time, click scoring, unversioned actions, weak trust boundaries. | Contracts, Case Schema, Clinical/Session/Assessment engines, ReviewExecutionArtifact | SUPERSEDED_BY_V2 | Full regression and portability suites | V2 package ownership and deterministic boundaries replace the monolith. |
+| ARCHITECTURE-REMOVED | AD-018 | Leaked resize listener. | None | INTENTIONALLY_REMOVED | Source audit | UI lifecycle bug carries no useful function. |
+| ARCHITECTURE-DELIVERY | AD-016 | Client-visible worker/model boundary. | Future secure AI Gateway; no current provider dependency | PARITY_READY_DELIVERY_PENDING | Portability/dependency guard | AI delivery is later and cannot become clinical authority. |
+| CONTRADICTION-REPLACED | C-001, C-009–C-010, C-014–C-015 | Aspirin contradiction, instant cure/ECG physiology, inconsistent drug effects, locale mismatch. | Approved V2-009 facts/rules/actions/locales | INTENTIONALLY_REPLACED | V2-009 authoring and clinical tests | Direct translation defects are resolved without altering the approved baseline. |
+| CONTRADICTION-REMOVED | C-003, C-017–C-018 | Fabricated VT-before-arrest and stale UI/report defects. | None | INTENTIONALLY_REMOVED | V2-009 no-VT test; matrix audit | No useful behavior is lost. |
+| CONTRADICTION-SUPERSEDED | C-002, C-004–C-005, C-007–C-008, C-011, C-013 | Implicit rhythm, conflicting clocks, fake waiting UI, scope/route bugs, lifecycle inconsistency. | Explicit rhythm, Clinical Time, diagnostic milestones, strict commands, Session lifecycle | SUPERSEDED_BY_V2 | Engine suites | Generic architecture resolves these defects. |
+| CONTRADICTION-DELIVERY | C-006, C-012, C-016 | Uneven media, free-text evidence/UI mismatch, overstated V1 delivery claims. | Domain truth/contracts ready; media, Patient AI/UI, and broader delivery pending | PARITY_READY_DELIVERY_PENDING | V2-010 readiness tests | These are clearly separated from Case/engine parity. |
+
+## Exact item-level disposition ledger
+
+The automated V2-010 accounting test expands the source inventory IDs and proves that each appears exactly once below. IDs resolve to the exact V1 source line and behavior in the V2-008 inventory.
+
+```text
+PRESERVED|P-002 P-006 P-007 P-010 P-013 S-013 H-002 H-003 H-004 H-005 H-006 H-008 H-011 H-012 H-014 H-015 H-016 H-034 H-035 H-036 H-037 H-039 H-041 H-044 H-045 H-046 H-047 H-048 E-001 E-002 E-003 E-004 E-005 E-006 I-001 A-001 A-002 D-001 Q-012 Q-014 AI-003 AI-004 AI-014 V-011 F-001 F-002 F-007
+INTENTIONALLY_REPLACED|P-001 P-003 P-005 P-008 P-009 P-011 P-012 P-014 P-015 S-001 S-002 S-003 S-004 S-005 S-006 S-007 S-008 S-010 H-001 H-042 H-043 I-003 I-004 I-005 I-006 I-008 I-009 I-011 I-015 A-003 A-004 A-007 M-003 M-006 M-012 M-018 M-023 M-024 M-038 D-012 D-014 D-018 R-004 R-006 R-008 R-009 R-010 R-011 R-015 R-017 T-001 T-004 T-010 T-013 Q-007 Q-008 Q-009 Q-011 Q-016 AI-017 C-001 C-009 C-010 C-014 C-015
+INTENTIONALLY_REMOVED|P-004 H-007 H-009 H-010 H-013 H-017 H-018 H-019 H-020 H-021 H-022 H-023 H-024 H-025 H-026 H-027 H-028 H-029 H-030 H-031 H-032 H-033 H-038 H-040 H-052 I-007 I-013 I-014 I-016 I-017 I-018 I-019 I-020 I-021 I-022 I-023 I-024 I-025 I-026 I-027 I-028 I-029 I-030 I-031 I-032 A-005 A-006 A-008 A-009 A-010 A-011 A-012 A-013 A-014 A-015 A-016 A-017 A-018 A-019 A-020 M-001 M-002 M-004 M-005 M-007 M-008 M-009 M-010 M-011 M-013 M-014 M-015 M-016 M-017 M-019 M-020 M-021 M-022 M-025 M-026 M-027 M-028 M-029 M-030 M-031 M-032 M-033 M-034 M-035 M-036 M-037 D-002 D-003 D-004 D-005 D-006 D-007 D-008 D-009 D-010 D-013 D-015 D-016 D-017 D-021 R-005 R-012 R-013 R-014 R-016 R-022 T-002 T-005 T-007 T-008 T-009 T-011 T-012 T-015 T-016 T-020 Q-017 AI-001 AI-002 AI-007 AI-008 AI-018 V-007 V-009 V-012 AD-018 C-003 C-017 C-018
+SUPERSEDED_BY_V2|S-009 S-011 S-012 S-014 S-015 S-016 S-017 S-018 S-019 S-020 H-049 H-050 H-051 E-007 E-008 I-012 I-033 A-021 A-022 M-039 M-040 D-011 D-019 D-020 D-022 R-001 R-002 R-003 R-007 R-018 R-019 R-020 R-021 T-003 T-006 T-014 T-017 T-018 T-019 Q-001 Q-002 Q-003 Q-004 Q-005 Q-006 Q-010 Q-013 Q-015 Q-018 AI-005 AI-010 AI-011 AI-012 AI-013 AI-016 V-002 V-003 V-010 F-003 F-004 F-006 F-008 AD-001 AD-002 AD-003 AD-004 AD-005 AD-006 AD-007 AD-008 AD-009 AD-010 AD-011 AD-012 AD-013 AD-014 AD-015 AD-017 C-002 C-004 C-005 C-007 C-008 C-011 C-013
+PARITY_READY_DELIVERY_PENDING|I-002 I-010 AI-006 AI-009 AI-015 V-001 V-004 V-005 V-006 V-008 F-005 AD-016 C-006 C-012 C-016
+FUNCTIONAL_GAP|
+```
+
+## Audit conclusion
+
+- Inventory coverage: **346/346**.
+- Functional gaps: **0**.
+- V2-009 Case/engine content changed by this audit: **no**.
+- Specialist-review dependency: function is present where applicable; 18 V2-009 checklist decisions remain pending.
+- UI/API/AI/media delivery: explicitly separated and not claimed complete.

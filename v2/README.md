@@ -146,6 +146,7 @@ npm run test:v2-007
 npm run test:diagnostic-contract
 npm run test:review-execution-artifact
 npm run test:v2-009
+npm run test:v2-010
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -162,6 +163,10 @@ npm exec playwright install chromium
 ## V2-009 medically reviewable STEMI case
 
 `content/cases/stemi/v2-draft/` contains the medically reviewable, explicitly `UNDER_REVIEW` Acute Inferior STEMI with right-ventricular-involvement Case source. It uses the published Case Schema, review-execution artifact, pinned Clinical/Session/Assessment paths, and deterministic Browser/Deno golden traces. Unresolved sources, specialist sign-off, curriculum mapping, and visual provenance intentionally keep publication fail-closed; this is not an approved or published Case Package. Run `npm run test:v2-009` for its focused gate.
+
+## V2-010 STEMI functional parity gate
+
+`planning_input/v2-010/` reconciles all 346 extracted V1 records against the medically reviewable V2 Case and deterministic engine path. The gate distinguishes preserved, intentionally replaced or removed, architecture-superseded, and domain-ready/later-delivery behavior. It adds no medical content and does not promote the Case beyond `UNDER_REVIEW` / `REVIEW_ONLY`. Run `npm run test:v2-010` for automated ledger accounting plus the focused Browser and existing Browser/Deno STEMI evidence.
 
 ## Portable package rules
 
