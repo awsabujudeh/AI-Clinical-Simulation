@@ -9,7 +9,9 @@
   },
   "packageManager": "npm@11.17.0",
   "allowScripts": {
-    "deno@2.9.6": true
+    "deno@2.9.6": true,
+    "@embedded-postgres/windows-x64@16.14.0-beta.17": true,
+    "@embedded-postgres/linux-x64@16.14.0-beta.17": true
   },
   "workspaces": [
     "apps/*",
@@ -47,9 +49,10 @@
     "test:v2-009": "vitest run --config vitest.config.mjs tests/browser/v2-009/stemi-case.browser.test.ts && deno test tests/deno/stemi_case_test.ts && npm run test:portability-guard",
     "test:v2-010": "node scripts/v2-010-parity-audit.mjs && vitest run --config vitest.config.mjs tests/browser/v2-010/stemi-functional-parity.browser.test.ts && npm run test:v2-009",
     "test:v2-011a": "node scripts/v2-011a-persistence-test.mjs",
+    "test:v2-011b": "node scripts/v2-011b-rls-security-test.mjs",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
-    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:v2-011a && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
+    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:v2-011a && npm run test:v2-011b && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -57,6 +60,7 @@
     "@vitest/browser": "4.1.11",
     "@vitest/browser-playwright": "4.1.11",
     "deno": "2.9.6",
+    "embedded-postgres": "16.14.0-beta.17",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   }

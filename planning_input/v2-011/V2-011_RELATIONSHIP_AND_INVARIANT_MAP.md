@@ -1,4 +1,4 @@
-# V2-011A Relationship and Invariant Map
+# V2-011 Relationship and Invariant Map
 
 ## Identity and tenant path
 
@@ -26,7 +26,7 @@ Case, review, approval, Session, and Assessment foreign keys carry the instituti
 | Boundary | Database invariant | Application invariant retained |
 |---|---|---|
 | Institution | Stable text IDs; canonical `ju` and `just` seed rows | Shared Institution schema remains source of runtime validation |
-| Auth | `profiles.user_id` references `auth.users`; roles exist only in memberships | Supabase Auth authenticates; V2-011B authorizes |
+| Auth | `profiles.user_id` references `auth.users`; roles exist only in memberships | Supabase Auth authenticates; V2-011B RLS authorizes from `auth.uid()` and active membership |
 | Case modules | PK prevents duplicate module names; CHECK allows exactly the frozen 16 names | Draft/publication validators prove completeness and references |
 | Review subject | Hash is exact lowercase SHA-256 and retained with Case Version/reviews | Application computes review subject bytes |
 | Review artifact | Literal artifact kind, `REVIEW_ONLY`, and `UNDER_REVIEW`; exact identity/hash FK | Application prepares and validates artifact bytes |
@@ -68,6 +68,8 @@ Every foreign key explicitly uses `ON DELETE RESTRICT`; no delete cascade exists
 
 `clinical_time_seconds` is an exact simulation value. `real_time_utc`, `created_at`, `recorded_at`, `committed_at`, `published_at`, and `approved_at` are trusted operational timestamps. No index, trigger, cron job, or ordering constraint promotes an operational timestamp to clinical authority.
 
-## Deferred enforcement
+## RLS and deferred enforcement
 
-V2-011B owns caller-level RLS policies, membership helper functions, role grants, and adversarial cross-tenant tests. V2-012 owns row locks, persistent compare-and-swap, idempotent replay, sequence allocation, and event/checkpoint atomic commit. Neither responsibility is implemented in Slice A.
+V2-011B supplies caller-level RLS policies, the hardened current-membership helper, narrow role grants, `FORCE ROW LEVEL SECURITY`, and native PostgreSQL adversarial cross-tenant tests. Direct client access remains denied wherever assignment, atomic write, or disclosure-safe projection cannot yet be proven.
+
+V2-012 owns row locks, persistent compare-and-swap, durable idempotent replay, sequence allocation, and Event/checkpoint atomic commit. It must use the trusted backend boundary without moving Session or Clinical Engine semantics into SQL.

@@ -1,10 +1,10 @@
 # V2-011 Persistence Schema
 
-## Slice A status
+## V2-011 status
 
-V2-011A establishes the local PostgreSQL/Supabase persistence substrate. It does not close V2-011 security work.
+V2-011A establishes the local PostgreSQL/Supabase persistence substrate. V2-011B completes the local RLS security gate for that substrate.
 
-**RLS SECURITY GATE: PENDING V2-011B**
+**RLS SECURITY GATE: PASSED V2-011B**
 
 No remote Supabase project, production region, storage bucket, secret, Edge Function, or deployment is part of this slice. Production provisioning remains blocked by the Region ADR gate.
 
@@ -28,7 +28,7 @@ An Approval Record is outside published package bytes. `case_approval_review_ref
 
 Contract identifiers remain bounded text. UUID is used only where the shared contract requires it (`session_events.event_id`) or where Supabase Auth already owns it (`auth.users.id`). `institutions` seeds the canonical `ju`/`JU` and `just`/`JUST` rows; stable contract identities are not replaced by surrogate UUIDs.
 
-`profiles` references Supabase Auth identity but carries no authorization role. Institution authority is represented in `institution_memberships`. Case, review, approval, Session, and Assessment relationships carry an institution dimension and use composite foreign keys where a same-tenant relationship is mandatory. V2-011B must enforce the final caller-visible tenant and role policy.
+`profiles` references Supabase Auth identity but carries no authorization role. Institution authority is represented in `institution_memberships`. Case, review, approval, Session, and Assessment relationships carry an institution dimension and use composite foreign keys where a same-tenant relationship is mandatory. V2-011B enforces the final least-privilege caller-visible tenant and role policy; authorization derives from `auth.uid()` plus active database-owned membership.
 
 ## Session representation
 
@@ -55,16 +55,17 @@ Only successfully committed commands are rows in `session_commands`. Unique `(se
 
 ## Local migrations and verification
 
-Migrations are ordered under `v2/supabase/migrations/`. The local harness uses exact-pinned `@electric-sql/pglite` to execute PostgreSQL migrations because Docker, `psql`, and the Supabase CLI are unavailable in the current environment. It bootstraps only the `auth.users(id uuid primary key)` shape that a real Supabase database owns, then applies the application migrations from zero twice and runs constraint, immutability, and real-contract round-trip tests.
+Migrations are ordered under `v2/supabase/migrations/`. V2-011A uses exact-pinned `@electric-sql/pglite` for fast structural, constraint, immutability, and contract round-trip regression tests. V2-011B uses exact-pinned `embedded-postgres` with native PostgreSQL 16.14 for roles, grants, real RLS policies, `FORCE ROW LEVEL SECURITY`, `SET ROLE`, and Supabase-compatible `auth.uid()` request context.
 
 From `v2/`:
 
 ```powershell
 npm run test:v2-011a
+npm run test:v2-011b
 npm run verify
 ```
 
-PGlite is a deterministic local PostgreSQL-compatible test runtime, not a production adapter or remote service. V2-011B still requires the dedicated local Supabase RLS/adversarial security gate.
+PGlite remains supplemental and is not used as the security claim. The native V2-011B harness applies migrations from empty, exercises the V2-011A-to-B upgrade, resets/reapplies, and runs the cross-tenant adversarial suite. Both runtimes are local test tools, not production adapters or remote services.
 
 ## Rollback and forward migration policy
 

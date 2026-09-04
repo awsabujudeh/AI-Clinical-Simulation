@@ -1,6 +1,6 @@
-# V2-011A Table Catalog
+# V2-011 Table Catalog
 
-All application tables are in `public`. Every table has RLS enabled with no client policies in Slice A; final access policies and grants are pending V2-011B.
+All application tables are in `public`. Every table has RLS enabled and forced. V2-011B adds 14 explicit least-privilege client policies; the final operation-by-operation inventory is in `V2-011_RLS_POLICY_MATRIX.md`.
 
 | # | Table | Purpose and authority | Primary identity | Tenant dimension | History/deletion |
 |---:|---|---|---|---|---|
@@ -35,4 +35,4 @@ All application tables are in `public`. Every table has RLS enabled with no clie
 
 ## Deliberate omissions
 
-No knowledge chunks, embeddings, retrieval bundles, AI workflow runs, tutor-generated prose, remote storage buckets, API tables, Postgres clinical scheduler, or V2-012 transaction function is introduced. Those are outside V2-011A.
+No knowledge chunks, embeddings, retrieval bundles, AI workflow runs, tutor-generated prose, remote storage buckets, API tables, Postgres clinical scheduler, or V2-012 transaction function is introduced. Those remain outside V2-011.

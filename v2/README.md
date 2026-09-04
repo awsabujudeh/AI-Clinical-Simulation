@@ -148,6 +148,7 @@ npm run test:review-execution-artifact
 npm run test:v2-009
 npm run test:v2-010
 npm run test:v2-011a
+npm run test:v2-011b
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -173,9 +174,9 @@ npm exec playwright install chromium
 
 `supabase/migrations/` defines the local PostgreSQL relational/JSONB substrate for institution membership, the 16-module Case source, exact review and publication artifacts, Session aggregates/events/checkpoints/idempotency, deterministic Assessments, and diagnostic/visual metadata. The database stores application-owned truth and hashes; it contains no Clinical Engine, score calculation, clinical timer, API, or remote service.
 
-`npm run test:v2-011a` applies all migrations to two independent empty embedded PostgreSQL databases and runs permanent structural, immutability, authority-binding, and real-contract round-trip checks. The embedded runtime is test-only because Docker/Supabase CLI is unavailable locally. No remote Supabase project or region is selected.
+`npm run test:v2-011a` applies all migrations to two independent PGlite databases and runs permanent structural, immutability, authority-binding, and real-contract round-trip checks. `npm run test:v2-011b` uses exact-pinned native PostgreSQL 16.14 to prove real roles, grants, `SET ROLE`, `row_security`, `FORCE ROW LEVEL SECURITY`, Supabase-compatible `auth.uid()` request context, empty/upgrade/reset migration paths, and JU/JUST adversarial isolation. Both runtimes are local test dependencies; no remote Supabase project or region is selected.
 
-All application tables have RLS enabled with no client policies in this slice. **RLS SECURITY GATE: PENDING V2-011B.** V2-012 will own persistent atomic Session commit orchestration.
+All 28 application tables have RLS enabled and forced. V2-011B adds 14 explicit least-privilege policies and one hardened membership helper. Raw governance, Session, Event, checkpoint, and Assessment access remains denied until trusted mutation and disclosure-safe API boundaries exist. **RLS SECURITY GATE: PASS.** V2-012 will own persistent atomic Session commit orchestration.
 
 ## Portable package rules
 

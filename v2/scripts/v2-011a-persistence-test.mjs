@@ -57,7 +57,7 @@ async function expectRejected(name, operation) {
 
 async function migrationFiles() {
   return (await readdir(migrationsDirectory))
-    .filter((file) => file.endsWith(".sql"))
+    .filter((file) => file.includes("_v2_011a_") && file.endsWith(".sql"))
     .sort();
 }
 
@@ -517,7 +517,7 @@ const migrationText = (
   ))
 ).join("\n");
 
-await check("migration set contains three ordered V2-011A files", async () => {
+await check("Slice-A migration set contains three ordered V2-011A files", async () => {
   assert.deepEqual(await migrationFiles(), [
     "202609030001_v2_011a_case_governance.sql",
     "202609030002_v2_011a_session_assessment.sql",
