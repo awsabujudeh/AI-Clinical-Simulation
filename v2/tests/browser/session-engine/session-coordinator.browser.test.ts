@@ -127,6 +127,52 @@ describe("one authoritative Session Coordinator", () => {
     expect(stored.next_sequence_no).toBe(2);
   });
 
+  it("does not blindly re-execute a clinical command after an unrelated stale commit", async () => {
+    const session = createSyntheticCommandSession({ trustedRealTimeUtc: TEST_REAL_TIME_UTC });
+    const memory = new InMemorySessionCommitAdapter([session]);
+    let eventIdCalls = 0;
+    let firstCommit = true;
+    const conflicting: SessionCommitAdapter = {
+      load: (sessionId) => memory.load(sessionId),
+      async commit(input) {
+        if (firstCommit) {
+          firstCommit = false;
+          const loaded = requireSuccess(await memory.load(session.session_id));
+          const concurrent = {
+            ...loaded.session,
+            trusted_real_time_anchor_utc: "2026-09-01T12:00:01Z"
+          };
+          requireSuccess(await memory.commit({
+            session_id: session.session_id,
+            expected_token: loaded.commit_token,
+            proposed_session: concurrent
+          }));
+        }
+        return memory.commit(input);
+      }
+    };
+    const coordinator = createSessionCoordinator({
+      adapter: conflicting,
+      hash_adapter: TEST_HASH_ADAPTER,
+      event_id_factory: {
+        createEventId(input) {
+          eventIdCalls += 1;
+          return DETERMINISTIC_EVENT_ID_FACTORY.createEventId(input);
+        }
+      }
+    });
+    const result = await coordinator.submitExternalClinicalCommand(
+      coordinatorRequest(session)
+    );
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error("Expected stale persistent commit conflict.");
+    expect(result.issues.map((issue) => issue.code)).toEqual(["SESSION_VERSION_CONFLICT"]);
+    expect(eventIdCalls).toBe(1);
+    const stored = requireSuccess(await memory.load(session.session_id)).session;
+    expect(stored.committed_events).toEqual([]);
+    expect(stored.idempotency_records).toEqual([]);
+  });
+
   it("keeps intent distinct from execution when the action is not Case-pinned", async () => {
     const { adapter, coordinator, session } = setup();
     const result = await coordinator.submitExternalClinicalCommand(coordinatorRequest(

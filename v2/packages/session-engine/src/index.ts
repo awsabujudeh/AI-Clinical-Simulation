@@ -2,6 +2,7 @@ export * from "../../contracts/src/session-clock.ts";
 export * from "./clock/session-clock.ts";
 export * from "./adapters/session-commit-adapter.ts";
 export * from "./adapters/in-memory-session-adapter.ts";
+export * from "./adapters/postgres/postgres-session-adapter.ts";
 export * from "./commands/external-command.ts";
 export * from "./commands/process-external-command.ts";
 export * from "./coordinator/session-coordinator.ts";

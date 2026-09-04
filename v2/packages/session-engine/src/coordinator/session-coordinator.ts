@@ -20,6 +20,7 @@ import {
   type SessionCommandFailure,
   type SessionCommandSuccess
 } from "../commands/process-external-command.ts";
+import { fingerprintExternalLearnerCommand } from "../commands/external-command.ts";
 import {
   commitPendingSessionEvents,
   type EventIdFactory,
@@ -163,10 +164,6 @@ function sameSession(
   right: InMemorySessionAggregate
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function isVersionConflict(issues: readonly SessionCommandIssue[]): boolean {
-  return issues.some((issue) => issue.code === "SESSION_VERSION_CONFLICT");
 }
 
 function validateNoBackwardControlTime(
@@ -406,9 +403,49 @@ export function createSessionCoordinator(
     });
   }
 
-  async function submitAttempt(
+  async function resolveExactReplayAfterCommitConflict(
     request: SessionCoordinatorSubmitRequest,
-    remainingConflictRetries: number
+    conflictIssues: SessionCommandIssue[]
+  ): Promise<SessionCoordinatorResult> {
+    const current = await dependencies.adapter.load(request.session_id);
+    if (!current.success) return failure(current.issues);
+    const fingerprint = await fingerprintExternalLearnerCommand(
+      request.command,
+      dependencies.hash_adapter
+    );
+    if (!fingerprint.success) return failure(fingerprint.issues);
+    const record = current.session.idempotency_records.find(
+      (candidate) => candidate.idempotency_key
+        === fingerprint.command.action_request.idempotency_key
+    );
+    if (record === undefined) {
+      // A concurrent unrelated commit may have changed medical state. Never
+      // recompute the clinical command against that new authority.
+      return failure(conflictIssues);
+    }
+    const replay = await processExternalLearnerCommand(
+      current.session,
+      request.command,
+      {
+        hash_adapter: dependencies.hash_adapter,
+        event_id_factory: dependencies.event_id_factory,
+        real_time_utc: request.trusted_real_time_utc,
+        expected_state_version_at_intake: current.session.patient_state.state_version
+      }
+    );
+    if (!replay.success) return failure(replay.issues, replay);
+    if (replay.status !== "REPLAYED") return failure(conflictIssues);
+    return success({
+      operation: "SUBMIT_EXTERNAL_COMMAND",
+      status: "REPLAYED",
+      session: current.session,
+      committedEvents: [],
+      commandResult: replay
+    });
+  }
+
+  async function submitAttempt(
+    request: SessionCoordinatorSubmitRequest
   ): Promise<SessionCoordinatorResult> {
     const loaded = await dependencies.adapter.load(request.session_id);
     if (!loaded.success) return failure(loaded.issues);
@@ -425,9 +462,7 @@ export function createSessionCoordinator(
         dependencies.adapter
       );
       if (!committedInterrupt.success) {
-        return remainingConflictRetries > 0 && isVersionConflict(committedInterrupt.issues)
-          ? submitAttempt(request, remainingConflictRetries - 1)
-          : failure(committedInterrupt.issues);
+        return failure(committedInterrupt.issues);
       }
       return success({
         operation: "SUBMIT_EXTERNAL_COMMAND",
@@ -462,8 +497,8 @@ export function createSessionCoordinator(
       dependencies.adapter
     );
     if (!committed.success) {
-      return remainingConflictRetries > 0 && isVersionConflict(committed.issues)
-        ? submitAttempt(request, remainingConflictRetries - 1)
+      return committed.issues.some((issue) => issue.code === "SESSION_VERSION_CONFLICT")
+        ? resolveExactReplayAfterCommitConflict(request, committed.issues)
         : failure(committed.issues);
     }
     const committedCommand = SessionCommandSuccessSchema.parse({
@@ -494,7 +529,7 @@ export function createSessionCoordinator(
         request.error
       ));
     }
-    return submitAttempt(request.data, 1);
+    return submitAttempt(request.data);
   }
 
   return Object.freeze({

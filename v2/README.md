@@ -18,7 +18,7 @@ V2-006B adds the pure external learner-command transaction boundary. A minimal `
 
 Command fingerprints use canonical JSON plus an injected `HashAdapter`; Patient/Scheduler state and wall-clock time are outside that equivalence boundary. Exact retries replay the committed event range without execution or sequence allocation, conflicting retries fail closed, and failed attempts create no replay record. Event UUIDs come from an injected testable factory, while trusted real UTC commit time is an explicit dependency. A pre-command Case interrupt commits its independently authoritative due settlement but neither executes nor records the learner command. Immediate V2-005 effects settle in the command transaction; positive-delay scheduler mutations commit atomically for later Clinical-Time processing. No zero-delay scheduler language, persistence, API, UI, database, assessment, AI, voice, or media behavior is added. Run `npm run test:v2-006b` for the affected command-orchestration regression set.
 
-V2-006C closes the in-memory Session boundary with one `SessionCoordinator`. It loads and atomically compare-and-swaps complete Session aggregates through a storage-neutral `SessionCommitAdapter`; the portable `InMemorySessionCommitAdapter` proves copy isolation, append-only progression, stale-write rejection, and deterministic double-click replay. Its composite commit token uses existing authoritative Patient State version, next event sequence, clock state/time, and trusted real-time anchor rather than inventing another mutable version counter. Future Postgres or IndexedDB adapters must implement this same boundary outside the portable core.
+V2-006C closes the in-memory Session boundary with one `SessionCoordinator`. It loads and atomically compare-and-swaps complete Session aggregates through a storage-neutral `SessionCommitAdapter`; the portable `InMemorySessionCommitAdapter` proves copy isolation, append-only progression, stale-write rejection, and deterministic double-click replay. Its composite commit token uses existing authoritative Patient State version, next event sequence, clock state/time, and trusted real-time anchor rather than inventing another mutable version counter. The V2-012 PostgreSQL adapter and any future IndexedDB adapter implement this same boundary without changing Session semantics.
 
 Trusted-time synchronization receives explicit UTC authority and never reads a live clock. RUNNING sessions advance elapsed whole seconds through the pinned ratio and V2-006A chronological scheduler path, so browser-sleep catch-up cannot skip Case work. An interrupt commits only the reached interval and advances the real-time anchor proportionally; PAUSED sessions never catch up, and resume establishes a new anchor. Normal sync/catch-up remains distinct from Case-owned action-duration advancement. Pause/resume produce generic committed lifecycle events but no clinical effects. Run `npm run test:v2-006` for the complete portable V2-006 closure suite.
 
@@ -149,6 +149,7 @@ npm run test:v2-009
 npm run test:v2-010
 npm run test:v2-011a
 npm run test:v2-011b
+npm run test:v2-012a
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -177,6 +178,12 @@ npm exec playwright install chromium
 `npm run test:v2-011a` applies all migrations to two independent PGlite databases and runs permanent structural, immutability, authority-binding, and real-contract round-trip checks. `npm run test:v2-011b` uses exact-pinned native PostgreSQL 16.14 to prove real roles, grants, `SET ROLE`, `row_security`, `FORCE ROW LEVEL SECURITY`, Supabase-compatible `auth.uid()` request context, empty/upgrade/reset migration paths, and JU/JUST adversarial isolation. Both runtimes are local test dependencies; no remote Supabase project or region is selected.
 
 All 28 application tables have RLS enabled and forced. V2-011B adds 14 explicit least-privilege policies and one hardened membership helper. Raw governance, Session, Event, checkpoint, and Assessment access remains denied until trusted mutation and disclosure-safe API boundaries exist. **RLS SECURITY GATE: PASS.** V2-012 will own persistent atomic Session commit orchestration.
+
+## V2-012A atomic persistent Session foundation
+
+`PostgresSessionCommitAdapter` implements the existing V2-006 storage-neutral boundary through a narrow SDK-free RPC client. The additive PostgreSQL migration provides `SECURITY INVOKER`, `service_role`-only load and commit functions. The commit function locks the Session row, applies the existing composite CAS token, preserves immutable review/production artifact authority, and atomically appends domain-assigned Events and successful replay records with an exact checkpoint and Session update. PostgreSQL stores the already-computed outcome; it contains no clinical rules, medical timers, event ordering logic, or scoring.
+
+Persistent reload validates the strict Session aggregate and cross-checks its committed Event and replay collections plus latest checkpoint. Stale commits fail without automatic clinical recomputation; a double-click race may resolve only when the newly loaded durable record proves an exact already-committed replay. Run `npm run test:v2-012a` for the native PostgreSQL 16.14 transaction and rollback suite. V2-012 remains open pending the dedicated Slice B concurrency/crash/recovery adversarial gate.
 
 ## Portable package rules
 
