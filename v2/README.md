@@ -150,6 +150,7 @@ npm run test:v2-010
 npm run test:v2-011a
 npm run test:v2-011b
 npm run test:v2-012a
+npm run test:v2-012b
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -184,6 +185,12 @@ All 28 application tables have RLS enabled and forced. V2-011B adds 14 explicit 
 `PostgresSessionCommitAdapter` implements the existing V2-006 storage-neutral boundary through a narrow SDK-free RPC client. The additive PostgreSQL migration provides `SECURITY INVOKER`, `service_role`-only load and commit functions. The commit function locks the Session row, applies the existing composite CAS token, preserves immutable review/production artifact authority, and atomically appends domain-assigned Events and successful replay records with an exact checkpoint and Session update. PostgreSQL stores the already-computed outcome; it contains no clinical rules, medical timers, event ordering logic, or scoring.
 
 Persistent reload validates the strict Session aggregate and cross-checks its committed Event and replay collections plus latest checkpoint. Stale commits fail without automatic clinical recomputation; a double-click race may resolve only when the newly loaded durable record proves an exact already-committed replay. Run `npm run test:v2-012a` for the native PostgreSQL 16.14 transaction and rollback suite. V2-012 remains open pending the dedicated Slice B concurrency/crash/recovery adversarial gate.
+
+## V2-012B concurrency and durability closure
+
+`npm run test:v2-012b` uses independent native PostgreSQL 16.14 connections and synchronized barriers to prove the V2-012A transaction under same-base, same-key, conflicting-key, retry, stale-writer, scheduler, Clinical-Time, review/production-authority, and cross-tenant contention. It also covers real pre-commit backend termination, deliberately lost post-commit responses, 10 restart cycles, fail-closed durable corruption, a 50-command sustained series, and a mixed adversarial recovery sequence.
+
+The authority remains one `READ COMMITTED` PostgreSQL operation whose Session-row `SELECT ... FOR UPDATE` serializes CAS and all Event/replay/checkpoint/Session writes. No application mutex, sticky connection, blind medical retry, remote Supabase resource, or client write path is introduced. The lost-response fixture discards an established successful result; it does not claim to be a physical network-partition simulation.
 
 ## Portable package rules
 

@@ -51,9 +51,10 @@
     "test:v2-011a": "node scripts/v2-011a-persistence-test.mjs",
     "test:v2-011b": "node scripts/v2-011b-rls-security-test.mjs",
     "test:v2-012a": "node scripts/v2-012a-atomic-persistence-test.mjs",
+    "test:v2-012b": "node scripts/v2-012b-durability-test.mjs",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
-    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:v2-011a && npm run test:v2-011b && npm run test:v2-012a && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
+    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:v2-011a && npm run test:v2-011b && npm run test:v2-012a && npm run test:v2-012b && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
