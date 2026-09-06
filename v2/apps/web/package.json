@@ -8,7 +8,10 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@ai-clinical-simulation/contracts": "0.1.0",
     "@ai-clinical-simulation/portability-smoke": "0.0.0",
+    "@ai-clinical-simulation/recovery-core": "0.1.0",
+    "idb": "8.0.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -16,6 +19,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "6.1.1",
-    "vite": "8.2.2"
+    "vite": "8.2.2",
+    "vite-plugin-pwa": "1.3.0"
   }
 }

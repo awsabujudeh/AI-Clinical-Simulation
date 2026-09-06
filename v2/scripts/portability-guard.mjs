@@ -5,6 +5,7 @@ const clinicalEngineSourceRoot = new URL("../packages/clinical-engine/src/", imp
 const sessionEngineSourceRoot = new URL("../packages/session-engine/src/", import.meta.url);
 const assessmentEngineSourceRoot = new URL("../packages/assessment-engine/src/", import.meta.url);
 const apiCoreSourceRoot = new URL("../packages/api-core/src/", import.meta.url);
+const recoveryCoreSourceRoot = new URL("../packages/recovery-core/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
@@ -12,7 +13,8 @@ const portableSourceRoots = [
   clinicalEngineSourceRoot,
   sessionEngineSourceRoot,
   assessmentEngineSourceRoot,
-  apiCoreSourceRoot
+  apiCoreSourceRoot,
+  recoveryCoreSourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -136,6 +138,31 @@ if (assessmentEngineViolations.length > 0) {
   );
 }
 
+const recoveryCoreSourceFiles = await collectTypeScriptFiles(recoveryCoreSourceRoot);
+const recoveryCoreViolations = [];
+const recoveryClinicalEngineDependency = /(?:from\s+|import\s*(?:\(\s*)?)["'][^"']*clinical-engine[^"']*["']/u;
+const recoveryDuplicateContractAuthority = /\b(?:export\s+)?const\s+(?:RecoveryMutationRequestSchema|InDoubtRecoveryJournalEntrySchema|LastKnownSafeSessionProjectionSchema)\s*=/u;
+for (const fileUrl of recoveryCoreSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+  if (diseaseSpecificTerms.test(source)) {
+    recoveryCoreViolations.push(`Disease-specific source term: ${fileUrl.pathname}`);
+  }
+  if (runtimeNondeterminism.test(source)) {
+    recoveryCoreViolations.push(`Runtime nondeterminism: ${fileUrl.pathname}`);
+  }
+  if (recoveryClinicalEngineDependency.test(source)) {
+    recoveryCoreViolations.push(`Offline recovery must not execute Clinical Engine: ${fileUrl.pathname}`);
+  }
+  if (recoveryDuplicateContractAuthority.test(source)) {
+    recoveryCoreViolations.push(`Duplicate shared recovery schema authority: ${fileUrl.pathname}`);
+  }
+}
+if (recoveryCoreViolations.length > 0) {
+  throw new Error(
+    `Recovery core foundation violations:\n${recoveryCoreViolations.join("\n")}`
+  );
+}
+
 const caseSchemaSourceFiles = await collectTypeScriptFiles(
   new URL("../packages/case-schema/src/", import.meta.url)
 );
@@ -160,6 +187,7 @@ const sharedContractSourceFiles = await collectTypeScriptFiles(
 );
 let sharedRuleAuthorityCount = 0;
 let sharedDiagnosticAuthorityCount = 0;
+let sharedRecoveryAuthorityCount = 0;
 for (const fileUrl of sharedContractSourceFiles) {
   const source = await readFile(fileUrl, "utf8");
   if (/\bexport\s+const\s+TransitionRuleSchema\s*=/u.test(source)) {
@@ -168,12 +196,18 @@ for (const fileUrl of sharedContractSourceFiles) {
   if (/\bexport\s+const\s+InvestigationDefinitionSchema\s*=/u.test(source)) {
     sharedDiagnosticAuthorityCount += 1;
   }
+  if (/\bexport\s+const\s+RecoveryMutationRequestSchema\s*=/u.test(source)) {
+    sharedRecoveryAuthorityCount += 1;
+  }
 }
 if (sharedRuleAuthorityCount !== 1) {
   throw new Error(`Expected exactly one shared TransitionRuleSchema authority; found ${sharedRuleAuthorityCount}.`);
 }
 if (sharedDiagnosticAuthorityCount !== 1) {
   throw new Error(`Expected exactly one shared InvestigationDefinitionSchema authority; found ${sharedDiagnosticAuthorityCount}.`);
+}
+if (sharedRecoveryAuthorityCount !== 1) {
+  throw new Error(`Expected exactly one shared RecoveryMutationRequestSchema authority; found ${sharedRecoveryAuthorityCount}.`);
 }
 
 const canonicalInstitutionTargets = [
@@ -210,3 +244,6 @@ console.log("SESSION_ENGINE_DETERMINISM_GUARD=PASS");
 console.log("ASSESSMENT_ENGINE_PORTABILITY_GUARD=PASS");
 console.log("ASSESSMENT_ENGINE_DETERMINISM_GUARD=PASS");
 console.log("API_CORE_EDGE_PORTABILITY_GUARD=PASS");
+console.log("RECOVERY_CORE_PORTABILITY_GUARD=PASS");
+console.log("RECOVERY_CORE_SERVER_AUTHORITY_GUARD=PASS");
+console.log("RECOVERY_CONTRACT_AUTHORITY_GUARD=PASS count=1");

@@ -152,6 +152,7 @@ npm run test:v2-011b
 npm run test:v2-012a
 npm run test:v2-012b
 npm run test:v2-013
+npm run test:v2-014a
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -204,6 +205,12 @@ Run `npm run test:v2-013` for Browser, Deno, native PostgreSQL, and portability 
 ## Portable package rules
 
 Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, `packages/clinical-engine/src/`, `packages/session-engine/src/`, `packages/assessment-engine/src/`, and `packages/api-core/src/` must remain Edge-portable and free of forbidden runtime/provider coupling. Deterministic domain packages additionally remain side-effect-free. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
+
+## V2-014A offline/recovery foundation
+
+`packages/recovery-core/` owns the portable, deterministic recovery coordinator: explicit connectivity states, strict exact-request journaling, bounded safe-read and in-doubt reconciliation, authoritative reload flow, and stale/non-authoritative safe projections. It never runs medical rules, Clinical Time, or scheduler work. Browser-only `idb` storage and authenticated fetch integration live under `apps/web/src/offline/`.
+
+Workbox precaches only the versioned application shell and approved static resources. Private `/v1` responses and authorization material have no generic runtime cache. A mutation attempted while offline is `NOT_SENT` and is not queued; only an already-sent `IN_DOUBT` mutation can be retried with its exact canonical request and original idempotency key. Run `npm run test:v2-014a`. V2-014 remains open pending the Slice B chaos/adversarial gate.
 
 ## Source of Truth and rollback
 

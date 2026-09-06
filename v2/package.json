@@ -56,9 +56,14 @@
     "test:api:deno": "deno test tests/deno/api_test.ts",
     "test:api:postgres": "node scripts/v2-013-api-integration-test.mjs",
     "test:v2-013": "npm run typecheck && npm run test:api:browser && npm run test:api:deno && npm run test:api:postgres && npm run test:portability-guard",
+    "test:recovery:browser": "vitest run --config vitest.config.mjs tests/browser/contracts.recovery.browser.test.ts tests/browser/recovery",
+    "test:recovery:deno": "deno test tests/deno/recovery_test.ts",
+    "test:recovery": "npm run test:recovery:browser && npm run test:recovery:deno",
+    "test:pwa": "node scripts/v2-014a-pwa-audit.mjs",
+    "test:v2-014a": "npm run typecheck && npm run build && npm run test:pwa && npm run test:recovery && npm run test:api:postgres && npm run test:portability-guard",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
-    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:v2-011a && npm run test:v2-011b && npm run test:v2-012a && npm run test:v2-012b && npm run test:api:postgres && npm run build && npm run test:browser && npm run test:deno && npm run test:playwright"
+    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:v2-011a && npm run test:v2-011b && npm run test:v2-012a && npm run test:v2-012b && npm run test:api:postgres && npm run build && npm run test:pwa && npm run test:browser && npm run test:deno && npm run test:playwright"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
