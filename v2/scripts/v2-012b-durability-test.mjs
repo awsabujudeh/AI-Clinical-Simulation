@@ -35,6 +35,7 @@ import { TEST_HASH_ADAPTER } from "../tests/fixtures/cases/synthetic-case.ts";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const V2_ROOT = resolve(SCRIPT_DIR, "..");
 const MIGRATION_DIR = join(V2_ROOT, "supabase", "migrations");
+const V2_012A_MIGRATION = "202609040005_v2_012a_atomic_session_commit.sql";
 const DATABASE_NAME = "v2_012b_durability";
 const JU_USER = "11111111-1111-4111-8111-111111111111";
 const JUST_USER = "22222222-2222-4222-8222-222222222222";
@@ -93,7 +94,7 @@ async function findFreePort() {
 
 async function loadMigrations() {
   const names = (await readdir(MIGRATION_DIR))
-    .filter((name) => name.endsWith(".sql"))
+    .filter((name) => name.endsWith(".sql") && name <= V2_012A_MIGRATION)
     .sort();
   return Promise.all(names.map(async (name) => ({
     name,
@@ -612,7 +613,7 @@ async function seedCommittedSession(postgres, full, sessionId) {
 
 async function main() {
   const migrations = await loadMigrations();
-  assert(migrations.at(-1)?.name === "202609040005_v2_012a_atomic_session_commit.sql",
+  assert(migrations.at(-1)?.name === V2_012A_MIGRATION,
     "V2-012B must not add or rewrite a migration.");
   const port = await findFreePort();
   const databaseDir = await mkdtemp(join(tmpdir(), "v2-012b-native-postgres-"));

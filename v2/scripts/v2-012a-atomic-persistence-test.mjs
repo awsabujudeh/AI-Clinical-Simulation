@@ -30,6 +30,7 @@ import { canonicalSerialize } from "../packages/case-schema/src/index.ts";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const V2_ROOT = resolve(SCRIPT_DIR, "..");
 const MIGRATION_DIR = join(V2_ROOT, "supabase", "migrations");
+const V2_012A_MIGRATION = "202609040005_v2_012a_atomic_session_commit.sql";
 const TEST_USER = "11111111-1111-4111-8111-111111111111";
 const REVIEW_SUBJECT = "b".repeat(64);
 const PACKAGE_HASH = "a".repeat(64);
@@ -67,7 +68,7 @@ async function findFreePort() {
 
 async function loadMigrations() {
   const names = (await readdir(MIGRATION_DIR))
-    .filter((name) => name.endsWith(".sql"))
+    .filter((name) => name.endsWith(".sql") && name <= V2_012A_MIGRATION)
     .sort();
   return Promise.all(names.map(async (name) => ({
     name,
@@ -374,8 +375,8 @@ function semanticallyEqual(left, right) {
 
 async function main() {
   const migrations = await loadMigrations();
-  assert(migrations.at(-1)?.name === "202609040005_v2_012a_atomic_session_commit.sql",
-    "V2-012A migration must be the additive migration tail.");
+  assert(migrations.at(-1)?.name === V2_012A_MIGRATION,
+    "V2-012A migration horizon must end at its additive migration.");
   const port = await findFreePort();
   const databaseDir = await mkdtemp(join(tmpdir(), "v2-012a-native-postgres-"));
   const postgres = new EmbeddedPostgres({

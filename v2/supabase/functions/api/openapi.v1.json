@@ -1,0 +1,178 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Clinical Simulation Platform V2 Secure API",
+    "version": "1.0.0",
+    "description": "V2-013 transport contract. Domain schemas are authoritative in @v2/contracts; this inventory does not redefine medical truth."
+  },
+  "servers": [],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "security": [],
+        "responses": { "200": { "description": "Local process health" } }
+      }
+    },
+    "/v1/sessions": {
+      "post": {
+        "operationId": "startSession",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": {
+          "201": { "description": "Atomic Session plus initial checkpoint created or replayed" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/review-sessions": {
+      "post": {
+        "operationId": "startReviewSession",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "description": "Same-institution Faculty/Reviewer preview. Authority is resolved from database membership and an UNDER_REVIEW ReviewExecutionArtifact.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": {
+          "201": { "description": "Review-only Session created or replayed" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/state": {
+      "get": {
+        "operationId": "getPatientState",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SessionId" }],
+        "responses": {
+          "200": { "description": "Safe observation and disclosure projection" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/actions/propose": {
+      "post": {
+        "operationId": "proposeAction",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "description": "Accepts learner intent and invokes the authoritative Session Coordinator; it cannot accept state, effects, score, Clinical Time, or execution authority.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": {
+          "200": { "description": "Committed authoritative action result or durable exact replay" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/investigations/{result_id}": {
+      "get": {
+        "operationId": "getInvestigationResult",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "name": "result_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Milestone-filtered diagnostic components" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/end": {
+      "post": {
+        "operationId": "endSimulation",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": {
+          "200": { "description": "Committed terminal Session plus deterministic final Assessment" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/assessment": {
+      "get": {
+        "operationId": "getAssessment",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SessionId" }],
+        "responses": {
+          "200": { "description": "Mode- and lifecycle-safe deterministic Assessment projection" },
+          "422": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/debriefs": {
+      "post": {
+        "operationId": "generateDebrief",
+        "x-delivery-status": "DETERMINISTIC_EVIDENCE_ONLY",
+        "description": "Returns only the existing deterministic Assessment projection. Tutor/LLM prose is not implemented.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": { "200": { "description": "Safe deterministic disclosure projection" } }
+      }
+    },
+    "/v1/sessions/{session_id}/questions": {
+      "post": {
+        "operationId": "submitQuestion",
+        "x-delivery-status": "DELIVERY_PENDING",
+        "description": "Strict contract shell only. Returns FEATURE_NOT_AVAILABLE; no Patient AI is fabricated.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SessionId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": { "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/faculty/cases": {
+      "post": {
+        "operationId": "createCaseDraft",
+        "x-delivery-status": "DELIVERY_PENDING",
+        "description": "Returns FEATURE_NOT_AVAILABLE. No Case Builder or AI draft is fabricated.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "responses": { "503": { "$ref": "#/components/responses/Error" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "supabaseBearer": { "type": "http", "scheme": "bearer", "bearerFormat": "Supabase JWT" }
+    },
+    "parameters": {
+      "SessionId": { "name": "session_id", "in": "path", "required": true, "schema": { "type": "string", "maxLength": 128 } },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "maxLength": 128 } }
+    },
+    "requestBodies": {
+      "StrictJson": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } }
+    },
+    "responses": {
+      "Error": { "description": "Versioned safe machine-readable API error envelope" }
+    }
+  }
+}

@@ -151,6 +151,7 @@ npm run test:v2-011a
 npm run test:v2-011b
 npm run test:v2-012a
 npm run test:v2-012b
+npm run test:v2-013
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -192,9 +193,17 @@ Persistent reload validates the strict Session aggregate and cross-checks its co
 
 The authority remains one `READ COMMITTED` PostgreSQL operation whose Session-row `SELECT ... FOR UPDATE` serializes CAS and all Event/replay/checkpoint/Session writes. No application mutex, sticky connection, blind medical retry, remote Supabase resource, or client write path is introduced. The lost-response fixture discards an established successful result; it does not claim to be a physical network-partition simulation.
 
+## V2-013 secure API boundary
+
+`packages/api-core/` provides the portable Deno/Edge Hono transport and application-service boundary. It cryptographically verifies Supabase JWTs, derives role/institution/resource authorization through injected database repositories, and delegates all action execution and finalization to the existing Session Coordinator and persistent adapter. Routes never own clinical decisions, state transitions, diagnostic truth, or scoring.
+
+The API uses `/v1`, strict shared Zod requests, safe response projections, a 16 KiB mutation-body limit, injected exact-origin CORS allowlisting, stable localized error keys, and caller-supplied bounded `Idempotency-Key` values. The V2-013 migration adds atomic Session-plus-initial-checkpoint creation and append-only terminal persistence; its functions remain server-only. Patient AI and Case Builder routes return explicit unavailability, curriculum/RAG stays future server-internal work, and visual resolution remains a pure future browser function. No remote Supabase project or production region is configured.
+
+Run `npm run test:v2-013` for Browser, Deno, native PostgreSQL, and portability checks. The contract catalog, authorization matrix, error model, disclosure policy, and verification record are under `planning_input/v2-013/`.
+
 ## Portable package rules
 
-Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, `packages/clinical-engine/src/`, `packages/session-engine/src/`, and `packages/assessment-engine/src/` must remain deterministic, side-effect-free, and portable. It must not depend directly on Node, Deno, browser globals, filesystems, databases, UI frameworks, provider SDKs, or environment state. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
+Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packages/case-schema/src/`, `packages/clinical-engine/src/`, `packages/session-engine/src/`, `packages/assessment-engine/src/`, and `packages/api-core/src/` must remain Edge-portable and free of forbidden runtime/provider coupling. Deterministic domain packages additionally remain side-effect-free. `npm run test:portability-guard` enforces these boundaries, rejects runtime randomness/clocks and disease-specific terms in generic engine source, and checks canonical contract/case fixtures for a reversed University of Jordan code.
 
 ## Source of Truth and rollback
 

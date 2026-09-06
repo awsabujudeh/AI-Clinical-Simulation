@@ -27,6 +27,11 @@ export const POSTGRES_SESSION_LOAD_FUNCTION =
 export const POSTGRES_SESSION_COMMIT_FUNCTION =
   "commit_authoritative_session_v2_012a" as const;
 
+export type PostgresSessionFunctionNames = Readonly<{
+  load: string;
+  commit: string;
+}>;
+
 export type PostgresRpcError = Readonly<{
   code?: string;
   message: string;
@@ -155,9 +160,17 @@ function asRpcObject(value: unknown): JsonObject {
  */
 export class PostgresSessionCommitAdapter implements SessionCommitAdapter {
   readonly #client: PostgresSessionRpcClient;
+  readonly #functionNames: PostgresSessionFunctionNames;
 
-  constructor(client: PostgresSessionRpcClient) {
+  constructor(
+    client: PostgresSessionRpcClient,
+    functionNames: PostgresSessionFunctionNames = {
+      load: POSTGRES_SESSION_LOAD_FUNCTION,
+      commit: POSTGRES_SESSION_COMMIT_FUNCTION
+    }
+  ) {
     this.#client = client;
+    this.#functionNames = functionNames;
   }
 
   async load(sessionIdInput: unknown): Promise<SessionAdapterLoadResult> {
@@ -171,7 +184,7 @@ export class PostgresSessionCommitAdapter implements SessionCommitAdapter {
     let result: PostgresRpcResult;
     try {
       result = await this.#client.rpc(
-        POSTGRES_SESSION_LOAD_FUNCTION,
+        this.#functionNames.load,
         asRpcObject({ p_session_id: sessionId.data })
       );
     } catch {
@@ -222,7 +235,7 @@ export class PostgresSessionCommitAdapter implements SessionCommitAdapter {
     let result: PostgresRpcResult;
     try {
       result = await this.#client.rpc(
-        POSTGRES_SESSION_COMMIT_FUNCTION,
+        this.#functionNames.commit,
         asRpcObject({ p_request: request.data })
       );
     } catch {
@@ -266,7 +279,8 @@ export class PostgresSessionCommitAdapter implements SessionCommitAdapter {
 }
 
 export function createPostgresSessionCommitAdapter(
-  client: PostgresSessionRpcClient
+  client: PostgresSessionRpcClient,
+  functionNames?: PostgresSessionFunctionNames
 ): SessionCommitAdapter {
-  return new PostgresSessionCommitAdapter(client);
+  return new PostgresSessionCommitAdapter(client, functionNames);
 }

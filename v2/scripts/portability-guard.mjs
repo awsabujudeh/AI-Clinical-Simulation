@@ -4,13 +4,15 @@ import { extname } from "node:path";
 const clinicalEngineSourceRoot = new URL("../packages/clinical-engine/src/", import.meta.url);
 const sessionEngineSourceRoot = new URL("../packages/session-engine/src/", import.meta.url);
 const assessmentEngineSourceRoot = new URL("../packages/assessment-engine/src/", import.meta.url);
+const apiCoreSourceRoot = new URL("../packages/api-core/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
   new URL("../packages/case-schema/src/", import.meta.url),
   clinicalEngineSourceRoot,
   sessionEngineSourceRoot,
-  assessmentEngineSourceRoot
+  assessmentEngineSourceRoot,
+  apiCoreSourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -207,3 +209,4 @@ console.log("SESSION_ENGINE_PORTABILITY_GUARD=PASS");
 console.log("SESSION_ENGINE_DETERMINISM_GUARD=PASS");
 console.log("ASSESSMENT_ENGINE_PORTABILITY_GUARD=PASS");
 console.log("ASSESSMENT_ENGINE_DETERMINISM_GUARD=PASS");
+console.log("API_CORE_EDGE_PORTABILITY_GUARD=PASS");

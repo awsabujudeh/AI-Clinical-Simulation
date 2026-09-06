@@ -2,10 +2,12 @@ import { z } from "zod";
 
 import {
   CanonicalEventEnvelopeSchema,
+  AssessmentIdSchema,
   CorrelationIdSchema,
   IdempotencyKeySchema,
   RealUtcTimeSchema,
   RequestIdSchema,
+  Sha256DigestSchema,
   SessionIdSchema,
   type HashAdapter
 } from "../../../contracts/src/index.ts";
@@ -21,6 +23,7 @@ import {
   type SessionCommandSuccess
 } from "../commands/process-external-command.ts";
 import { fingerprintExternalLearnerCommand } from "../commands/external-command.ts";
+import { canonicalSerialize } from "../../../case-schema/src/index.ts";
 import {
   commitPendingSessionEvents,
   type EventIdFactory,
@@ -52,7 +55,8 @@ const SessionCoordinatorOperationSchema = z.enum([
   "SUBMIT_EXTERNAL_COMMAND",
   "SYNC_TRUSTED_TIME",
   "PAUSE_SESSION",
-  "RESUME_SESSION"
+  "RESUME_SESSION",
+  "END_SESSION"
 ]);
 export type SessionCoordinatorOperation = z.infer<
   typeof SessionCoordinatorOperationSchema
@@ -73,6 +77,15 @@ export const SessionCoordinatorSubmitRequestSchema = SessionCoordinatorContextSc
 });
 export type SessionCoordinatorSubmitRequest = z.infer<
   typeof SessionCoordinatorSubmitRequestSchema
+>;
+
+export const SessionCoordinatorEndRequestSchema = SessionCoordinatorContextSchema.extend({
+  assessment_id: AssessmentIdSchema,
+  expected_state_version: InMemorySessionAggregateSchema.shape.patient_state.shape.state_version,
+  reason: z.enum(["LEARNER_COMPLETED", "FACULTY_ENDED", "TIME_EXPIRED"])
+});
+export type SessionCoordinatorEndRequest = z.infer<
+  typeof SessionCoordinatorEndRequestSchema
 >;
 
 export const SessionCoordinatorSuccessSchema = z.strictObject({
@@ -106,6 +119,15 @@ export interface SessionCoordinator {
   syncRunningSession(input: unknown): Promise<SessionCoordinatorResult>;
   pauseSession(input: unknown): Promise<SessionCoordinatorResult>;
   resumeSession(input: unknown): Promise<SessionCoordinatorResult>;
+  endSession(input: unknown): Promise<SessionCoordinatorResult>;
+}
+
+function endedFailure(): SessionCoordinatorFailure {
+  return failure([createSessionCommandIssue({
+    code: "SESSION_ENDED",
+    path: "$.session.status",
+    message: "The authoritative Session has already ended."
+  })]);
 }
 
 function failure(
@@ -277,6 +299,7 @@ export function createSessionCoordinator(
     if (!parsed.success) return failure(parsed.issues);
     const loaded = await dependencies.adapter.load(parsed.context.session_id);
     if (!loaded.success) return failure(loaded.issues);
+    if (loaded.session.status === "ENDED") return endedFailure();
     const synchronized = synchronize(
       loaded.session,
       parsed.context,
@@ -309,6 +332,7 @@ export function createSessionCoordinator(
     if (!parsed.success) return failure(parsed.issues);
     const loaded = await dependencies.adapter.load(parsed.context.session_id);
     if (!loaded.success) return failure(loaded.issues);
+    if (loaded.session.status === "ENDED") return endedFailure();
     if (loaded.session.clinical_clock.status === "PAUSED") {
       const timeIssues = validateNoBackwardControlTime(
         loaded.session,
@@ -369,6 +393,7 @@ export function createSessionCoordinator(
     if (!parsed.success) return failure(parsed.issues);
     const loaded = await dependencies.adapter.load(parsed.context.session_id);
     if (!loaded.success) return failure(loaded.issues);
+    if (loaded.session.status === "ENDED") return endedFailure();
     const timeIssues = validateNoBackwardControlTime(
       loaded.session,
       parsed.context.trusted_real_time_utc
@@ -449,6 +474,7 @@ export function createSessionCoordinator(
   ): Promise<SessionCoordinatorResult> {
     const loaded = await dependencies.adapter.load(request.session_id);
     if (!loaded.success) return failure(loaded.issues);
+    if (loaded.session.status === "ENDED") return endedFailure();
     const synchronized = synchronize(
       loaded.session,
       request,
@@ -532,10 +558,172 @@ export function createSessionCoordinator(
     return submitAttempt(request.data);
   }
 
+  async function fingerprintFinalization(request: SessionCoordinatorEndRequest) {
+    try {
+      const digest = Sha256DigestSchema.safeParse(await dependencies.hash_adapter.sha256(
+        canonicalSerialize({
+          session_id: request.session_id,
+          idempotency_key: request.idempotency_key,
+          expected_state_version: request.expected_state_version,
+          reason: request.reason
+        })
+      ));
+      return digest.success
+        ? { success: true as const, fingerprint: digest.data }
+        : { success: false as const, result: failure([createSessionCommandIssue({
+            code: "COMMAND_FINGERPRINT_FAILED",
+            path: "$.dependencies.hash_adapter",
+            message: "Hash adapter did not return a valid finalization fingerprint."
+          })]) };
+    } catch {
+      return { success: false as const, result: failure([createSessionCommandIssue({
+        code: "COMMAND_FINGERPRINT_FAILED",
+        path: "$.dependencies.hash_adapter",
+        message: "Hash adapter failed before Session finalization."
+      })]) };
+    }
+  }
+
+  async function endSession(input: unknown): Promise<SessionCoordinatorResult> {
+    const request = SessionCoordinatorEndRequestSchema.safeParse(input);
+    if (!request.success) {
+      return failure(sessionCommandIssuesFromZodError(
+        "INVALID_COORDINATOR_INPUT",
+        "$.coordinator",
+        request.error
+      ));
+    }
+    const fingerprint = await fingerprintFinalization(request.data);
+    if (!fingerprint.success) return fingerprint.result;
+    const loaded = await dependencies.adapter.load(request.data.session_id);
+    if (!loaded.success) return failure(loaded.issues);
+
+    if (loaded.session.status === "ENDED") {
+      const record = loaded.session.finalization!;
+      if (
+        record.idempotency_key !== request.data.idempotency_key
+        || record.request_fingerprint !== fingerprint.fingerprint
+      ) {
+        return failure([createSessionCommandIssue({
+          code: "IDEMPOTENCY_CONFLICT",
+          path: "$.coordinator.idempotency_key",
+          message: "Session finalization already committed with different request authority."
+        })]);
+      }
+      return success({
+        operation: "END_SESSION",
+        status: "REPLAYED",
+        session: loaded.session
+      });
+    }
+    if (loaded.session.patient_state.state_version !== request.data.expected_state_version) {
+      return failure([createSessionCommandIssue({
+        code: "STATE_VERSION_CONFLICT",
+        path: "$.coordinator.expected_state_version",
+        message: "Expected Patient State Version does not match finalization intake state."
+      })]);
+    }
+
+    const synchronized = synchronize(
+      loaded.session,
+      request.data,
+      dependencies.event_id_factory
+    );
+    if (!synchronized.success) return failure(synchronized.issues);
+    if (synchronized.status === "INTERRUPTED") {
+      const committedInterrupt = await commitProposal(
+        loaded,
+        synchronized.proposed_session,
+        dependencies.adapter
+      );
+      if (!committedInterrupt.success) return failure(committedInterrupt.issues);
+      return success({
+        operation: "END_SESSION",
+        status: "INTERRUPTED",
+        session: committedInterrupt.session,
+        committedEvents: newEventsSince(loaded.session, committedInterrupt.session)
+      });
+    }
+
+    const pausedClock = synchronized.proposed_session.clinical_clock.status === "PAUSED"
+      ? { success: true as const, clock: synchronized.proposed_session.clinical_clock }
+      : pauseSessionClinicalClock(synchronized.proposed_session.clinical_clock);
+    if (!pausedClock.success) {
+      return failure(pausedClock.issues.map((issue) => createSessionCommandIssue({
+        code: "TIME_SYNCHRONIZATION_FAILED",
+        path: issue.path,
+        message: issue.message
+      })));
+    }
+    const committedEnd = commitPendingSessionEvents({
+      session_id: loaded.session.session_id,
+      case_version: loaded.session.pinned_case.case_version,
+      first_sequence_no: synchronized.proposed_session.next_sequence_no,
+      real_time_utc: request.data.trusted_real_time_utc,
+      pending_events: [{
+        event_origin: "SESSION_COORDINATOR",
+        clinical_time: synchronized.proposed_session.patient_state.clinical_time,
+        actor_type: "SYSTEM",
+        source: "ENGINE",
+        correlation_id: request.data.correlation_id,
+        event_type: "SIMULATION_ENDED",
+        parameters: {},
+        payload: {
+          reason: request.data.reason,
+          assessment_id: request.data.assessment_id
+        },
+        clinical_effect_ids: [],
+        state_version_before: synchronized.proposed_session.patient_state.state_version,
+        state_version_after: synchronized.proposed_session.patient_state.state_version,
+        idempotency_key: request.data.idempotency_key,
+        request_id: request.data.request_id
+      }],
+      event_id_factory: dependencies.event_id_factory
+    });
+    if (!committedEnd.success) return failure(committedEnd.issues);
+    const endEvent = committedEnd.events[0]!;
+    const proposed = InMemorySessionAggregateSchema.safeParse({
+      ...synchronized.proposed_session,
+      status: "ENDED",
+      clinical_clock: pausedClock.clock,
+      committed_events: [
+        ...synchronized.proposed_session.committed_events,
+        endEvent
+      ],
+      next_sequence_no: synchronized.proposed_session.next_sequence_no + 1,
+      finalization: {
+        finalization_schema_version: "1.0",
+        idempotency_key: request.data.idempotency_key,
+        request_fingerprint: fingerprint.fingerprint,
+        assessment_id: request.data.assessment_id,
+        reason: request.data.reason,
+        event_id: endEvent.event_id,
+        event_sequence: endEvent.sequence_no,
+        finalized_at_utc: request.data.trusted_real_time_utc
+      }
+    });
+    if (!proposed.success) {
+      return failure([createSessionCommandIssue({
+        code: "INVALID_SESSION_AGGREGATE",
+        path: "$.session.finalization",
+        message: "Trusted finalization did not form a valid authoritative Session."
+      })]);
+    }
+    const committed = await commitProposal(loaded, proposed.data, dependencies.adapter);
+    if (!committed.success) return failure(committed.issues);
+    return success({
+      operation: "END_SESSION",
+      status: "COMMITTED",
+      session: committed.session,
+      committedEvents: newEventsSince(loaded.session, committed.session)
+    });
+  }
+
   return Object.freeze({
     submitExternalClinicalCommand,
     syncRunningSession,
     pauseSession,
-    resumeSession
+    resumeSession,
+    endSession
   });
 }

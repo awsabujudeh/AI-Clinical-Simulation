@@ -6,12 +6,14 @@ import {
   CommandIdSchema,
   EventIdSchema,
   IdempotencyKeySchema,
+  AssessmentIdSchema,
   PatientStateSchema,
   RealUtcTimeSchema,
   SchedulerStateSchema,
   SequenceNumberSchema,
   SessionClinicalClockSchema,
   SessionIdSchema,
+  SessionLifecycleStatusSchema,
   SessionModeSchema,
   Sha256DigestSchema,
   StateVersionSchema
@@ -70,9 +72,23 @@ export type CommittedCommandReplayRecord = z.infer<
   typeof CommittedCommandReplayRecordSchema
 >;
 
+export const SessionFinalizationRecordSchema = z.strictObject({
+  finalization_schema_version: z.literal("1.0"),
+  idempotency_key: IdempotencyKeySchema,
+  request_fingerprint: Sha256DigestSchema,
+  assessment_id: AssessmentIdSchema,
+  reason: z.enum(["LEARNER_COMPLETED", "FACULTY_ENDED", "TIME_EXPIRED"]),
+  event_id: EventIdSchema,
+  event_sequence: SequenceNumberSchema,
+  finalized_at_utc: RealUtcTimeSchema
+});
+export type SessionFinalizationRecord = z.infer<
+  typeof SessionFinalizationRecordSchema
+>;
+
 export const InMemorySessionAggregateSchema = z.strictObject({
   aggregate_schema_version: z.literal(IN_MEMORY_SESSION_AGGREGATE_SCHEMA_VERSION),
-  status: z.literal("ACTIVE"),
+  status: SessionLifecycleStatusSchema,
   session_id: SessionIdSchema,
   mode: SessionModeSchema,
   pinned_case: ExecutablePinnedSessionCaseContextSchema,
@@ -82,7 +98,8 @@ export const InMemorySessionAggregateSchema = z.strictObject({
   trusted_real_time_anchor_utc: RealUtcTimeSchema.optional(),
   committed_events: z.array(CanonicalEventEnvelopeSchema).max(4096),
   next_sequence_no: SequenceNumberSchema,
-  idempotency_records: z.array(CommittedCommandReplayRecordSchema).max(4096)
+  idempotency_records: z.array(CommittedCommandReplayRecordSchema).max(4096),
+  finalization: SessionFinalizationRecordSchema.optional()
 }).superRefine((value, context) => {
   if (value.patient_state.session_id !== value.session_id) {
     context.addIssue({
@@ -173,6 +190,42 @@ export const InMemorySessionAggregateSchema = z.strictObject({
         code: "custom",
         path: ["idempotency_records", recordIndex, "command_event_id"],
         message: "Replay record must identify its committed learner command event."
+      });
+    }
+  }
+
+  const endEvents = value.committed_events.filter(
+    (event) => event.event_type === "SIMULATION_ENDED"
+  );
+  if (value.status === "ACTIVE") {
+    if (value.finalization !== undefined || endEvents.length > 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["status"],
+        message: "An active Session cannot contain finalization authority."
+      });
+    }
+  } else {
+    const lastEvent = value.committed_events.at(-1);
+    if (
+      value.finalization === undefined
+      || endEvents.length !== 1
+      || lastEvent?.event_type !== "SIMULATION_ENDED"
+      || lastEvent.event_id !== value.finalization.event_id
+      || lastEvent.sequence_no !== value.finalization.event_sequence
+      || lastEvent.idempotency_key !== value.finalization.idempotency_key
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["finalization"],
+        message: "An ended Session requires one exact terminal finalization event and record."
+      });
+    }
+    if (value.clinical_clock.status !== "PAUSED") {
+      context.addIssue({
+        code: "custom",
+        path: ["clinical_clock", "status"],
+        message: "An ended Session clock must be paused."
       });
     }
   }

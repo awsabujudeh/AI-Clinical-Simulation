@@ -11,6 +11,9 @@ export type CaseLifecycle = z.infer<typeof CaseLifecycleSchema>;
 export const SessionModeSchema = z.enum(["PRACTICE_DEMO", "ASSESSMENT"]);
 export type SessionMode = z.infer<typeof SessionModeSchema>;
 
+export const SessionLifecycleStatusSchema = z.enum(["ACTIVE", "ENDED"]);
+export type SessionLifecycleStatus = z.infer<typeof SessionLifecycleStatusSchema>;
+
 /**
  * The immutable authority under which deterministic engines may execute.
  * REVIEW_ONLY can never satisfy a PUBLISHED_PRODUCTION boundary.

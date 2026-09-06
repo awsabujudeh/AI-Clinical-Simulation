@@ -48,9 +48,10 @@ function setup(session = createSyntheticCommandSession({
 }
 
 describe("one authoritative Session Coordinator", () => {
-  it("exposes one coordinator with the four orchestration operations", () => {
+  it("exposes one coordinator with all five authoritative orchestration operations", () => {
     const { coordinator } = setup();
     expect(Object.keys(coordinator).sort()).toEqual([
+      "endSession",
       "pauseSession",
       "resumeSession",
       "submitExternalClinicalCommand",
