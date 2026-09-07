@@ -153,6 +153,7 @@ npm run test:v2-012a
 npm run test:v2-012b
 npm run test:v2-013
 npm run test:v2-014a
+npm run test:v2-014b
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -210,7 +211,13 @@ Code under `packages/portability-smoke/src/`, `packages/contracts/src/`, `packag
 
 `packages/recovery-core/` owns the portable, deterministic recovery coordinator: explicit connectivity states, strict exact-request journaling, bounded safe-read and in-doubt reconciliation, authoritative reload flow, and stale/non-authoritative safe projections. It never runs medical rules, Clinical Time, or scheduler work. Browser-only `idb` storage and authenticated fetch integration live under `apps/web/src/offline/`.
 
-Workbox precaches only the versioned application shell and approved static resources. Private `/v1` responses and authorization material have no generic runtime cache. A mutation attempted while offline is `NOT_SENT` and is not queued; only an already-sent `IN_DOUBT` mutation can be retried with its exact canonical request and original idempotency key. Run `npm run test:v2-014a`. V2-014 remains open pending the Slice B chaos/adversarial gate.
+Workbox precaches only the versioned application shell and approved static resources. Private `/v1` responses and authorization material have no generic runtime cache. A mutation attempted while offline is `NOT_SENT` and is not queued; only an already-sent `IN_DOUBT` mutation can be retried with its exact canonical request and original idempotency key. Run `npm run test:v2-014a`; the following Slice B gate supplies final chaos/adversarial closure.
+
+## V2-014B recovery durability gate
+
+`npm run test:v2-014b` exercises explicit transport-phase failures, reload/process and multi-tab recovery, authentication and local-record tampering, bounded storage/retry behavior, real Chromium IndexedDB and service-worker boundaries, and native PostgreSQL durable replay. Recovery remains exact-request reconciliation of already-sent ambiguity; it never becomes an offline clinical-action queue.
+
+The browser may show the application shell and a clearly stale last-known projection while unreachable. It does not advance authoritative Clinical Time, run scheduler or Clinical Engine work, unlock investigations, or calculate/reveal Assessment truth. Final evidence and limitations are recorded under `planning_input/v2-014/`.
 
 ## Source of Truth and rollback
 

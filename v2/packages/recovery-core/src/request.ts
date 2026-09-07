@@ -98,11 +98,23 @@ export function createInDoubtEntry(input: {
 
 export type ValidatedStoredEntry =
   | { success: true; entry: InDoubtRecoveryJournalEntry }
-  | { success: false; reason: "SCHEMA_INVALID" | "CANONICAL_REQUEST_MISMATCH" };
+  | {
+      success: false;
+      reason:
+        | "SCHEMA_INVALID"
+        | "CANONICAL_REQUEST_MISMATCH"
+        | "JOURNAL_IDENTITY_MISMATCH";
+    };
 
 export function validateStoredEntry(input: unknown): ValidatedStoredEntry {
   const parsed = InDoubtRecoveryJournalEntrySchema.safeParse(input);
   if (!parsed.success) return { success: false, reason: "SCHEMA_INVALID" };
+  if (
+    parsed.data.journal_entry_id
+    !== recoveryJournalEntryId(parsed.data.principal_user_id, parsed.data.request)
+  ) {
+    return { success: false, reason: "JOURNAL_IDENTITY_MISMATCH" };
+  }
   return canonicalRecoveryRequest(parsed.data.request) === parsed.data.canonical_request
     ? { success: true, entry: parsed.data }
     : { success: false, reason: "CANONICAL_REQUEST_MISMATCH" };

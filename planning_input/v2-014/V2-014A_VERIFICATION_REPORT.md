@@ -34,6 +34,6 @@ npm run verify
 
 Then run `git diff --check` from the repository root. Exact final counts and preservation hashes are reported in the task checkpoint; this file intentionally contains no transient machine paths or secrets.
 
-## Deferred to V2-014B
+## Slice B closure
 
-Dedicated service interruption, refresh-during-mutation, process crash/restart, simultaneous-tab interleavings, stale-cache, service-worker update, prolonged-offline, request/response ambiguity, and recovery-chaos matrices remain explicitly deferred. No Slice B implementation is included here.
+Slice A intentionally deferred dedicated service interruption, refresh-during-mutation, process restart, simultaneous-tab interleavings, stale-cache, service-worker update, prolonged-offline, request/response ambiguity, and recovery-chaos evidence. V2-014B now supplies that evidence without changing Slice A's server-authority model; see the V2-014B reports and final verification report in this directory.

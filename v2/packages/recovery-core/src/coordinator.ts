@@ -43,7 +43,10 @@ import {
   readRetryDelayMilliseconds,
   shouldRetrySafeRead
 } from "./retry.ts";
-import type { RecoveryStorageAdapter } from "./storage.ts";
+import type {
+  RecoveryStorageAdapter,
+  RecoveryStorageWriteResult
+} from "./storage.ts";
 
 const SubmitMutationInputSchema = z.strictObject({
   principal_user_id: RecoveryPrincipalIdSchema,
@@ -192,6 +195,38 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
     }
   }
 
+  async function safelyWriteJournal(
+    entry: InDoubtRecoveryJournalEntry
+  ): Promise<RecoveryStorageWriteResult> {
+    try {
+      return await dependencies.storage.writeJournalEntry(entry);
+    } catch {
+      return { success: false, code: "STORAGE_FAILURE" };
+    }
+  }
+
+  async function safelyWriteProjection(
+    projection: z.infer<typeof LastKnownSafeSessionProjectionSchema>
+  ): Promise<RecoveryStorageWriteResult> {
+    try {
+      return await dependencies.storage.writeLastKnownProjection(projection);
+    } catch {
+      return { success: false, code: "STORAGE_FAILURE" };
+    }
+  }
+
+  async function safelyResolveTerminalEntry(
+    entry: InDoubtRecoveryJournalEntry
+  ): Promise<boolean> {
+    if (await safelyDelete(entry)) return true;
+    const suppressed = InDoubtRecoveryJournalEntrySchema.safeParse({
+      ...entry,
+      attempt_count: entry.maximum_attempts
+    });
+    if (!suppressed.success) return false;
+    return (await safelyWriteJournal(suppressed.data)).success;
+  }
+
   async function sendEntry(
     entry: InDoubtRecoveryJournalEntry
   ): Promise<RecoveryMutationResult> {
@@ -206,7 +241,17 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
     }
 
     if (transport.kind === "NOT_SENT") {
-      await safelyDelete(entry);
+      const locallyResolved = await safelyResolveTerminalEntry(entry);
+      if (!locallyResolved) {
+        return {
+          success: false,
+          issue: issue(
+            "LOCAL_STORAGE_FAILURE",
+            "recovery.storage.resolve-terminal-failed",
+            true
+          )
+        };
+      }
       const notSentIssue = issue(
         "REQUEST_NOT_SENT",
         "recovery.request.not-sent",
@@ -275,7 +320,16 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
     };
 
     if (classification === "STALE_CONFLICT") {
-      await safelyDelete(entry);
+      if (!await safelyResolveTerminalEntry(entry)) {
+        return {
+          success: false,
+          issue: issue(
+            "LOCAL_STORAGE_FAILURE",
+            "recovery.storage.resolve-terminal-failed",
+            true
+          )
+        };
+      }
       const staleIssue = issue(
         "SESSION_VERSION_CONFLICT",
         "recovery.mutation.stale-not-executed",
@@ -291,7 +345,16 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
       };
     }
     if (classification === "IDEMPOTENCY_CONFLICT") {
-      await safelyDelete(entry);
+      if (!await safelyResolveTerminalEntry(entry)) {
+        return {
+          success: false,
+          issue: issue(
+            "LOCAL_STORAGE_FAILURE",
+            "recovery.storage.resolve-terminal-failed",
+            true
+          )
+        };
+      }
       const conflictIssue = issue(
         "IDEMPOTENCY_CONFLICT",
         "recovery.mutation.idempotency-conflict",
@@ -322,7 +385,16 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
       };
     }
     if (classification === "AUTHORIZATION_FAILURE") {
-      await safelyDelete(entry);
+      if (!await safelyResolveTerminalEntry(entry)) {
+        return {
+          success: false,
+          issue: issue(
+            "LOCAL_STORAGE_FAILURE",
+            "recovery.storage.resolve-terminal-failed",
+            true
+          )
+        };
+      }
       const authorizationIssue = issue(
         "AUTHORIZATION_DENIED",
         "recovery.authorization.denied",
@@ -338,7 +410,16 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
       };
     }
     if (classification === "DEFINITIVE_REJECTION") {
-      await safelyDelete(entry);
+      if (!await safelyResolveTerminalEntry(entry)) {
+        return {
+          success: false,
+          issue: issue(
+            "LOCAL_STORAGE_FAILURE",
+            "recovery.storage.resolve-terminal-failed",
+            true
+          )
+        };
+      }
       const rejectionIssue = issue(
         "HTTP_REQUEST_REJECTED",
         "recovery.mutation.confirmed-rejection",
@@ -462,7 +543,7 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
               })
             } satisfies RecoveryMutationResult;
           }
-          const stored = await dependencies.storage.writeJournalEntry(incremented);
+          const stored = await safelyWriteJournal(incremented);
           if (!stored.success) {
             return {
               success: false,
@@ -487,12 +568,7 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
             issue: issue("INVALID_RECOVERY_INPUT", "recovery.input.invalid", false)
           } satisfies RecoveryMutationResult;
         }
-        let stored;
-        try {
-          stored = await dependencies.storage.writeJournalEntry(entry);
-        } catch {
-          stored = { success: false as const, code: "STORAGE_FAILURE" as const };
-        }
+        const stored = await safelyWriteJournal(entry);
         if (!stored.success) {
           const storageIssue = issue(
             stored.code === "LOCAL_IDEMPOTENCY_CONFLICT"
@@ -610,7 +686,7 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
         })
       };
     }
-    const stored = await dependencies.storage.writeJournalEntry(incremented);
+    const stored = await safelyWriteJournal(incremented);
     if (!stored.success) {
       return {
         success: false,
@@ -683,7 +759,11 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
         raw = null;
       }
       const cached = LastKnownSafeSessionProjectionSchema.safeParse(raw);
-      if (!cached.success || cached.data.principal_user_id !== recoveryInput.principal_user_id) {
+      if (
+        !cached.success
+        || cached.data.principal_user_id !== recoveryInput.principal_user_id
+        || cached.data.session_id !== recoveryInput.session_id
+      ) {
         return {
           success: false,
           issue: issue("REQUEST_IN_DOUBT", "recovery.session.unreachable", true)
@@ -712,7 +792,11 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
     const envelope = read.status === 200
       ? SafeSessionEnvelopeSchema.safeParse(read.body)
       : undefined;
-    if (envelope === undefined || !envelope.success) {
+    if (
+      envelope === undefined
+      || !envelope.success
+      || envelope.data.data.session_id !== recoveryInput.session_id
+    ) {
       const serverError = parseServerError(read);
       const classification = classifyApiResponse(read.status, serverError?.code);
       return {
@@ -740,7 +824,7 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
         issue: issue("HTTP_RESPONSE_INVALID", "recovery.response.invalid", false)
       };
     }
-    const stored = await dependencies.storage.writeLastKnownProjection(cached.data);
+    const stored = await safelyWriteProjection(cached.data);
     if (!stored.success) {
       return {
         success: false,
@@ -764,7 +848,11 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
     let synchronizationRequired = false;
     for (const rawEntry of rawEntries) {
       const entry = validateStoredEntry(rawEntry);
-      if (!entry.success) {
+      if (
+        !entry.success
+        || entry.entry.principal_user_id !== recoveryInput.principal_user_id
+        || entry.entry.session_id !== recoveryInput.session_id
+      ) {
         return {
           success: false,
           issue: issue("LOCAL_RECORD_INVALID", "recovery.local-record.invalid", false)
@@ -788,7 +876,11 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
       const refreshedEnvelope = refreshed.kind === "HTTP_RESPONSE" && refreshed.status === 200
         ? SafeSessionEnvelopeSchema.safeParse(refreshed.body)
         : undefined;
-      if (refreshedEnvelope === undefined || !refreshedEnvelope.success) {
+      if (
+        refreshedEnvelope === undefined
+        || !refreshedEnvelope.success
+        || refreshedEnvelope.data.data.session_id !== recoveryInput.session_id
+      ) {
         return {
           success: false,
           issue: issue("HTTP_RESPONSE_INVALID", "recovery.resync.failed", true)
@@ -811,7 +903,7 @@ export function createRecoveryCoordinator(dependencies: RecoveryCoordinatorDepen
         issue: issue("HTTP_RESPONSE_INVALID", "recovery.response.invalid", false)
       };
     }
-    const finalStored = await dependencies.storage.writeLastKnownProjection(
+    const finalStored = await safelyWriteProjection(
       finalCached.data
     );
     if (!finalStored.success) {

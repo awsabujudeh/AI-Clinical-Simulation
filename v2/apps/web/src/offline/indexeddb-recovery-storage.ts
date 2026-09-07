@@ -94,6 +94,8 @@ export class IndexedDbRecoveryStorageAdapter implements RecoveryStorageAdapter {
         && (
           prior.principal_user_id !== entry.principal_user_id
           || prior.canonical_request !== entry.canonical_request
+          || prior.created_at_utc !== entry.created_at_utc
+          || prior.attempt_count > entry.attempt_count
         )
       ) {
         await transaction.done;

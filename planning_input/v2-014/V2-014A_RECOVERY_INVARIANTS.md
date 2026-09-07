@@ -19,4 +19,4 @@
 17. Service-worker cache versioning is independent of Case versions and recovery storage.
 18. Start, action, and finalization response loss resolve through existing durable server replay without duplicate Session creation, Event/state advance, or terminal finalization.
 19. No remote Supabase project, production region, offline medical mode, media ingestion, Visual Patient, or deployment is introduced.
-20. V2-014 is not closed until Slice B completes the dedicated chaos/adversarial recovery gate.
+20. V2-014 closes only when Slice B's dedicated chaos/adversarial recovery gate and full regression verification pass; that evidence is recorded in the V2-014B and final verification reports.

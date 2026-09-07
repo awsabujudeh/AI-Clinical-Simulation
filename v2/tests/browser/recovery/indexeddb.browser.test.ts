@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { deleteDB } from "idb";
+import { deleteDB, openDB } from "idb";
 
 import {
   IndexedDbRecoveryStorageAdapter,
   RECOVERY_DATABASE_NAME
 } from "../../../apps/web/src/offline/indexeddb-recovery-storage.ts";
 import {
-  LastKnownSafeSessionProjectionSchema
+  LastKnownSafeSessionProjectionSchema,
+  RealUtcTimeSchema
 } from "../../../packages/contracts/src/index.ts";
 import {
   canonicalRecoveryRequest,
-  createInDoubtEntry
+  createInDoubtEntry,
+  createRecoveryCoordinator
 } from "../../../packages/recovery-core/src/index.ts";
 import {
   RECOVERY_OTHER_PRINCIPAL,
@@ -75,6 +77,78 @@ describe("V2-014A IndexedDB recovery storage", () => {
     expect((await first.readJournalEntry(entry.journal_entry_id) as {
       canonical_request: string;
     }).canonical_request).toBe(entry.canonical_request);
+  });
+
+  it("rejects timestamp rewrites and attempt-counter regression for one journal identity", async () => {
+    const storage = adapter();
+    const entry = createInDoubtEntry({
+      principal_user_id: RECOVERY_TEST_PRINCIPAL,
+      request: createStartRecoveryRequest(
+        "case.synthetic-assessment",
+        "idempotency.recovery.indexed-monotonic"
+      ),
+      attempted_at_utc: RECOVERY_TEST_TIME
+    })!;
+    expect(await storage.writeJournalEntry({
+      ...entry,
+      attempt_count: 2,
+      last_attempt_at_utc: RealUtcTimeSchema.parse("2026-09-06T10:00:01.000Z")
+    })).toEqual({ success: true });
+    expect(await storage.writeJournalEntry(entry)).toEqual({
+      success: false,
+      code: "LOCAL_IDEMPOTENCY_CONFLICT"
+    });
+    expect(await storage.writeJournalEntry({
+      ...entry,
+      attempt_count: 3,
+      created_at_utc: RealUtcTimeSchema.parse("2026-09-06T09:59:59.000Z"),
+      last_attempt_at_utc: RealUtcTimeSchema.parse("2026-09-06T10:00:02.000Z")
+    })).toEqual({
+      success: false,
+      code: "LOCAL_IDEMPOTENCY_CONFLICT"
+    });
+  });
+
+  it("contains a structurally valid but identity-tampered IndexedDB record", async () => {
+    const storage = adapter();
+    const request = createStartRecoveryRequest(
+      "case.synthetic-assessment",
+      "idempotency.recovery.indexed-corrupt"
+    );
+    const entry = createInDoubtEntry({
+      principal_user_id: RECOVERY_TEST_PRINCIPAL,
+      request,
+      attempted_at_utc: RECOVERY_TEST_TIME
+    })!;
+    expect(await storage.writeJournalEntry(entry)).toEqual({ success: true });
+
+    const rawDatabase = await openDB(RECOVERY_DATABASE_NAME, 1);
+    await rawDatabase.put("recovery_journal", {
+      ...entry,
+      principal_user_id: RECOVERY_OTHER_PRINCIPAL
+    });
+    rawDatabase.close();
+
+    let sends = 0;
+    const result = await createRecoveryCoordinator({
+      storage,
+      transport: {
+        async send() {
+          sends += 1;
+          return { kind: "NOT_SENT", failure: "KNOWN_OFFLINE" } as const;
+        }
+      },
+      delay: { async wait() {} }
+    }).reconcileInDoubt({
+      principal_user_id: RECOVERY_TEST_PRINCIPAL,
+      journal_entry_id: entry.journal_entry_id,
+      attempted_at_utc: "2026-09-06T10:01:00.000Z",
+      authentication_state: "VERIFIED"
+    });
+
+    expect(result.success).toBe(false);
+    expect(!result.success && result.issue.code).toBe("LOCAL_RECORD_INVALID");
+    expect(sends).toBe(0);
   });
 
   it("stores only strict stale safe projections scoped by principal and Session", async () => {

@@ -89,6 +89,8 @@ export class InMemoryRecoveryStorageAdapter implements RecoveryStorageAdapter {
         !priorParsed.success
         || priorParsed.data.principal_user_id !== entry.principal_user_id
         || priorParsed.data.canonical_request !== entry.canonical_request
+        || priorParsed.data.created_at_utc !== entry.created_at_utc
+        || priorParsed.data.attempt_count > entry.attempt_count
       ) {
         return { success: false, code: "LOCAL_IDEMPOTENCY_CONFLICT" };
       }
@@ -127,14 +129,18 @@ export class InMemoryRecoveryStorageAdapter implements RecoveryStorageAdapter {
 
   async deletePrincipalRecoveryData(principalUserId: RecoveryPrincipalId): Promise<void> {
     for (const [key, value] of this.#journal.entries()) {
-      const parsed = InDoubtRecoveryJournalEntrySchema.safeParse(value);
-      if (parsed.success && parsed.data.principal_user_id === principalUserId) {
+      const candidate = typeof value === "object" && value !== null
+        ? value as Record<string, unknown>
+        : undefined;
+      if (candidate?.principal_user_id === principalUserId) {
         this.#journal.delete(key);
       }
     }
     for (const [key, value] of this.#projections.entries()) {
-      const parsed = LastKnownSafeSessionProjectionSchema.safeParse(value);
-      if (parsed.success && parsed.data.principal_user_id === principalUserId) {
+      const candidate = typeof value === "object" && value !== null
+        ? value as Record<string, unknown>
+        : undefined;
+      if (candidate?.principal_user_id === principalUserId) {
         this.#projections.delete(key);
       }
     }
