@@ -27,6 +27,7 @@
     "content/**/*.ts",
     "packages/*/src",
     "tests/browser/**/*.ts",
+    "tests/browser/**/*.tsx",
     "tests/fixtures/**/*.ts",
     "tests/types/**/*.ts"
   ]

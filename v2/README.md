@@ -219,6 +219,12 @@ Workbox precaches only the versioned application shell and approved static resou
 
 The browser may show the application shell and a clearly stale last-known projection while unreachable. It does not advance authoritative Clinical Time, run scheduler or Clinical Engine work, unlock investigations, or calculate/reveal Assessment truth. Final evidence and limitations are recorded under `planning_input/v2-014/`.
 
+## V2-015 student UI shell
+
+`apps/web/` now provides the learner-facing route and workspace shell for desktop, laptop, and tablet use. Public, login, Expo, Session entry, and protected Session routes use React Router; authenticated read/start boundaries use TanStack Query and consume only disclosure-safe Session projections. The shell supports `ar-JO`/RTL and `en-US`/LTR, explicit Practice/Assessment presentation, recovery and stale-state banners, and first-class monitor, Visual Patient, investigation, action-navigation, and timeline regions.
+
+The server remains authoritative for access, Clinical Time, clinical state, actions, investigations, and Assessment truth. React contains no clinical rules, local timer, optimistic medical mutation, waveform fabrication, diagnostic-media ingestion, Patient AI, 3D runtime, or V2-016 action execution. The runtime integration slots are intentionally inert until their owning later tasks connect approved APIs and assets. Run `npm run test:v2-015` for the focused shell gate; the full `npm run verify` also runs the static disclosure/scope audit and all browser integration tests.
+
 ## Source of Truth and rollback
 
 The two files under repository-root `planning_input/` are frozen, read-only Architecture Source of Truth documents. They are not copied into this workspace.

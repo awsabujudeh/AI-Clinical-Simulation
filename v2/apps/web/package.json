@@ -11,9 +11,11 @@
     "@ai-clinical-simulation/contracts": "0.1.0",
     "@ai-clinical-simulation/portability-smoke": "0.0.0",
     "@ai-clinical-simulation/recovery-core": "0.1.0",
+    "@tanstack/react-query": "^5.102.8",
     "idb": "8.0.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
