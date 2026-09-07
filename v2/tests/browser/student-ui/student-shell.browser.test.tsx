@@ -58,6 +58,17 @@ function services(input: Partial<StudentUiServices> = {}): StudentUiServices {
           replayed: false
         };
       }
+    },
+    actions: input.actions ?? {
+      async submit() {
+        return {
+          kind: "COMMITTED" as const,
+          replayed: false,
+          idempotency_key: "idempotency.ui.action",
+          committed_event_ids: ["00000000-0000-4000-8000-000000000015"],
+          projection: SYNTHETIC_SAFE_SESSION
+        };
+      }
     }
   };
 }

@@ -5,6 +5,7 @@ import {
   EndSimulationResponseDataSchema,
   SafeFinalAssessmentProjectionSchema,
   SafeInvestigationProjectionSchema,
+  SafeLearnerActionCatalogueSchema,
   SafeSessionProjectionSchema,
   StartSessionResponseDataSchema,
   SubmitClinicalActionResponseDataSchema,
@@ -156,6 +157,33 @@ function safeSessionProjection(
     session.pinned_case.clinical_policy.observation_projection
   );
   if (!observations.success) return { success: false, error: ERRORS.internal };
+  const caseActions = "review_execution_hash" in authorization.artifact
+    ? authorization.artifact.source_case.action_catalogue.actions
+    : authorization.artifact.action_catalogue.actions;
+  const pinnedActionIds = new Set(
+    session.pinned_case.action_catalogue.map((action) => action.action_id)
+  );
+  const learnerActionCatalogue = SafeLearnerActionCatalogueSchema.safeParse({
+    catalogue_schema_version: "1.0",
+    actions: caseActions
+      .filter((action) => pinnedActionIds.has(action.action_id))
+      .map((action) => ({
+        action_id: action.action_id,
+        action_type: action.action_type,
+        labels: action.aliases
+          .flatMap((alias) => alias.phrases[0] === undefined
+            ? []
+            : [{ locale: alias.locale, label: alias.phrases[0] }])
+          .sort((left, right) => left.locale < right.locale ? -1 : left.locale > right.locale ? 1 : 0),
+        parameter_definitions: action.parameter_definitions,
+        confirmation_policy: action.confirmation_policy,
+        repeat_policy: action.repeat_policy
+      }))
+      .sort((left, right) => left.action_id < right.action_id ? -1 : left.action_id > right.action_id ? 1 : 0)
+  });
+  if (!learnerActionCatalogue.success) {
+    return { success: false, error: ERRORS.internal };
+  }
   const projection = SafeSessionProjectionSchema.safeParse({
     session_id: session.session_id,
     status: session.status,
@@ -171,6 +199,7 @@ function safeSessionProjection(
     event_sequence_through: session.next_sequence_no - 1,
     clock_status: session.clinical_clock.status,
     observations: observations.observations,
+    learner_action_catalogue: learnerActionCatalogue.data,
     ...(session.status === "ACTIVE"
       ? { assessment_disclosure: activeAssessmentProjection(session, authorization, assessmentId) }
       : {})

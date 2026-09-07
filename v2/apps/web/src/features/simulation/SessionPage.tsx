@@ -77,5 +77,12 @@ export function SessionPage({
       </AppFrame>
     );
   }
-  return <SimulationWorkspace services={services} auth={auth} state={state} />;
+  return (
+    <SimulationWorkspace
+      services={services}
+      auth={auth}
+      state={state}
+      onAuthoritativeRefresh={() => session.refetch()}
+    />
+  );
 }

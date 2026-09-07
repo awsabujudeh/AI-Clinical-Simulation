@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ActionTypeSchema } from "./actions.ts";
+
 import {
   ActionIdSchema,
   ActionRequestIdSchema,
@@ -88,6 +90,96 @@ export const SafePinnedCaseIdentitySchema = z.strictObject({
   case_version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u)
 });
 
+export const LEARNER_ACTION_CATALOGUE_SCHEMA_VERSION = "1.0" as const;
+
+export const LearnerActionLocalizedLabelSchema = z.strictObject({
+  locale: PatientLanguageSchema,
+  label: z.string().trim().min(1).max(160)
+});
+
+export const LearnerActionParameterDefinitionSchema = z.strictObject({
+  parameter_code: CaseControlledValueSchema,
+  value_type: z.enum(["STRING", "NUMBER", "INTEGER", "BOOLEAN", "CODE"]),
+  required: z.boolean(),
+  allowed_codes: z.array(CaseControlledValueSchema).max(64).optional(),
+  minimum: z.number().finite().optional(),
+  maximum: z.number().finite().optional()
+}).superRefine((value, context) => {
+  if (value.minimum !== undefined && value.maximum !== undefined
+    && value.minimum > value.maximum) {
+    context.addIssue({
+      code: "custom",
+      path: ["minimum"],
+      message: "Minimum learner action parameter value cannot exceed maximum."
+    });
+  }
+  if (value.allowed_codes !== undefined && value.value_type !== "CODE") {
+    context.addIssue({
+      code: "custom",
+      path: ["allowed_codes"],
+      message: "Allowed codes apply only to CODE learner action parameters."
+    });
+  }
+});
+
+export const SafeLearnerActionSchema = z.strictObject({
+  action_id: ActionIdSchema,
+  action_type: ActionTypeSchema,
+  labels: z.array(LearnerActionLocalizedLabelSchema).max(2),
+  parameter_definitions: z.array(LearnerActionParameterDefinitionSchema).max(32),
+  confirmation_policy: z.enum([
+    "NONE",
+    "EXPLICIT_REQUEST",
+    "EXPLICIT_ADMINISTRATION",
+    "CASE_DEFINED"
+  ]),
+  repeat_policy: z.enum(["NOT_REPEATABLE", "REPEATABLE", "CASE_DEFINED"])
+}).superRefine((value, context) => {
+  const locales = new Set<string>();
+  for (const [index, label] of value.labels.entries()) {
+    if (locales.has(label.locale)) {
+      context.addIssue({
+        code: "custom",
+        path: ["labels", index, "locale"],
+        message: "Learner action labels must have unique locales."
+      });
+    }
+    locales.add(label.locale);
+  }
+  const parameterCodes = new Set<string>();
+  for (const [index, parameter] of value.parameter_definitions.entries()) {
+    if (parameterCodes.has(parameter.parameter_code)) {
+      context.addIssue({
+        code: "custom",
+        path: ["parameter_definitions", index, "parameter_code"],
+        message: "Learner action parameter codes must be unique."
+      });
+    }
+    parameterCodes.add(parameter.parameter_code);
+  }
+});
+export type SafeLearnerAction = z.infer<typeof SafeLearnerActionSchema>;
+
+export const SafeLearnerActionCatalogueSchema = z.strictObject({
+  catalogue_schema_version: z.literal(LEARNER_ACTION_CATALOGUE_SCHEMA_VERSION),
+  actions: z.array(SafeLearnerActionSchema).max(256)
+}).superRefine((value, context) => {
+  const actionIds = new Set<string>();
+  for (const [index, action] of value.actions.entries()) {
+    if (actionIds.has(action.action_id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["actions", index, "action_id"],
+        message: "Learner-visible action identities must be unique."
+      });
+    }
+    actionIds.add(action.action_id);
+  }
+});
+export type SafeLearnerActionCatalogue = z.infer<
+  typeof SafeLearnerActionCatalogueSchema
+>;
+
 export const SafeActiveAssessmentDisclosureSchema = z.discriminatedUnion(
   "projection_type",
   [
@@ -136,6 +228,7 @@ export const SafeSessionProjectionSchema = z.strictObject({
   event_sequence_through: z.number().int().nonnegative(),
   clock_status: z.enum(["RUNNING", "PAUSED"]),
   observations: ObservationProjectionSchema,
+  learner_action_catalogue: SafeLearnerActionCatalogueSchema,
   assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional()
 });
 export type SafeSessionProjection = z.infer<typeof SafeSessionProjectionSchema>;

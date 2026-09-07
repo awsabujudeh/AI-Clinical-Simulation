@@ -1,20 +1,10 @@
-import { useState } from "react";
-
-import { useLocalization, type MessageKey } from "../../app/localization";
+import { useLocalization } from "../../app/localization";
 import { formatClinicalTime, isSessionMutationEntryEnabled } from "../../app/session-presentation";
 import type { AuthSnapshot, SessionPresentationState, StudentUiServices } from "../../app/types";
 import { AppFrame } from "../../components/AppFrame";
 import { EmptyState, Panel, SectionHeader, StatusBadge } from "../../components/ui";
+import { ClinicalActionsPanel } from "../actions/ClinicalActionsPanel";
 import { ConnectionBanner } from "./ConnectionBanner";
-
-const navigation: readonly MessageKey[] = [
-  "navHistory",
-  "navExamination",
-  "navInvestigations",
-  "navMedications",
-  "navProcedures",
-  "navDiagnosis"
-];
 
 function PatientHeader({ state }: { state: SessionPresentationState }) {
   const { t } = useLocalization();
@@ -87,44 +77,6 @@ export function VisualPatientSlot() {
   );
 }
 
-function ClinicalInteractionShell({ enabled }: { enabled: boolean }) {
-  const { t } = useLocalization();
-  const [selected, setSelected] = useState<MessageKey>("navHistory");
-  return (
-    <Panel className="interaction-shell" aria-labelledby="interaction-title">
-      <SectionHeader id="interaction-title" title={t("interactionTitle")} subtitle={t("interactionSubtitle")} />
-      <div className="clinical-tabs" role="tablist" aria-label={t("interactionTitle")}>
-        {navigation.map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={selected === key}
-            aria-controls="clinical-domain-panel"
-            id={`tab-${key}`}
-            onClick={() => setSelected(key)}
-          >
-            <span className="clinical-tab__mark" aria-hidden="true" />
-            {t(key)}
-          </button>
-        ))}
-      </div>
-      <div
-        className="domain-placeholder"
-        id="clinical-domain-panel"
-        role="tabpanel"
-        aria-labelledby={`tab-${selected}`}
-      >
-        <strong>{t(selected)}</strong>
-        <p>{t("domainDeferred")}</p>
-        <StatusBadge tone={enabled ? "information" : "warning"}>
-          {enabled ? t("comingLater") : t("connectionOffline")}
-        </StatusBadge>
-      </div>
-    </Panel>
-  );
-}
-
 function InvestigationSlot() {
   const { t } = useLocalization();
   return (
@@ -151,11 +103,13 @@ function TimelineStatusSlot({ state }: { state: SessionPresentationState }) {
 export function SimulationWorkspace({
   services,
   auth,
-  state
+  state,
+  onAuthoritativeRefresh
 }: {
   services: StudentUiServices;
   auth: Extract<AuthSnapshot, { status: "AUTHENTICATED" }>;
   state: SessionPresentationState;
+  onAuthoritativeRefresh(): Promise<unknown>;
 }) {
   const enabled = isSessionMutationEntryEnabled(state);
   return (
@@ -166,7 +120,13 @@ export function SimulationWorkspace({
         <div className="workspace-grid">
           <MonitorSlot state={state} />
           <VisualPatientSlot />
-          <ClinicalInteractionShell enabled={enabled} />
+          <ClinicalActionsPanel
+            services={services}
+            auth={auth}
+            state={state}
+            enabled={enabled}
+            onAuthoritativeRefresh={onAuthoritativeRefresh}
+          />
           <InvestigationSlot />
           <TimelineStatusSlot state={state} />
         </div>

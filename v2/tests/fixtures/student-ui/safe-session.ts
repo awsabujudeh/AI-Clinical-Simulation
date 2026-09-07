@@ -37,6 +37,110 @@ export const SYNTHETIC_SAFE_SESSION = SafeSessionProjectionSchema.parse({
       waveform_descriptor: "waveform.synthetic-regular"
     }
   },
+  learner_action_catalogue: {
+    catalogue_schema_version: "1.0",
+    actions: [
+      {
+        action_id: "examination.synthetic-check",
+        action_type: "EXAMINATION",
+        labels: [
+          { locale: "ar-JO", label: "إجراء فحص اصطناعي" },
+          { locale: "en-US", label: "Perform synthetic examination" }
+        ],
+        parameter_definitions: [],
+        confirmation_policy: "NONE",
+        repeat_policy: "REPEATABLE"
+      },
+      {
+        action_id: "investigation.synthetic-panel",
+        action_type: "INVESTIGATION",
+        labels: [
+          { locale: "ar-JO", label: "طلب فحص اصطناعي" },
+          { locale: "en-US", label: "Order synthetic investigation" }
+        ],
+        parameter_definitions: [],
+        confirmation_policy: "NONE",
+        repeat_policy: "NOT_REPEATABLE"
+      },
+      {
+        action_id: "medication.synthetic-study-agent",
+        action_type: "MEDICATION",
+        labels: [
+          { locale: "ar-JO", label: "اقتراح دواء اصطناعي للدراسة" },
+          { locale: "en-US", label: "Propose synthetic study medication" }
+        ],
+        parameter_definitions: [
+          {
+            parameter_code: "dose",
+            value_type: "NUMBER",
+            required: true,
+            minimum: 0,
+            maximum: 100
+          },
+          {
+            parameter_code: "unit",
+            value_type: "CODE",
+            required: true,
+            allowed_codes: ["unit.synthetic-small", "unit.synthetic-large"]
+          },
+          {
+            parameter_code: "route",
+            value_type: "CODE",
+            required: true,
+            allowed_codes: ["route.synthetic-a", "route.synthetic-b"]
+          }
+        ],
+        confirmation_policy: "EXPLICIT_ADMINISTRATION",
+        repeat_policy: "NOT_REPEATABLE"
+      },
+      {
+        action_id: "procedure.synthetic-support",
+        action_type: "PROCEDURE",
+        labels: [
+          { locale: "ar-JO", label: "إجراء دعم اصطناعي" },
+          { locale: "en-US", label: "Perform synthetic support procedure" }
+        ],
+        parameter_definitions: [],
+        confirmation_policy: "EXPLICIT_REQUEST",
+        repeat_policy: "NOT_REPEATABLE"
+      },
+      {
+        action_id: "diagnosis.synthetic-entry",
+        action_type: "DIAGNOSIS",
+        labels: [
+          { locale: "ar-JO", label: "إدخال تشخيص الطالب" },
+          { locale: "en-US", label: "Enter learner diagnosis" }
+        ],
+        parameter_definitions: [
+          {
+            parameter_code: "diagnosis_text",
+            value_type: "STRING",
+            required: true
+          }
+        ],
+        confirmation_policy: "NONE",
+        repeat_policy: "REPEATABLE"
+      },
+      {
+        action_id: "disposition.synthetic-choice",
+        action_type: "DISPOSITION",
+        labels: [
+          { locale: "ar-JO", label: "اختيار التصرف" },
+          { locale: "en-US", label: "Choose disposition" }
+        ],
+        parameter_definitions: [
+          {
+            parameter_code: "disposition_code",
+            value_type: "CODE",
+            required: true,
+            allowed_codes: ["disposition.synthetic-one", "disposition.synthetic-two"]
+          }
+        ],
+        confirmation_policy: "NONE",
+        repeat_policy: "NOT_REPEATABLE"
+      }
+    ]
+  },
   assessment_disclosure: {
     projection_schema_version: "1.0",
     projection_type: "ACTIVE_PRACTICE_FEEDBACK",

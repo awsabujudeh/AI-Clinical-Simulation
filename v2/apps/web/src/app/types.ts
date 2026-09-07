@@ -1,5 +1,8 @@
 import {
+  type ConnectivityState,
+  type JsonObject,
   PatientLanguageSchema,
+  type SafeLearnerAction,
   type LastKnownSafeSessionProjection,
   type PatientLanguage,
   type SafeSessionProjection,
@@ -73,9 +76,47 @@ export interface StudentSessionService {
   start(request: StartSessionRequest): Promise<StartSessionResult>;
 }
 
+export type StudentClinicalActionIntent = Readonly<{
+  principal_user_id: string;
+  session_id: string;
+  expected_state_version: number;
+  action: SafeLearnerAction;
+  parameters: JsonObject;
+  connectivity_state: ConnectivityState;
+}>;
+
+export type StudentClinicalActionResult =
+  | Readonly<{
+      kind: "COMMITTED";
+      replayed: boolean;
+      idempotency_key: string;
+      committed_event_ids: readonly string[];
+      projection: SafeSessionProjection;
+    }>
+  | Readonly<{
+      kind:
+        | "INVALID"
+        | "NOT_SENT"
+        | "IN_DOUBT"
+        | "STALE"
+        | "IDEMPOTENCY_CONFLICT"
+        | "UNAUTHENTICATED"
+        | "UNAUTHORIZED"
+        | "REJECTED"
+        | "UNAVAILABLE";
+      idempotency_key?: string;
+      http_status?: number;
+      requires_authoritative_sync: boolean;
+    }>;
+
+export interface StudentClinicalActionService {
+  submit(intent: StudentClinicalActionIntent): Promise<StudentClinicalActionResult>;
+}
+
 export type StudentUiServices = Readonly<{
   auth: StudentAuthService;
   sessions: StudentSessionService;
+  actions: StudentClinicalActionService;
 }>;
 
 export type StudentShellLocale = PatientLanguage;
