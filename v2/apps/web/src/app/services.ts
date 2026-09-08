@@ -1,5 +1,6 @@
 import {
   ConnectivityStateSchema,
+  EndSimulationResponseDataSchema,
   RecoveryMutationRequestSchema,
   RecoveryPrincipalIdSchema,
   SafeLearnerActionSchema,
@@ -18,6 +19,8 @@ import type {
   SessionLoadResult,
   StudentClinicalActionIntent,
   StudentClinicalActionResult,
+  StudentFinalizationIntent,
+  StudentFinalizationResult,
   StartSessionResult,
   StudentUiServices
 } from "./types";
@@ -27,6 +30,9 @@ const StartSessionSuccessEnvelopeSchema = createApiV1SuccessEnvelopeSchema(
 );
 const SubmitClinicalActionSuccessEnvelopeSchema = createApiV1SuccessEnvelopeSchema(
   SubmitClinicalActionResponseDataSchema
+);
+const EndSimulationSuccessEnvelopeSchema = createApiV1SuccessEnvelopeSchema(
+  EndSimulationResponseDataSchema
 );
 
 export type ClinicalActionRequestIdentity = Readonly<{
@@ -44,6 +50,17 @@ export interface ClinicalActionIdentityFactory {
 
 export interface RecoveryMutationCoordinator {
   submitMutation(input: unknown): Promise<RecoveryMutationResult>;
+}
+
+export type SessionFinalizationRequestIdentity = Readonly<{
+  request_id: string;
+  correlation_id: string;
+  idempotency_key: string;
+  attempted_at_utc: string;
+}>;
+
+export interface SessionFinalizationIdentityFactory {
+  create(intent: StudentFinalizationIntent): SessionFinalizationRequestIdentity;
 }
 
 export function actionSubmissionFromRecovery(
@@ -144,6 +161,90 @@ export function createRecoveryBackedStudentActionService(dependencies: {
   });
 }
 
+export function finalizationFromRecovery(
+  result: RecoveryMutationResult,
+  idempotencyKey: string
+): StudentFinalizationResult {
+  if (result.success) {
+    const parsed = EndSimulationSuccessEnvelopeSchema.safeParse(result.response);
+    return parsed.success
+      ? {
+          kind: "COMMITTED",
+          replayed: parsed.data.data.replayed,
+          idempotency_key: idempotencyKey,
+          projection: parsed.data.data.session,
+          assessment: parsed.data.data.assessment
+        }
+      : { kind: "UNAVAILABLE", requires_authoritative_sync: true };
+  }
+  const common = {
+    ...(result.outcome?.idempotency_key === undefined
+      ? {}
+      : { idempotency_key: result.outcome.idempotency_key }),
+    ...(result.outcome?.http_status === undefined
+      ? {}
+      : { http_status: result.outcome.http_status })
+  };
+  switch (result.outcome?.status) {
+    case "NOT_SENT":
+      return { kind: "NOT_SENT", requires_authoritative_sync: true, ...common };
+    case "IN_DOUBT":
+      return { kind: "IN_DOUBT", requires_authoritative_sync: true, ...common };
+    case "STALE_NOT_EXECUTED":
+      return { kind: "STALE", requires_authoritative_sync: true, ...common };
+    case "IDEMPOTENCY_CONFLICT":
+      return { kind: "IDEMPOTENCY_CONFLICT", requires_authoritative_sync: true, ...common };
+    case "AUTHENTICATION_REQUIRED":
+      return { kind: "UNAUTHENTICATED", requires_authoritative_sync: false, ...common };
+    case "AUTHORIZATION_DENIED":
+      return { kind: "UNAUTHORIZED", requires_authoritative_sync: false, ...common };
+    case "CONFIRMED_REJECTION":
+      return { kind: "REJECTED", requires_authoritative_sync: false, ...common };
+    default:
+      return {
+        kind: result.issue.code === "INVALID_RECOVERY_INPUT" ? "INVALID" : "UNAVAILABLE",
+        requires_authoritative_sync: result.issue.retryable,
+        ...common
+      };
+  }
+}
+
+export function createRecoveryBackedStudentFinalizationService(dependencies: {
+  coordinator: RecoveryMutationCoordinator;
+  identity_factory: SessionFinalizationIdentityFactory;
+}) {
+  return Object.freeze({
+    async end(intent: StudentFinalizationIntent): Promise<StudentFinalizationResult> {
+      const identity = dependencies.identity_factory.create(intent);
+      const principal = RecoveryPrincipalIdSchema.safeParse(intent.principal_user_id);
+      const connectivity = ConnectivityStateSchema.safeParse(intent.connectivity_state);
+      const request = RecoveryMutationRequestSchema.safeParse({
+        recovery_schema_version: "1.0",
+        api_schema_version: "1.0",
+        operation: "END_SESSION",
+        session_id: intent.session_id,
+        request_id: identity.request_id,
+        correlation_id: identity.correlation_id,
+        idempotency_key: identity.idempotency_key,
+        request: {
+          expected_state_version: intent.expected_state_version,
+          reason: "LEARNER_COMPLETED"
+        }
+      });
+      if (!principal.success || !connectivity.success || !request.success) {
+        return { kind: "INVALID", requires_authoritative_sync: false };
+      }
+      const result = await dependencies.coordinator.submitMutation({
+        principal_user_id: principal.data,
+        connectivity_state: connectivity.data,
+        attempted_at_utc: identity.attempted_at_utc,
+        request: request.data
+      });
+      return finalizationFromRecovery(result, identity.idempotency_key);
+    }
+  });
+}
+
 export function sessionLoadFromRecovery(
   result: SessionRecoveryResult
 ): SessionLoadResult {
@@ -233,6 +334,24 @@ export function createUnconfiguredStudentUiServices(): StudentUiServices {
     }),
     actions: Object.freeze({
       async submit() {
+        return {
+          kind: "UNAUTHENTICATED" as const,
+          requires_authoritative_sync: false
+        };
+      }
+    }),
+    timeline: Object.freeze({
+      async load() {
+        return { kind: "UNAUTHORIZED" as const, http_status: 401 };
+      }
+    }),
+    assessment: Object.freeze({
+      async load() {
+        return { kind: "UNAUTHORIZED" as const, http_status: 401 };
+      }
+    }),
+    finalization: Object.freeze({
+      async end() {
         return {
           kind: "UNAUTHENTICATED" as const,
           requires_authoritative_sync: false

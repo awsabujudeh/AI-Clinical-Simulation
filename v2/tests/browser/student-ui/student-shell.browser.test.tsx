@@ -69,6 +69,11 @@ function services(input: Partial<StudentUiServices> = {}): StudentUiServices {
           projection: SYNTHETIC_SAFE_SESSION
         };
       }
+    },
+    timeline: input.timeline ?? { async load() { return { kind: "UNAVAILABLE" as const }; } },
+    assessment: input.assessment ?? { async load() { return { kind: "PENDING" as const }; } },
+    finalization: input.finalization ?? {
+      async end() { return { kind: "UNAVAILABLE" as const, requires_authoritative_sync: true }; }
     }
   };
 }
@@ -184,7 +189,8 @@ describe("V2-015 safe Session workspace", () => {
     expect(text()).toContain("Visual Patient");
     expect(text()).toContain("Clinical interaction");
     expect(text()).toContain("Investigations");
-    expect(text()).toContain("Session context");
+    expect(text()).toContain("Learner timeline");
+    expect(text()).toContain("Assessment and debrief");
     expect(text()).not.toMatch(/hidden diagnosis|rubric|approval record|clinical review/i);
     expect(text()).not.toMatch(/package hash|scheduler state/i);
   });
@@ -193,7 +199,7 @@ describe("V2-015 safe Session workspace", () => {
     await render("/sessions/session.ui-neutral");
     await settle(() => text().includes("Current patient"));
     expect(host.querySelector("main#main-content")).not.toBeNull();
-    for (const id of ["monitor-title", "visual-patient-title", "interaction-title", "investigation-title", "timeline-title"]) {
+    for (const id of ["monitor-title", "visual-patient-title", "interaction-title", "investigation-title", "timeline-title", "assessment-title"]) {
       const region = host.querySelector(`[aria-labelledby="${id}"]`);
       expect(region).not.toBeNull();
       expect(host.querySelector(`#${id}`)).not.toBeNull();
@@ -215,7 +221,7 @@ describe("V2-015 safe Session workspace", () => {
     }));
     await settle(() => text().includes("Assessment"));
     expect(text()).toContain("Assessment");
-    expect(text()).not.toMatch(/score|correct action|unsafe action|expected action|rubric/i);
+    expect(text()).not.toMatch(/overall score|six-domain result|safety finding|expected action|rubric/i);
   });
 
   it("marks cached state stale, frozen, and without mutation authority", async () => {

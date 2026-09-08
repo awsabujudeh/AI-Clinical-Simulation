@@ -90,6 +90,11 @@ function authenticatedServices(input?: {
         committed_event_ids: ["00000000-0000-4000-8000-000000000015"],
         projection: SYNTHETIC_SAFE_SESSION
       }))
+    },
+    timeline: { async load() { return { kind: "UNAVAILABLE" }; } },
+    assessment: { async load() { return { kind: "PENDING" }; } },
+    finalization: {
+      async end() { return { kind: "UNAVAILABLE", requires_authoritative_sync: true }; }
     }
   };
 }
@@ -229,7 +234,7 @@ describe("V2-016 generic action presentation and validation", () => {
     await click("Propose synthetic study medication");
     await click("Propose action");
     expect(submit).not.toHaveBeenCalled();
-    expect(host.querySelectorAll('[role="alert"]')).toHaveLength(3);
+    expect(host.querySelectorAll('.interaction-shell [role="alert"]')).toHaveLength(3);
     await setInput("dose", "10");
     await setInput("unit", "unit.synthetic-small");
     await setInput("route", "route.synthetic-a");

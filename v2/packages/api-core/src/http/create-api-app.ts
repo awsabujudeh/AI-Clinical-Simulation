@@ -224,6 +224,15 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
     ));
   });
 
+  app.get("/v1/sessions/:session_id/timeline", async (context) => {
+    const path = SessionPathParametersSchema.safeParse(context.req.param());
+    if (!path.success) return errorJson(context, ERRORS.malformed);
+    return respond(context, await service.getLearnerTimeline(
+      context.get("authority"),
+      path.data.session_id
+    ));
+  });
+
   app.post("/v1/sessions/:session_id/actions/propose", async (context) => {
     const path = SessionPathParametersSchema.safeParse(context.req.param());
     if (!path.success) return errorJson(context, ERRORS.malformed);

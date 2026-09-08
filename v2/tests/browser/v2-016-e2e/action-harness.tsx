@@ -81,6 +81,11 @@ const services: StudentUiServices = {
         projection
       };
     }
+  },
+  timeline: { async load() { return { kind: "UNAVAILABLE" }; } },
+  assessment: { async load() { return { kind: "PENDING" }; } },
+  finalization: {
+    async end() { return { kind: "UNAVAILABLE", requires_authoritative_sync: true }; }
   }
 };
 

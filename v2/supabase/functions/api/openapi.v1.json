@@ -59,6 +59,19 @@
         }
       }
     },
+    "/v1/sessions/{session_id}/timeline": {
+      "get": {
+        "operationId": "getLearnerTimeline",
+        "x-delivery-status": "EXECUTABLE_NOW",
+        "description": "Bounded learner-safe projection of committed events. Raw event payloads and internal rule, scheduler, scoring, hash, and governance data are excluded.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SessionId" }],
+        "responses": {
+          "200": { "description": "Committed learner-safe timeline ordered by authoritative event sequence" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/v1/sessions/{session_id}/actions/propose": {
       "post": {
         "operationId": "proposeAction",

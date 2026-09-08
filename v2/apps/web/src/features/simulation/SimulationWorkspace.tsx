@@ -4,6 +4,9 @@ import type { AuthSnapshot, SessionPresentationState, StudentUiServices } from "
 import { AppFrame } from "../../components/AppFrame";
 import { EmptyState, Panel, SectionHeader, StatusBadge } from "../../components/ui";
 import { ClinicalActionsPanel } from "../actions/ClinicalActionsPanel";
+import { AssessmentDebriefPanel } from "../assessment/AssessmentDebriefPanel";
+import { ClinicalMonitor } from "../monitor/ClinicalMonitor";
+import { LearnerTimeline } from "../timeline/LearnerTimeline";
 import { ConnectionBanner } from "./ConnectionBanner";
 
 function PatientHeader({ state }: { state: SessionPresentationState }) {
@@ -35,30 +38,6 @@ function PatientHeader({ state }: { state: SessionPresentationState }) {
   );
 }
 
-function MonitorSlot({ state }: { state: SessionPresentationState }) {
-  const { t } = useLocalization();
-  const observation = state.projection.observations;
-  return (
-    <Panel className="monitor-slot" aria-labelledby="monitor-title">
-      <SectionHeader id="monitor-title" title={t("monitorTitle")} subtitle={t("monitorSubtitle")} />
-      <div className="monitor-grid">
-        <div><span>{t("heartRate")}</span><strong>{observation.heart_rate_bpm}</strong><small>bpm</small></div>
-        <div><span>{t("bloodPressure")}</span><strong>{observation.systolic_bp_mm_hg}/{observation.diastolic_bp_mm_hg}</strong><small>mmHg</small></div>
-        <div><span>{t("respiratoryRate")}</span><strong>{observation.respiratory_rate_per_minute}</strong><small>/min</small></div>
-        <div><span>{t("oxygenSaturation")}</span><strong>{observation.spo2_percent}</strong><small>%</small></div>
-        {observation.temperature_celsius === undefined ? null : (
-          <div><span>{t("temperature")}</span><strong>{observation.temperature_celsius}</strong><small>°C</small></div>
-        )}
-      </div>
-      <dl className="monitor-context">
-        <div><dt>{t("rhythm")}</dt><dd>{observation.rhythm.cardiac_rhythm}</dd></div>
-        <div><dt>{t("consciousness")}</dt><dd>{observation.consciousness_display_code}</dd></div>
-      </dl>
-      <p className="monitor-disclaimer">{state.kind === "ACTIVE_STALE" ? t("staleDescription") : t("connectionOnline")}</p>
-    </Panel>
-  );
-}
-
 export function VisualPatientSlot() {
   const { t } = useLocalization();
   return (
@@ -87,19 +66,6 @@ function InvestigationSlot() {
   );
 }
 
-function TimelineStatusSlot({ state }: { state: SessionPresentationState }) {
-  const { t } = useLocalization();
-  return (
-    <Panel className="timeline-slot" aria-labelledby="timeline-title">
-      <SectionHeader id="timeline-title" title={t("timelineTitle")} subtitle={t("timelineBody")} />
-      <div className="timeline-metadata">
-        <span>{t("eventSequence")}</span>
-        <strong>{state.projection.event_sequence_through}</strong>
-      </div>
-    </Panel>
-  );
-}
-
 export function SimulationWorkspace({
   services,
   auth,
@@ -118,7 +84,7 @@ export function SimulationWorkspace({
         <ConnectionBanner state={state} />
         <PatientHeader state={state} />
         <div className="workspace-grid">
-          <MonitorSlot state={state} />
+          <ClinicalMonitor state={state} />
           <VisualPatientSlot />
           <ClinicalActionsPanel
             services={services}
@@ -128,7 +94,14 @@ export function SimulationWorkspace({
             onAuthoritativeRefresh={onAuthoritativeRefresh}
           />
           <InvestigationSlot />
-          <TimelineStatusSlot state={state} />
+          <LearnerTimeline state={state} service={services.timeline} />
+          <AssessmentDebriefPanel
+            state={state}
+            auth={auth}
+            assessmentService={services.assessment}
+            finalizationService={services.finalization}
+            onAuthoritativeRefresh={onAuthoritativeRefresh}
+          />
         </div>
       </div>
     </AppFrame>

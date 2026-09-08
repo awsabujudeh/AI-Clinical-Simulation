@@ -17,6 +17,7 @@ import {
   DiagnosticMeasurementIdSchema,
   DiagnosticResultIdSchema,
   EventIdSchema,
+  FeedbackFindingIdSchema,
   IdempotencyKeySchema,
   RequestIdSchema,
   SequenceNumberSchema,
@@ -91,6 +92,12 @@ export const SafePinnedCaseIdentitySchema = z.strictObject({
 });
 
 export const LEARNER_ACTION_CATALOGUE_SCHEMA_VERSION = "1.0" as const;
+
+export const LearnerLocalizedTextSchema = z.strictObject({
+  locale: PatientLanguageSchema,
+  text: z.string().trim().min(1).max(240)
+});
+export type LearnerLocalizedText = z.infer<typeof LearnerLocalizedTextSchema>;
 
 export const LearnerActionLocalizedLabelSchema = z.strictObject({
   locale: PatientLanguageSchema,
@@ -233,6 +240,72 @@ export const SafeSessionProjectionSchema = z.strictObject({
 });
 export type SafeSessionProjection = z.infer<typeof SafeSessionProjectionSchema>;
 
+export const LEARNER_TIMELINE_SCHEMA_VERSION = "1.0" as const;
+
+export const LearnerTimelineItemTypeSchema = z.enum([
+  "SESSION_STARTED",
+  "SESSION_PAUSED",
+  "SESSION_RESUMED",
+  "ACTION_COMMITTED",
+  "INVESTIGATION_RESULT_AVAILABLE",
+  "SESSION_ENDED"
+]);
+export type LearnerTimelineItemType = z.infer<typeof LearnerTimelineItemTypeSchema>;
+
+export const SafeLearnerTimelineItemSchema = z.strictObject({
+  event_id: EventIdSchema,
+  sequence_no: SequenceNumberSchema,
+  clinical_time: ClinicalTimeSchema,
+  item_type: LearnerTimelineItemTypeSchema,
+  labels: z.array(LearnerLocalizedTextSchema).min(1).max(2),
+  action_id: ActionIdSchema.optional()
+}).superRefine((value, context) => {
+  const locales = new Set<string>();
+  for (const [index, label] of value.labels.entries()) {
+    if (locales.has(label.locale)) {
+      context.addIssue({
+        code: "custom",
+        path: ["labels", index, "locale"],
+        message: "Learner timeline labels must have unique locales."
+      });
+    }
+    locales.add(label.locale);
+  }
+});
+export type SafeLearnerTimelineItem = z.infer<typeof SafeLearnerTimelineItemSchema>;
+
+export const SafeLearnerTimelineProjectionSchema = z.strictObject({
+  timeline_schema_version: z.literal(LEARNER_TIMELINE_SCHEMA_VERSION),
+  session_id: SessionIdSchema,
+  event_sequence_through: z.number().int().nonnegative(),
+  items: z.array(SafeLearnerTimelineItemSchema).max(256),
+  truncated_before_sequence: SequenceNumberSchema.optional()
+}).superRefine((value, context) => {
+  let priorSequence = 0;
+  const eventIds = new Set<string>();
+  for (const [index, item] of value.items.entries()) {
+    if (item.sequence_no <= priorSequence || item.sequence_no > value.event_sequence_through) {
+      context.addIssue({
+        code: "custom",
+        path: ["items", index, "sequence_no"],
+        message: "Learner timeline items must preserve increasing committed sequence order."
+      });
+    }
+    if (eventIds.has(item.event_id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["items", index, "event_id"],
+        message: "Learner timeline Event references must be unique."
+      });
+    }
+    priorSequence = item.sequence_no;
+    eventIds.add(item.event_id);
+  }
+});
+export type SafeLearnerTimelineProjection = z.infer<
+  typeof SafeLearnerTimelineProjectionSchema
+>;
+
 export const VisualPreloadStatusSchema = z.strictObject({
   status: z.literal("DELIVERY_PENDING"),
   static_fallback_required: z.literal(true)
@@ -333,19 +406,38 @@ export const SafeFinalAssessmentProjectionSchema = z.strictObject({
   event_sequence_through: z.number().int().nonnegative(),
   domain_scores: z.array(z.strictObject({
     domain_id: AssessmentDomainIdSchema,
+    labels: z.array(LearnerLocalizedTextSchema).min(1).max(2),
     score_basis_points: z.number().int().min(0).max(10_000),
     weight_basis_points: z.number().int().min(1).max(10_000),
     weighted_contribution_basis_points: z.number().int().min(0).max(10_000)
   })).length(6),
   findings: z.array(z.strictObject({
-    rubric_item_id: z.string().min(1).max(160),
-    criterion_kind: z.enum(["AWARD", "PENALTY", "CRITICAL_ACTION", "CRITICAL_ERROR"]),
-    status: z.enum(["SATISFIED", "MISSED", "TRIGGERED", "NOT_TRIGGERED"]),
-    evidence_event_ids: z.array(EventIdSchema).max(33)
+    finding_id: FeedbackFindingIdSchema,
+    category: z.enum([
+      "CORRECT_ACTION",
+      "UNSAFE_ACTION",
+      "IMPORTANT_DELAY",
+      "MISSED_OPPORTUNITY"
+    ]),
+    resolution: z.literal("RESOLVED"),
+    evidence: z.array(z.strictObject({
+      event_id: EventIdSchema,
+      sequence_no: SequenceNumberSchema,
+      clinical_time: ClinicalTimeSchema,
+      action_id: ActionIdSchema.optional()
+    })).max(32)
   })).max(1024)
 });
 export type SafeFinalAssessmentProjection = z.infer<
   typeof SafeFinalAssessmentProjectionSchema
+>;
+
+export const SafeAssessmentApiProjectionSchema = z.union([
+  SafeActiveAssessmentDisclosureSchema,
+  SafeFinalAssessmentProjectionSchema
+]);
+export type SafeAssessmentApiProjection = z.infer<
+  typeof SafeAssessmentApiProjectionSchema
 >;
 
 export const EndSimulationResponseDataSchema = z.strictObject({

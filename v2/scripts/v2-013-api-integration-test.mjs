@@ -391,6 +391,31 @@ async function main() {
       const result = await full.query("select count(*)::int count from public.session_events where session_id=$1", [sessionId]);
       assert(response.status === 200 && body.data.replayed === true && result.rows[0].count === 1, JSON.stringify(body));
     });
+    await check("learner timeline is derived from the persisted committed Event sequence", async () => {
+      const response = await app.request(`/v1/sessions/${sessionId}/timeline`, { headers: headers() });
+      const body = await response.json();
+      assert(
+        response.status === 200
+          && body.data.items.length === 1
+          && body.data.items[0].sequence_no === 1
+          && body.data.items[0].item_type === "ACTION_COMMITTED",
+        JSON.stringify(body)
+      );
+    });
+    await check("native learner timeline excludes internal Event and Case authority", async () => {
+      const response = await app.request(`/v1/sessions/${sessionId}/timeline`, { headers: headers() });
+      const serialized = JSON.stringify(await response.json());
+      assert(
+        !/payload|rule_id|scheduler|effect|patient_state|rubric|package_hash|review_subject|approval/iu.test(serialized),
+        serialized
+      );
+    });
+    await check("native timeline and Assessment reads enforce Session ownership", async () => {
+      const deniedHeaders = { ...headers(), Authorization: "Bearer native.other" };
+      const timeline = await app.request(`/v1/sessions/${sessionId}/timeline`, { headers: deniedHeaders });
+      const assessment = await app.request(`/v1/sessions/${sessionId}/assessment`, { headers: deniedHeaders });
+      assert(timeline.status === 404 && assessment.status === 404, `timeline=${timeline.status} assessment=${assessment.status}`);
+    });
     await check("conflicting action key maps to HTTP 409", async () => {
       const response = await app.request(`/v1/sessions/${sessionId}/actions/propose`, {
         ...actionOptions,
@@ -428,6 +453,19 @@ async function main() {
     const endedBody = await ended.json();
     await check("endSimulation commits terminal Session and deterministic assessment", async () => {
       assert(ended.status === 200 && endedBody.data.session.status === "ENDED" && endedBody.data.assessment.assessment_status === "FINAL", `${JSON.stringify(endedBody)} rpc=${JSON.stringify(rpc.lastError)}`);
+    });
+    await check("final Assessment transport contains six localized safe domains without rubric internals", async () => {
+      const response = await app.request(`/v1/sessions/${sessionId}/assessment`, { headers: headers() });
+      const body = await response.json();
+      const serialized = JSON.stringify(body);
+      assert(
+        response.status === 200
+          && body.data.assessment_status === "FINAL"
+          && body.data.domain_scores.length === 6
+          && body.data.domain_scores.every((domain) => domain.labels.length > 0)
+          && !/rubric_item_id|criterion|trace_code|package_hash|scheduler|approval/iu.test(serialized),
+        serialized
+      );
     });
     await check("terminal status and event persist in PostgreSQL", async () => {
       const result = await full.query(`select session_status,
@@ -623,6 +661,7 @@ async function main() {
         "/v1/sessions/{session_id}/investigations/{result_id}",
         "/v1/sessions/{session_id}/questions",
         "/v1/sessions/{session_id}/state"
+        ,"/v1/sessions/{session_id}/timeline"
       ].sort();
       assert(JSON.stringify(paths) === JSON.stringify(expected), JSON.stringify(paths));
     });

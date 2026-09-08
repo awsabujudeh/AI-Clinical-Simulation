@@ -3,8 +3,11 @@ import {
   ASSESSMENT_FINALIZATION_BOUNDARY_SCHEMA_VERSION,
   AssessmentFinalizationBoundarySchema,
   EndSimulationResponseDataSchema,
+  LEARNER_TIMELINE_SCHEMA_VERSION,
+  PatientLanguageSchema,
   SafeFinalAssessmentProjectionSchema,
   SafeInvestigationProjectionSchema,
+  SafeLearnerTimelineProjectionSchema,
   SafeLearnerActionCatalogueSchema,
   SafeSessionProjectionSchema,
   StartSessionResponseDataSchema,
@@ -13,6 +16,8 @@ import {
   type EventType,
   type HashAdapter,
   type SafeFinalAssessmentProjection,
+  type SafeLearnerTimelineItem,
+  type SafeLearnerTimelineProjection,
   type SafeSessionProjection,
   type StartSessionRequest,
   type SubmitClinicalActionRequest
@@ -45,6 +50,163 @@ import type {
 } from "../authorization/api-authority.ts";
 import { ERRORS, type ApiServiceResult } from "../errors/api-service-error.ts";
 import type { SessionStartRepository } from "../persistence/session-start.ts";
+
+const LEARNER_ACTION_EVENT_TYPES = new Set<EventType>([
+  "EXAM_PERFORMED",
+  "INVESTIGATION_ORDERED",
+  "INVESTIGATION_PERFORMED",
+  "MEDICATION_ORDERED",
+  "MEDICATION_ADMINISTERED",
+  "PROCEDURE_ORDERED",
+  "PROCEDURE_PERFORMED",
+  "CONSULT_REQUESTED",
+  "DIAGNOSIS_SUBMITTED",
+  "DISPOSITION_SELECTED"
+]);
+
+const STATIC_TIMELINE_LABELS = Object.freeze({
+  SESSION_STARTED: [
+    { locale: "ar-JO", text: "بدأت الجلسة" },
+    { locale: "en-US", text: "Session started" }
+  ],
+  SESSION_PAUSED: [
+    { locale: "ar-JO", text: "أُوقفت الجلسة مؤقتًا" },
+    { locale: "en-US", text: "Session paused" }
+  ],
+  SESSION_RESUMED: [
+    { locale: "ar-JO", text: "استؤنفت الجلسة" },
+    { locale: "en-US", text: "Session resumed" }
+  ],
+  SESSION_ENDED: [
+    { locale: "ar-JO", text: "انتهت الجلسة" },
+    { locale: "en-US", text: "Session ended" }
+  ]
+} as const);
+
+function sourceCase(authorization: AuthorizedSession) {
+  return "review_execution_hash" in authorization.artifact
+    ? authorization.artifact.source_case
+    : authorization.artifact;
+}
+
+function localizedLabelsForKey(
+  authorization: AuthorizedSession,
+  localizationKey: string
+) {
+  const entry = sourceCase(authorization).localization.entries.find(
+    (candidate) => candidate.key === localizationKey
+  );
+  return entry?.translations
+    .map((translation) => ({
+      locale: PatientLanguageSchema.parse(translation.locale),
+      text: translation.text
+    }))
+    .sort((left, right) => left.locale < right.locale ? -1 : left.locale > right.locale ? 1 : 0)
+    ?? [];
+}
+
+function actionLabels(authorization: AuthorizedSession, actionId: string) {
+  const action = sourceCase(authorization).action_catalogue.actions.find(
+    (candidate) => candidate.action_id === actionId
+  );
+  return action?.aliases
+    .flatMap((alias) => alias.phrases[0] === undefined
+      ? []
+      : [{ locale: PatientLanguageSchema.parse(alias.locale), text: alias.phrases[0] }])
+    .sort((left, right) => left.locale < right.locale ? -1 : left.locale > right.locale ? 1 : 0)
+    ?? [];
+}
+
+function investigationAvailabilityIsLearnerVisible(
+  authorization: AuthorizedSession,
+  actionId: string,
+  eventType: EventType,
+  ended: boolean
+): boolean {
+  const action = sourceCase(authorization).action_catalogue.actions.find(
+    (candidate) => candidate.action_id === actionId
+  );
+  if (action?.investigation === undefined) return false;
+  const visibility = action.investigation.learner_visibility;
+  const policy = eventType === "INVESTIGATION_IMAGE_AVAILABLE"
+    ? visibility.media
+    : eventType === "INVESTIGATION_FORMAL_REPORT_AVAILABLE"
+      ? visibility.formal_report
+      : visibility.structured_result;
+  return policy === "AT_COMPONENT_AVAILABILITY"
+    || (policy === "AFTER_SESSION_END" && ended);
+}
+
+function safeTimelineItem(
+  event: InMemorySessionAggregate["committed_events"][number],
+  authorization: AuthorizedSession,
+  ended: boolean
+): SafeLearnerTimelineItem | undefined {
+  const common = {
+    event_id: event.event_id,
+    sequence_no: event.sequence_no,
+    clinical_time: event.clinical_time
+  };
+  if (event.event_type === "SESSION_STARTED"
+    || event.event_type === "SESSION_PAUSED"
+    || event.event_type === "SESSION_RESUMED") {
+    return {
+      ...common,
+      item_type: event.event_type,
+      labels: STATIC_TIMELINE_LABELS[event.event_type].map((label) => ({
+        locale: PatientLanguageSchema.parse(label.locale),
+        text: label.text
+      }))
+    };
+  }
+  if (event.event_type === "SIMULATION_ENDED") {
+    return {
+      ...common,
+      item_type: "SESSION_ENDED",
+      labels: STATIC_TIMELINE_LABELS.SESSION_ENDED.map((label) => ({
+        locale: PatientLanguageSchema.parse(label.locale),
+        text: label.text
+      }))
+    };
+  }
+  if (event.action_id !== undefined && LEARNER_ACTION_EVENT_TYPES.has(event.event_type)) {
+    const labels = actionLabels(authorization, event.action_id);
+    return labels.length === 0
+      ? undefined
+      : { ...common, item_type: "ACTION_COMMITTED", labels, action_id: event.action_id };
+  }
+  if (
+    event.action_id !== undefined
+    && [
+      "INVESTIGATION_RESULT_AVAILABLE",
+      "INVESTIGATION_IMAGE_AVAILABLE",
+      "INVESTIGATION_FORMAL_REPORT_AVAILABLE"
+    ].includes(event.event_type)
+    && investigationAvailabilityIsLearnerVisible(
+      authorization,
+      event.action_id,
+      event.event_type,
+      ended
+    )
+  ) {
+    const action = actionLabels(authorization, event.action_id);
+    const labels = action.map((label) => ({
+      locale: label.locale,
+      text: label.locale === "ar-JO"
+        ? `أصبحت نتيجة ${label.text} متاحة`
+        : `${label.text} result available`
+    }));
+    return labels.length === 0
+      ? undefined
+      : {
+          ...common,
+          item_type: "INVESTIGATION_RESULT_AVAILABLE",
+          labels,
+          action_id: event.action_id
+        };
+  }
+  return undefined;
+}
 
 export type ApiRequestAuthority = Readonly<{
   principal: VerifiedPrincipal;
@@ -209,6 +371,33 @@ function safeSessionProjection(
     : { success: false, error: ERRORS.internal };
 }
 
+function safeLearnerTimelineProjection(
+  session: InMemorySessionAggregate,
+  authorization: AuthorizedSession
+): ApiServiceResult<SafeLearnerTimelineProjection> {
+  const allSafeItems = session.committed_events.flatMap((event) => {
+    if (event.status !== "COMMITTED" || event.clinical_time > session.patient_state.clinical_time) {
+      return [];
+    }
+    const item = safeTimelineItem(event, authorization, session.status === "ENDED");
+    return item === undefined ? [] : [item];
+  });
+  const firstIncludedIndex = Math.max(0, allSafeItems.length - 256);
+  const items = allSafeItems.slice(firstIncludedIndex);
+  const projection = SafeLearnerTimelineProjectionSchema.safeParse({
+    timeline_schema_version: LEARNER_TIMELINE_SCHEMA_VERSION,
+    session_id: session.session_id,
+    event_sequence_through: session.next_sequence_no - 1,
+    items,
+    ...(firstIncludedIndex === 0
+      ? {}
+      : { truncated_before_sequence: allSafeItems[firstIncludedIndex]!.sequence_no })
+  });
+  return projection.success
+    ? { success: true, data: projection.data }
+    : { success: false, error: ERRORS.internal };
+}
+
 function safeFinalAssessment(result: {
   assessment_id: string;
   session_id: string;
@@ -228,19 +417,37 @@ function safeFinalAssessment(result: {
     criterion_kind: "AWARD" | "PENALTY" | "CRITICAL_ACTION" | "CRITICAL_ERROR";
     status: "PENDING" | "SATISFIED" | "MISSED" | "TRIGGERED" | "NOT_TRIGGERED";
     evidence_ref_ids: readonly string[];
+    trace_codes: readonly string[];
   }[];
   evidence_records: readonly {
     evidence_ref_id: string;
     evidence_kind: string;
     event_id?: string;
+    sequence_no?: number;
+    clinical_time?: number;
+    action_id?: string;
   }[];
-}): ApiServiceResult<SafeFinalAssessmentProjection> {
-  const eventIdByEvidence = new Map(
+}, authorization: AuthorizedSession): ApiServiceResult<SafeFinalAssessmentProjection> {
+  const eventByEvidence = new Map(
     result.evidence_records.flatMap((evidence) =>
-      evidence.evidence_kind === "COMMITTED_EVENT" && evidence.event_id !== undefined
-        ? [[evidence.evidence_ref_id, evidence.event_id] as const]
+      evidence.evidence_kind === "COMMITTED_EVENT"
+        && evidence.event_id !== undefined
+        && evidence.sequence_no !== undefined
+        && evidence.clinical_time !== undefined
+        ? [[evidence.evidence_ref_id, {
+            event_id: evidence.event_id,
+            sequence_no: evidence.sequence_no,
+            clinical_time: evidence.clinical_time,
+            ...(evidence.action_id === undefined ? {} : { action_id: evidence.action_id })
+          }] as const]
         : []
     )
+  );
+  const rubric = sourceCase(authorization).assessment_rubric;
+  const findingCandidates = result.criterion_results.filter((criterion) =>
+    (criterion.criterion_kind === "AWARD"
+      && (criterion.status === "SATISFIED" || criterion.status === "MISSED"))
+    || (criterion.criterion_kind !== "AWARD" && criterion.status === "TRIGGERED")
   );
   const projection = SafeFinalAssessmentProjectionSchema.safeParse({
     assessment_id: result.assessment_id,
@@ -251,19 +458,33 @@ function safeFinalAssessment(result: {
     unsafe: result.unsafe,
     assessed_through_clinical_time: result.assessed_through_clinical_time,
     event_sequence_through: result.event_sequence_through,
-    domain_scores: result.domain_scores.map((domain) => ({
-      domain_id: domain.domain_id,
-      score_basis_points: domain.score_basis_points,
-      weight_basis_points: domain.weight_basis_points,
-      weighted_contribution_basis_points: domain.weighted_contribution_basis_points
-    })),
-    findings: result.criterion_results.map((criterion) => ({
-      rubric_item_id: criterion.rubric_item_id,
-      criterion_kind: criterion.criterion_kind,
-      status: criterion.status,
-      evidence_event_ids: criterion.evidence_ref_ids.flatMap((id) => {
-        const eventId = eventIdByEvidence.get(id);
-        return eventId === undefined ? [] : [eventId];
+    domain_scores: result.domain_scores.map((domain) => {
+      const definition = rubric.domains.find(
+        (candidate) => candidate.domain_code === domain.domain_id
+      );
+      return {
+        domain_id: domain.domain_id,
+        labels: definition === undefined
+          ? []
+          : localizedLabelsForKey(authorization, definition.title_key),
+        score_basis_points: domain.score_basis_points,
+        weight_basis_points: domain.weight_basis_points,
+        weighted_contribution_basis_points: domain.weighted_contribution_basis_points
+      };
+    }),
+    findings: findingCandidates.map((criterion, index) => ({
+      finding_id: `finding:${result.assessment_id}:final-${index + 1}`,
+      category: criterion.criterion_kind === "AWARD"
+        ? criterion.status === "SATISFIED"
+          ? "CORRECT_ACTION"
+          : criterion.trace_codes.includes("OUTSIDE_CLINICAL_TIME_WINDOW")
+            ? "IMPORTANT_DELAY"
+            : "MISSED_OPPORTUNITY"
+        : "UNSAFE_ACTION",
+      resolution: "RESOLVED",
+      evidence: criterion.evidence_ref_ids.flatMap((id) => {
+        const evidence = eventByEvidence.get(id);
+        return evidence === undefined ? [] : [evidence];
       })
     }))
   });
@@ -610,7 +831,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       finalization_boundary: boundary.data
     });
     return evaluated.success
-      ? safeFinalAssessment(evaluated.result)
+      ? safeFinalAssessment(evaluated.result, authorization)
       : { success: false, error: ERRORS.internal };
   }
 
@@ -683,6 +904,15 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       : { success: true, data: projection } as const;
   }
 
+  async function getLearnerTimeline(authority: ApiRequestAuthority, sessionId: string) {
+    const loaded = await authorizeAndLoad(authority, sessionId);
+    if (!loaded.success) return loaded;
+    return safeLearnerTimelineProjection(
+      loaded.data.session,
+      loaded.data.authorization
+    );
+  }
+
   return Object.freeze({
     startSession,
     getPatientState,
@@ -690,6 +920,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     getInvestigationResult,
     endSimulation,
     getAssessment,
+    getLearnerTimeline,
     authorizeAndLoad
   });
 }

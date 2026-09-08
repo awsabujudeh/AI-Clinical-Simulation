@@ -157,8 +157,9 @@ p { line-height: 1.55; }
 .clinical-time { display: grid; text-align: end; }
 .clinical-time span, .clinical-time small { color: var(--muted); font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .clinical-time strong { color: var(--navy); font-size: 1.7rem; font-variant-numeric: tabular-nums; }
-.workspace-grid { display: grid; grid-template-columns: minmax(15rem, 0.75fr) minmax(22rem, 1.45fr) minmax(17rem, 0.8fr); grid-template-areas: "monitor visual interaction" "investigation visual interaction" "timeline timeline timeline"; gap: 0.75rem; align-items: stretch; }
+.workspace-grid { display: grid; grid-template-columns: minmax(15rem, 0.75fr) minmax(22rem, 1.45fr) minmax(17rem, 0.8fr); grid-template-areas: "monitor visual interaction" "investigation visual interaction" "timeline timeline assessment"; gap: 0.75rem; align-items: stretch; }
 .monitor-slot { grid-area: monitor; padding: 1rem; background: #101f30; border-color: #263a4e; color: #fff; }
+.monitor-slot--stale { border-color: #b17a25; box-shadow: inset 0 0 0 1px #b17a25; }
 .monitor-slot .section-header h2 { color: #fff; }
 .monitor-slot .section-header p { color: #9eafbf; }
 .monitor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.55rem; }
@@ -216,11 +217,36 @@ p { line-height: 1.55; }
 .empty-state h3 { margin: 0.6rem 0 0.25rem; font-size: 0.85rem; }
 .empty-state p { margin: 0; color: var(--muted); font-size: 0.72rem; }
 .empty-state__line { display: block; width: 2.5rem; height: 2px; background: var(--blue); }
-.timeline-slot { grid-area: timeline; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 1rem; }
-.timeline-slot .section-header { margin: 0; }
+.timeline-slot { grid-area: timeline; padding: 1rem; }
+.surface-state { margin: 0; padding: 0.75rem; border: 1px dashed #c4ced6; border-radius: 0.35rem; color: var(--muted); background: var(--surface-muted); font-size: 0.75rem; }
+.surface-state--error { color: #812d2d; border-color: #e2b2b2; background: var(--red-soft); }
+.learner-timeline { max-height: 18rem; display: grid; gap: 0; overflow: auto; margin: 0; padding: 0; list-style: none; }
+.learner-timeline li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.7rem 0; border-top: 1px solid var(--soft-line); }
+.learner-timeline li:first-child { border-top: 0; }
+.learner-timeline li > div:nth-child(2) { display: grid; gap: 0.18rem; }
+.learner-timeline strong { color: var(--ink); font-size: 0.78rem; }
+.learner-timeline span { color: var(--muted); font-size: 0.68rem; }
+.timeline-sequence { width: 1.75rem; height: 1.75rem; display: grid; place-items: center; border: 1px solid #9fb3c2; border-radius: 50%; color: #275a73; background: var(--blue-soft); font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .timeline-metadata { display: grid; text-align: end; }
 .timeline-metadata span { color: var(--muted); font-size: 0.66rem; }
 .timeline-metadata strong { color: var(--navy); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.assessment-slot { grid-area: assessment; padding: 1rem; }
+.assessment-active { display: grid; gap: 0.75rem; }
+.assessment-active > p:not(.surface-state) { margin: 0; color: var(--muted); font-size: 0.75rem; }
+.practice-findings, .debrief-findings { display: grid; gap: 0.55rem; margin: 0; padding: 0; list-style: none; }
+.practice-findings li, .debrief-findings li { display: grid; gap: 0.2rem; padding: 0.7rem; border-inline-start: 3px solid var(--blue); background: var(--surface-muted); }
+.practice-findings strong, .debrief-findings strong { font-size: 0.76rem; }
+.practice-findings span, .debrief-findings span { color: var(--muted); font-size: 0.66rem; }
+.final-assessment { display: grid; gap: 1.1rem; }
+.final-assessment h3 { margin: 0 0 0.55rem; color: var(--navy); font-size: 0.8rem; }
+.final-assessment__summary { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.8rem; border: 1px solid #b8cbd4; background: #f4f9fb; }
+.final-assessment__summary > div { display: grid; }
+.final-assessment__summary span { color: var(--muted); font-size: 0.65rem; }
+.final-assessment__summary strong { color: var(--navy); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.domain-score-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
+.domain-score-grid article { display: grid; gap: 0.25rem; padding: 0.55rem; border: 1px solid var(--soft-line); background: var(--surface-muted); }
+.domain-score-grid span { color: var(--muted); font-size: 0.63rem; }
+.domain-score-grid strong { color: var(--navy); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 
 [dir="rtl"] body { font-family: "Noto Sans Arabic", "Segoe UI", system-ui, sans-serif; }
 [dir="rtl"] .eyebrow { letter-spacing: 0; }
@@ -228,7 +254,7 @@ p { line-height: 1.55; }
 [dir="rtl"] .public-hero h1 { letter-spacing: -0.025em; }
 
 @media (max-width: 1120px) {
-  .workspace-grid { grid-template-columns: minmax(15rem, 0.8fr) minmax(20rem, 1.2fr); grid-template-areas: "monitor visual" "investigation visual" "interaction interaction" "timeline timeline"; }
+  .workspace-grid { grid-template-columns: minmax(15rem, 0.8fr) minmax(20rem, 1.2fr); grid-template-areas: "monitor visual" "investigation visual" "interaction interaction" "timeline assessment"; }
   .clinical-tabs { grid-template-columns: repeat(3, 1fr); }
   .domain-placeholder { grid-column: 1 / -1; }
 }
@@ -239,7 +265,7 @@ p { line-height: 1.55; }
   .entry-grid { grid-template-columns: 1fr; }
   .expo-route-preview { grid-template-columns: 1fr; }
   .expo-route-preview__monitor { grid-template-columns: repeat(3, 1fr auto); }
-  .workspace-grid { grid-template-columns: 1fr; grid-template-areas: "visual" "monitor" "interaction" "investigation" "timeline"; }
+  .workspace-grid { grid-template-columns: 1fr; grid-template-areas: "visual" "monitor" "interaction" "investigation" "timeline" "assessment"; }
   .visual-patient-slot { min-height: 23rem; }
   .visual-patient-slot__content { margin-top: 5rem; }
   .clinical-tabs { grid-template-columns: repeat(2, 1fr); }
@@ -249,12 +275,13 @@ p { line-height: 1.55; }
   .brand > span:last-child, .auth-summary { display: none; }
   .topbar__actions { flex-wrap: wrap; }
   .public-hero h1 { font-size: 2.5rem; }
-  .entry-header, .expo-intro, .patient-header, .timeline-slot { align-items: stretch; flex-direction: column; }
+  .entry-header, .expo-intro, .patient-header { align-items: stretch; flex-direction: column; }
   .clinical-time, .timeline-metadata { text-align: start; }
   .monitor-grid { grid-template-columns: 1fr 1fr; }
   .visual-patient-slot__status { flex-direction: column; }
   .clinical-tabs { grid-template-columns: 1fr; }
   .expo-actions { align-items: stretch; flex-direction: column; }
+  .domain-score-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }

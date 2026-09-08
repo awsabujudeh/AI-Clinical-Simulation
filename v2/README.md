@@ -156,6 +156,7 @@ npm run test:v2-014a
 npm run test:v2-014b
 npm run test:v2-015
 npm run test:v2-016
+npm run test:v2-017
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -232,6 +233,12 @@ The server remains authoritative for access, Clinical Time, clinical state, acti
 The Student UI now discovers a strict learner-safe action catalogue in the authorized Session projection and submits structured learner intent through the existing recovery-backed `/actions/propose` path. The catalogue contains only pinned action identity/type, authored localized labels, permitted parameter definitions, confirmation policy, and repeat policy. It excludes Case rules/effects, hidden facts or prerequisites, scoring/expected-action data, scheduler work, hashes, and governance metadata. Authored `ar-JO` labels fall back first to authored `en-US`, then to the stable action identifier; the UI does not invent clinical translations.
 
 React performs bounded form validation and presentation only. Recovery metadata is journaled before transport; ambiguous sends retain the same canonical request and idempotency key; stale state is refreshed without automatic medical re-execution. Vitals, Patient State, Clinical Time, results, and Assessment truth change only after an authoritative response and Session refresh. Free-text Patient AI, diagnostic media, Visual Patient behavior, final timeline, and final debrief UI remain unavailable. Run `npm run test:v2-016` for the focused contract, API, recovery, Browser/Deno, native PostgreSQL, Playwright, and static-scope gate.
+
+## V2-017 monitor, timeline, and Assessment UI
+
+The learner workspace now renders committed safe observation projections, a bounded learner-safe timeline ordered by authoritative Event sequence and Clinical Time, and the V2-007 Assessment disclosure boundary. Active Assessment mode exposes no scores, correctness, unsafe findings, rubric, or debrief; Practice / Demo is limited to resolved disclosure-safe findings. An authoritative ended Session may load the final six-domain result and deterministic evidence references through the secured Session API.
+
+The monitor includes no fabricated ECG or client medical thresholds. Timeline responses exclude raw Event payloads, rules, scheduler/effect internals, scoring criteria, hidden diagnosis, hashes, and governance data. Finalization uses the existing recovery/idempotency path and never retries an ambiguous request automatically. React formats returned basis-point scores but does not calculate weights, penalties, caps, unsafe status, or medical truth. Run `npm run test:v2-017` for the focused contract, API, Browser/Deno, native PostgreSQL, Playwright, disclosure-audit, and portability gates.
 
 ## Source of Truth and rollback
 

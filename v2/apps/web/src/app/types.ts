@@ -3,6 +3,9 @@ import {
   type JsonObject,
   PatientLanguageSchema,
   type SafeLearnerAction,
+  type SafeAssessmentApiProjection,
+  type SafeFinalAssessmentProjection,
+  type SafeLearnerTimelineProjection,
   type LastKnownSafeSessionProjection,
   type PatientLanguage,
   type SafeSessionProjection,
@@ -113,10 +116,70 @@ export interface StudentClinicalActionService {
   submit(intent: StudentClinicalActionIntent): Promise<StudentClinicalActionResult>;
 }
 
+export type TimelineLoadResult =
+  | Readonly<{ kind: "AVAILABLE"; projection: SafeLearnerTimelineProjection }>
+  | Readonly<{
+      kind: "UNAUTHENTICATED" | "UNAUTHORIZED" | "NOT_FOUND" | "UNAVAILABLE";
+      http_status?: number;
+    }>;
+
+export interface StudentTimelineService {
+  load(sessionId: string): Promise<TimelineLoadResult>;
+}
+
+export type AssessmentLoadResult =
+  | Readonly<{ kind: "AVAILABLE"; projection: SafeAssessmentApiProjection }>
+  | Readonly<{
+      kind: "UNAUTHENTICATED" | "UNAUTHORIZED" | "NOT_FOUND" | "PENDING" | "UNAVAILABLE";
+      http_status?: number;
+    }>;
+
+export interface StudentAssessmentService {
+  load(sessionId: string): Promise<AssessmentLoadResult>;
+}
+
+export type StudentFinalizationIntent = Readonly<{
+  principal_user_id: string;
+  session_id: string;
+  expected_state_version: number;
+  connectivity_state: ConnectivityState;
+}>;
+
+export type StudentFinalizationResult =
+  | Readonly<{
+      kind: "COMMITTED";
+      replayed: boolean;
+      idempotency_key: string;
+      projection: SafeSessionProjection;
+      assessment: SafeFinalAssessmentProjection;
+    }>
+  | Readonly<{
+      kind:
+        | "INVALID"
+        | "NOT_SENT"
+        | "IN_DOUBT"
+        | "STALE"
+        | "IDEMPOTENCY_CONFLICT"
+        | "UNAUTHENTICATED"
+        | "UNAUTHORIZED"
+        | "REJECTED"
+        | "UNAVAILABLE";
+      idempotency_key?: string;
+      http_status?: number;
+      requires_authoritative_sync: boolean;
+    }>;
+
+export interface StudentFinalizationService {
+  end(intent: StudentFinalizationIntent): Promise<StudentFinalizationResult>;
+}
+
 export type StudentUiServices = Readonly<{
   auth: StudentAuthService;
   sessions: StudentSessionService;
   actions: StudentClinicalActionService;
+  timeline: StudentTimelineService;
+  assessment: StudentAssessmentService;
+  finalization: StudentFinalizationService;
 }>;
 
 export type StudentShellLocale = PatientLanguage;
