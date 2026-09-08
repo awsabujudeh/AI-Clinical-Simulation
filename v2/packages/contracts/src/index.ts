@@ -1,6 +1,7 @@
 export * from "./actions.ts";
 export * from "./assessment.ts";
 export * from "./adapters.ts";
+export * from "./ai.ts";
 export * from "./api.ts";
 export * from "./api-v1.ts";
 export * from "./diagnostics.ts";

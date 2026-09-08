@@ -145,6 +145,15 @@ export type AiWorkflowRunId = z.infer<typeof AiWorkflowRunIdSchema>;
 export const AiWorkflowRequestIdSchema = opaqueOperationalIdentifier("AI workflow request identifier").brand<"AiWorkflowRequestId">();
 export type AiWorkflowRequestId = z.infer<typeof AiWorkflowRequestIdSchema>;
 
+export const AiPromptIdSchema = prefixedIdentifier("prompt").brand<"AiPromptId">();
+export type AiPromptId = z.infer<typeof AiPromptIdSchema>;
+
+export const AiModelPolicyIdSchema = prefixedIdentifier("model-policy").brand<"AiModelPolicyId">();
+export type AiModelPolicyId = z.infer<typeof AiModelPolicyIdSchema>;
+
+export const AiOutputSchemaIdSchema = prefixedIdentifier("ai-schema").brand<"AiOutputSchemaId">();
+export type AiOutputSchemaId = z.infer<typeof AiOutputSchemaIdSchema>;
+
 export const RequestIdSchema = opaqueOperationalIdentifier("request identifier").brand<"RequestId">();
 export type RequestId = z.infer<typeof RequestIdSchema>;
 

@@ -157,6 +157,7 @@ npm run test:v2-014b
 npm run test:v2-015
 npm run test:v2-016
 npm run test:v2-017
+npm run test:v2-018
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -239,6 +240,12 @@ React performs bounded form validation and presentation only. Recovery metadata 
 The learner workspace now renders committed safe observation projections, a bounded learner-safe timeline ordered by authoritative Event sequence and Clinical Time, and the V2-007 Assessment disclosure boundary. Active Assessment mode exposes no scores, correctness, unsafe findings, rubric, or debrief; Practice / Demo is limited to resolved disclosure-safe findings. An authoritative ended Session may load the final six-domain result and deterministic evidence references through the secured Session API.
 
 The monitor includes no fabricated ECG or client medical thresholds. Timeline responses exclude raw Event payloads, rules, scheduler/effect internals, scoring criteria, hidden diagnosis, hashes, and governance data. Finalization uses the existing recovery/idempotency path and never retries an ambiguous request automatically. React formats returned basis-point scores but does not calculate weights, penalties, caps, unsafe status, or medical truth. Run `npm run test:v2-017` for the focused contract, API, Browser/Deno, native PostgreSQL, Playwright, disclosure-audit, and portability gates.
+
+## V2-018 secure AI gateway
+
+`packages/ai-gateway/` provides the server-only, Edge-portable capability router, provider interface, direct OpenAI Responses API adapter, strict Structured Outputs plus local Zod validation, bounded input/output/timeout/retry policy, typed failures, and data-minimized audit metadata. The provider request forces `store: false`, has no provider-owned conversation authority, and defaults to no tools.
+
+Trusted server configuration owns capability, prompt/schema versions, candidate model, and operational budgets. Luna and Terra remain evaluation candidates; V2-018 selects no production winner and performs no silent model failover. The browser has no provider key, URL, prompt, routing, or SDK, and `submitQuestion` remains unavailable. No Patient AI, RAG, Case Builder, AI scoring, clinical mutation, remote Supabase resource, or deployment is included. Run `npm run test:v2-018`; design and verification records are under `planning_input/v2-018/`.
 
 ## Source of Truth and rollback
 

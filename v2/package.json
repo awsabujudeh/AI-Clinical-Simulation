@@ -79,9 +79,13 @@
     "test:v2-017:audit": "node scripts/v2-017-disclosure-audit.mjs",
     "test:v2-017:playwright": "playwright test --config playwright.v2-017.config.mjs",
     "test:v2-017": "npm run typecheck && npm run build && npm run test:v2-017:browser && npm run test:v2-017:deno && npm run test:v2-017:audit && npm run test:api:postgres && npm run test:v2-017:playwright && npm run test:portability-guard",
+    "test:v2-018:browser": "vitest run --config vitest.config.mjs tests/browser/ai-gateway",
+    "test:v2-018:deno": "deno test tests/deno/ai_gateway_test.ts",
+    "test:v2-018:audit": "node scripts/v2-018-ai-security-audit.mjs",
+    "test:v2-018": "npm run typecheck && npm run test:v2-018:browser && npm run test:v2-018:deno && npm run test:v2-018:audit && npm run test:portability-guard",
     "test:playwright": "playwright test --config playwright.config.mjs",
     "test:portability-guard": "node scripts/portability-guard.mjs",
-    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:student-ui:audit && npm run test:v2-011a && npm run test:v2-011b && npm run test:v2-012a && npm run test:v2-012b && npm run test:api:postgres && npm run build && npm run test:pwa && npm run test:browser && npm run test:deno && npm run test:playwright"
+    "verify": "npm run typecheck && npm run test:portability-guard && npm run test:student-ui:audit && npm run test:v2-011a && npm run test:v2-011b && npm run test:v2-012a && npm run test:v2-012b && npm run test:api:postgres && npm run build && npm run test:v2-018:audit && npm run test:pwa && npm run test:browser && npm run test:deno && npm run test:playwright"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

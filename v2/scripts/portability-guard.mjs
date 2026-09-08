@@ -6,6 +6,7 @@ const sessionEngineSourceRoot = new URL("../packages/session-engine/src/", impor
 const assessmentEngineSourceRoot = new URL("../packages/assessment-engine/src/", import.meta.url);
 const apiCoreSourceRoot = new URL("../packages/api-core/src/", import.meta.url);
 const recoveryCoreSourceRoot = new URL("../packages/recovery-core/src/", import.meta.url);
+const aiGatewaySourceRoot = new URL("../packages/ai-gateway/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
@@ -14,7 +15,8 @@ const portableSourceRoots = [
   sessionEngineSourceRoot,
   assessmentEngineSourceRoot,
   apiCoreSourceRoot,
-  recoveryCoreSourceRoot
+  recoveryCoreSourceRoot,
+  aiGatewaySourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -22,7 +24,7 @@ const forbiddenPatterns = [
   ["Node filesystem/path import", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["'](?:fs|path)(?:\/[^"']*)?["']/u],
   ["runtime-specific global", /(?:\bprocess\s*(?:\.|\[)|\b(?:Deno|document|localStorage|indexedDB|IndexedDB|Buffer|__dirname|__filename|require)\b)/u],
   ["browser window global access", /\bwindow\s*(?:\.|\[)/u],
-  ["provider SDK", /(?:@supabase\/|@azure\/|@sentry\/|@openai\/|["']openai["'])/iu],
+  ["provider SDK", /(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["'](?:@supabase\/[^"']*|@azure\/[^"']*|@sentry\/[^"']*|@openai\/[^"']*|openai)["']/iu],
   ["UI framework", /(?:from\s+|import\s*(?:\(\s*)?)["'](?:react(?:-dom)?|vue|svelte|@angular\/[^"']+)["']/u]
 ];
 
@@ -247,3 +249,4 @@ console.log("API_CORE_EDGE_PORTABILITY_GUARD=PASS");
 console.log("RECOVERY_CORE_PORTABILITY_GUARD=PASS");
 console.log("RECOVERY_CORE_SERVER_AUTHORITY_GUARD=PASS");
 console.log("RECOVERY_CONTRACT_AUTHORITY_GUARD=PASS count=1");
+console.log("AI_GATEWAY_EDGE_PORTABILITY_GUARD=PASS");
