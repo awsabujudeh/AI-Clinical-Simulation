@@ -211,11 +211,11 @@ describe("V2-016 generic action presentation and validation", () => {
     })).toMatchObject({ success: false, issues: [{ code: "TEXT_TOO_LONG" }] });
   });
 
-  it("renders interactive domains while leaving free-text Patient AI unavailable", async () => {
+  it("renders interactive domains with a safe unavailable Patient Conversation boundary", async () => {
     await render();
-    expect(text()).toContain("Structured history actions are not available");
-    expect(text()).toContain("Free-text patient conversation is not available");
-    expect(host.querySelector('textarea[name="patient-question"]')).toBeNull();
+    expect(text()).toContain("Talk with the patient");
+    expect(text()).toContain("Reconnect to ask a new question");
+    expect(host.querySelector("textarea")?.disabled).toBe(true);
     await click("Examination");
     expect(text()).toContain("Perform synthetic examination");
     await click("Investigations");

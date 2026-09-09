@@ -2,14 +2,23 @@ import {
   ASSESSMENT_DISCLOSURE_SCHEMA_VERSION,
   ASSESSMENT_FINALIZATION_BOUNDARY_SCHEMA_VERSION,
   AssessmentFinalizationBoundarySchema,
+  CanonicalEventEnvelopeSchema,
+  ConversationTurnIdSchema,
   EndSimulationResponseDataSchema,
   LEARNER_TIMELINE_SCHEMA_VERSION,
+  EventIdSchema,
+  IdempotencyKeySchema,
   PatientLanguageSchema,
+  PatientConversationTurnSchema,
+  SafePatientConversationTurnSchema,
+  RealUtcTimeSchema,
+  SubmitQuestionResponseDataSchema,
   SafeFinalAssessmentProjectionSchema,
   SafeInvestigationProjectionSchema,
   SafeLearnerTimelineProjectionSchema,
   SafeLearnerActionCatalogueSchema,
   SafeSessionProjectionSchema,
+  Sha256DigestSchema,
   StartSessionResponseDataSchema,
   SubmitClinicalActionResponseDataSchema,
   type EndSimulationRequest,
@@ -20,7 +29,8 @@ import {
   type SafeLearnerTimelineProjection,
   type SafeSessionProjection,
   type StartSessionRequest,
-  type SubmitClinicalActionRequest
+  type SubmitClinicalActionRequest,
+  type SubmitQuestionRequest
 } from "../../../contracts/src/index.ts";
 import { canonicalSerialize } from "../../../case-schema/src/index.ts";
 import {
@@ -34,6 +44,7 @@ import {
   InMemorySessionAggregateSchema,
   SESSION_COORDINATOR_SCHEMA_VERSION,
   createSessionCoordinator,
+  createSessionCommitToken,
   initializeInMemorySession,
   initializeReviewInMemorySession,
   projectAssessmentEvidenceFromSession,
@@ -41,6 +52,11 @@ import {
   type SessionCommitAdapter,
   type SessionCoordinator
 } from "../../../session-engine/src/index.ts";
+import type { SecureAiGateway } from "../../../ai-gateway/src/index.ts";
+import {
+  buildPatientConversationContext,
+  executePatientConversation
+} from "../../../patient-conversation/src/index.ts";
 
 import type { VerifiedPrincipal } from "../auth/verified-principal.ts";
 import type {
@@ -50,6 +66,10 @@ import type {
 } from "../authorization/api-authority.ts";
 import { ERRORS, type ApiServiceResult } from "../errors/api-service-error.ts";
 import type { SessionStartRepository } from "../persistence/session-start.ts";
+import {
+  PatientConversationClaimTokenSchema,
+  type PatientConversationRepository
+} from "../patient-conversation/repository.ts";
 
 const LEARNER_ACTION_EVENT_TYPES = new Set<EventType>([
   "EXAM_PERFORMED",
@@ -228,6 +248,14 @@ export type SecureApiDependencies = Readonly<{
   hash_adapter: HashAdapter;
   id_factories: SecureApiIdFactories;
   trusted_time_utc: () => unknown;
+  patient_conversation?: Readonly<{
+    repository: PatientConversationRepository;
+    gateway: SecureAiGateway;
+    create_turn_id(input: { session_id: string; idempotency_key: string }): unknown;
+    create_event_id(input: { session_id: string; kind: "QUESTION" | "RESPONSE"; idempotency_key: string }): unknown;
+    create_claim_token(input: { session_id: string; idempotency_key: string }): unknown;
+    claim_expires_at_utc(claimedAtUtc: string): unknown;
+  }>;
 }>;
 
 function sessionFailure(issues: readonly { code: string }[]): ApiServiceResult<never> {
@@ -499,6 +527,77 @@ async function hashCanonical(hashAdapter: HashAdapter, value: unknown) {
   } catch {
     return undefined;
   }
+}
+
+function appendConversationEvent(input: {
+  session: InMemorySessionAggregate;
+  event_id: unknown;
+  real_time_utc: unknown;
+  correlation_id: string;
+  request_id: string;
+  idempotency_key: string;
+  event_type: "QUESTION_ASKED" | "PATIENT_RESPONSE_RECORDED";
+  actor_type: "LEARNER" | "AI_WORKFLOW";
+  source: "UI" | "AI_RESPONSE";
+  clinical_time: number;
+  state_version: number;
+  payload: unknown;
+  causation_event_id?: string;
+}) {
+  const event = CanonicalEventEnvelopeSchema.safeParse({
+    event_id: input.event_id,
+    session_id: input.session.session_id,
+    sequence_no: input.session.next_sequence_no,
+    event_schema_version: "1.0",
+    clinical_time: input.clinical_time,
+    real_time_utc: input.real_time_utc,
+    actor_type: input.actor_type,
+    source: input.source,
+    correlation_id: input.correlation_id,
+    ...(input.causation_event_id === undefined
+      ? {}
+      : { causation_event_id: input.causation_event_id }),
+    event_type: input.event_type,
+    parameters: {},
+    status: "COMMITTED",
+    payload: input.payload,
+    clinical_effect_ids: [],
+    state_version_before: input.state_version,
+    state_version_after: input.state_version,
+    scoring_evidence_refs: [],
+    case_version: input.session.pinned_case.case_version,
+    idempotency_key: input.idempotency_key,
+    request_id: input.request_id
+  });
+  if (!event.success) return undefined;
+  const session = InMemorySessionAggregateSchema.safeParse({
+    ...input.session,
+    committed_events: [...input.session.committed_events, event.data],
+    next_sequence_no: input.session.next_sequence_no + 1
+  });
+  return session.success ? { session: session.data, event: event.data } : undefined;
+}
+
+function patientRepositoryError(code: string): ApiServiceResult<never> {
+  if (code === "IDEMPOTENCY_CONFLICT") return { success: false, error: ERRORS.idempotency };
+  if (code === "IN_PROGRESS") return { success: false, error: ERRORS.conversationInProgress };
+  if (code === "VERSION_CONFLICT") return { success: false, error: ERRORS.stale };
+  if (code === "SESSION_ENDED") return { success: false, error: ERRORS.ended };
+  if (code === "NOT_AUTHORIZED" || code === "NOT_FOUND") {
+    return { success: false, error: ERRORS.authorization };
+  }
+  if (code === "INVALID_REQUEST" || code === "CLAIM_MISMATCH" || code === "CLAIM_NOT_FOUND") {
+    return { success: false, error: ERRORS.domainRejected };
+  }
+  return { success: false, error: ERRORS.persistence };
+}
+
+function safePatientConversationTurn(input: unknown) {
+  const parsed = PatientConversationTurnSchema.safeParse(input);
+  if (!parsed.success) return undefined;
+  const { provider_metadata: _providerMetadata, ...safe } = parsed.data;
+  const learnerSafe = SafePatientConversationTurnSchema.safeParse(safe);
+  return learnerSafe.success ? learnerSafe.data : undefined;
 }
 
 export function createSecureApiService(dependencies: SecureApiDependencies) {
@@ -913,6 +1012,253 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     );
   }
 
+  async function getPatientConversation(authority: ApiRequestAuthority, sessionId: string) {
+    if (dependencies.patient_conversation === undefined) {
+      return { success: false, error: ERRORS.unavailable } as const;
+    }
+    const loaded = await authorizeAndLoad(authority, sessionId);
+    if (!loaded.success) return loaded;
+    const transcript = await dependencies.patient_conversation.repository.list({
+      session_id: sessionId,
+      principal_user_id: authority.principal.user_id,
+      limit: 512
+    });
+    return transcript.success
+      ? { success: true, data: transcript.transcript } as const
+      : patientRepositoryError(transcript.code);
+  }
+
+  async function submitQuestion(input: {
+    authority: ApiRequestAuthority;
+    session_id: string;
+    request: SubmitQuestionRequest;
+  }) {
+    const capability = dependencies.patient_conversation;
+    if (capability === undefined || input.authority.idempotency_key === undefined) {
+      return { success: false, error: capability === undefined ? ERRORS.unavailable : ERRORS.malformed } as const;
+    }
+    const initial = await authorizeAndLoad(input.authority, input.session_id);
+    if (!initial.success) return initial;
+    if (initial.data.session.status === "ENDED") {
+      return { success: false, error: ERRORS.ended } as const;
+    }
+    const history = await capability.repository.list({
+      session_id: input.session_id,
+      principal_user_id: input.authority.principal.user_id,
+      limit: 512
+    });
+    if (!history.success) return patientRepositoryError(history.code);
+    const context = buildPatientConversationContext({
+      case_package: sourceCase(initial.data.authorization),
+      patient_state: initial.data.session.patient_state,
+      locale: input.request.locale,
+      history: history.transcript.turns.map((turn) => ({
+        turn_id: turn.turn_id,
+        turn_sequence: turn.turn_sequence,
+        locale: turn.locale,
+        learner_utterance: turn.learner_utterance,
+        patient_utterance: turn.patient_utterance,
+        answer_mode: turn.answer_mode
+      }))
+    });
+    if (!context.success) return { success: false, error: ERRORS.domainRejected } as const;
+    const idempotencyKey = IdempotencyKeySchema.safeParse(input.authority.idempotency_key);
+    const turnId = ConversationTurnIdSchema.safeParse(capability.create_turn_id({
+      session_id: input.session_id,
+      idempotency_key: input.authority.idempotency_key
+    }));
+    const questionEventId = EventIdSchema.safeParse(capability.create_event_id({
+      session_id: input.session_id,
+      kind: "QUESTION",
+      idempotency_key: input.authority.idempotency_key
+    }));
+    const claimedAt = RealUtcTimeSchema.safeParse(dependencies.trusted_time_utc());
+    if (!idempotencyKey.success || !turnId.success || !questionEventId.success || !claimedAt.success) {
+      return { success: false, error: ERRORS.internal } as const;
+    }
+    const claimExpiresAt = RealUtcTimeSchema.safeParse(
+      capability.claim_expires_at_utc(claimedAt.data)
+    );
+    const requestHash = Sha256DigestSchema.safeParse(await hashCanonical(dependencies.hash_adapter, {
+      session_id: input.session_id,
+      principal_user_id: input.authority.principal.user_id,
+      idempotency_key: idempotencyKey.data,
+      question: input.request
+    }));
+    const existingQuestionEvent = initial.data.session.committed_events.find(
+      (event) => event.event_id === questionEventId.data
+        && event.event_type === "QUESTION_ASKED"
+        && event.idempotency_key === idempotencyKey.data
+    );
+    const claimedQuestion = existingQuestionEvent === undefined
+      ? appendConversationEvent({
+          session: initial.data.session,
+          event_id: questionEventId.data,
+          real_time_utc: claimedAt.data,
+          correlation_id: input.authority.correlation_id,
+          request_id: input.authority.request_id,
+          idempotency_key: idempotencyKey.data,
+          event_type: "QUESTION_ASKED",
+          actor_type: "LEARNER",
+          source: "UI",
+          clinical_time: initial.data.session.patient_state.clinical_time,
+          state_version: initial.data.session.patient_state.state_version,
+          payload: {
+            turn_id: turnId.data,
+            utterance_id: input.request.utterance_id,
+            locale: input.request.locale,
+            source: input.request.source,
+            learner_utterance: input.request.text
+          }
+        })
+      : { session: initial.data.session, event: existingQuestionEvent };
+    if (!claimExpiresAt.success || !requestHash.success || claimedQuestion === undefined) {
+      return { success: false, error: ERRORS.internal } as const;
+    }
+    const claimToken = PatientConversationClaimTokenSchema.safeParse(capability.create_claim_token({
+      session_id: input.session_id,
+      idempotency_key: idempotencyKey.data
+    }));
+    if (!claimToken.success) return { success: false, error: ERRORS.internal } as const;
+    const begin = await capability.repository.begin({
+      session_id: initial.data.session.session_id,
+      principal_user_id: input.authority.principal.user_id,
+      membership_id: initial.data.authorization.membership.membership_id,
+      institution_id: initial.data.authorization.institution_id,
+      idempotency_key: idempotencyKey.data,
+      canonical_request_hash: requestHash.data,
+      turn_id: turnId.data,
+      question_event_id: questionEventId.data,
+      claim_token: claimToken.data,
+      claimed_at_utc: claimedAt.data,
+      claim_expires_at_utc: claimExpiresAt.data,
+      context: context.context,
+      question: input.request,
+      expected_token: createSessionCommitToken(initial.data.session),
+      proposed_session: claimedQuestion.session
+    });
+    if (!begin.success) return patientRepositoryError(begin.code);
+    if (begin.status === "REPLAYED") {
+      const learnerSafeTurn = safePatientConversationTurn(begin.turn);
+      const response = SubmitQuestionResponseDataSchema.safeParse({
+        replayed: true,
+        turn: learnerSafeTurn
+      });
+      return response.success
+        ? { success: true, data: response.data } as const
+        : { success: false, error: ERRORS.internal } as const;
+    }
+
+    const workflow = await executePatientConversation({
+      gateway: capability.gateway,
+      request_id: input.authority.request_id,
+      correlation_id: input.authority.correlation_id,
+      question: input.request.text,
+      locale: input.request.locale,
+      context: begin.context
+    });
+    const patientOutput = workflow.success
+      ? workflow.output
+      : workflow.fallback_output;
+    const completedAt = RealUtcTimeSchema.safeParse(dependencies.trusted_time_utc());
+    const responseEventId = EventIdSchema.safeParse(capability.create_event_id({
+      session_id: input.session_id,
+      kind: "RESPONSE",
+      idempotency_key: idempotencyKey.data
+    }));
+    if (!completedAt.success || !responseEventId.success) {
+      return { success: false, error: ERRORS.internal } as const;
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const current = await authorizeAndLoad(input.authority, input.session_id);
+      if (!current.success) return current;
+      const responseEvent = appendConversationEvent({
+        session: current.data.session,
+        event_id: responseEventId.data,
+        real_time_utc: completedAt.data,
+        correlation_id: input.authority.correlation_id,
+        request_id: input.authority.request_id,
+        idempotency_key: idempotencyKey.data,
+        event_type: "PATIENT_RESPONSE_RECORDED",
+        actor_type: "AI_WORKFLOW",
+        source: "AI_RESPONSE",
+        clinical_time: begin.context.grounded_clinical_time,
+        state_version: begin.context.grounded_state_version,
+        causation_event_id: begin.question_event_id,
+        payload: {
+          turn_id: begin.turn_id,
+          locale: input.request.locale,
+          patient_utterance: patientOutput.utterance,
+          answer_mode: patientOutput.answer_mode,
+          fallback_used: !workflow.success,
+          grounding_fact_ids: patientOutput.grounding_fact_ids,
+          grounding_state_refs: patientOutput.grounding_state_refs
+        }
+      });
+      const turn = PatientConversationTurnSchema.safeParse({
+        conversation_schema_version: "1.0",
+        turn_id: begin.turn_id,
+        session_id: current.data.session.session_id,
+        turn_sequence: begin.turn_sequence,
+        clinical_time: begin.context.grounded_clinical_time,
+        grounded_state_version: begin.context.grounded_state_version,
+        locale: input.request.locale,
+        source: input.request.source,
+        utterance_id: input.request.utterance_id,
+        learner_utterance: input.request.text,
+        patient_utterance: patientOutput.utterance,
+        answer_mode: patientOutput.answer_mode,
+        fallback_used: !workflow.success,
+        grounding_fact_ids: patientOutput.grounding_fact_ids,
+        grounding_state_refs: patientOutput.grounding_state_refs,
+        question_event_id: begin.question_event_id,
+        response_event_id: responseEventId.data,
+        ...(workflow.success
+          ? {
+              provider_metadata: {
+                capability_id: workflow.metadata.capability_id,
+                prompt_id: workflow.metadata.prompt_id,
+                prompt_version: workflow.metadata.prompt_version,
+                output_schema_id: workflow.metadata.output_schema_id,
+                output_schema_version: workflow.metadata.output_schema_version,
+                model_policy_id: workflow.metadata.model_policy_id,
+                ...(workflow.metadata.provider_model === undefined
+                  ? {}
+                  : { provider_model: workflow.metadata.provider_model })
+              }
+            }
+          : {})
+      });
+      if (responseEvent === undefined || !turn.success) {
+        return { success: false, error: ERRORS.internal } as const;
+      }
+      const completed = await capability.repository.complete({
+        session_id: current.data.session.session_id,
+        principal_user_id: input.authority.principal.user_id,
+        idempotency_key: idempotencyKey.data,
+        canonical_request_hash: requestHash.data,
+        claim_token: claimToken.data,
+        completed_at_utc: completedAt.data,
+        turn: turn.data,
+        expected_token: createSessionCommitToken(current.data.session),
+        proposed_session: responseEvent.session
+      });
+      if (completed.success) {
+        const learnerSafeTurn = safePatientConversationTurn(completed.turn);
+        const response = SubmitQuestionResponseDataSchema.safeParse({
+          replayed: completed.status === "REPLAYED",
+          turn: learnerSafeTurn
+        });
+        return response.success
+          ? { success: true, data: response.data } as const
+          : { success: false, error: ERRORS.internal } as const;
+      }
+      if (completed.code !== "VERSION_CONFLICT") return patientRepositoryError(completed.code);
+    }
+    return { success: false, error: ERRORS.stale } as const;
+  }
+
   return Object.freeze({
     startSession,
     getPatientState,
@@ -921,6 +1267,8 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     endSimulation,
     getAssessment,
     getLearnerTimeline,
+    getPatientConversation,
+    submitQuestion,
     authorizeAndLoad
   });
 }

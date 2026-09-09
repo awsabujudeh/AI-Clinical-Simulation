@@ -350,6 +350,14 @@ export function createUnconfiguredStudentUiServices(): StudentUiServices {
         return { kind: "UNAUTHORIZED" as const, http_status: 401 };
       }
     }),
+    patient_conversation: Object.freeze({
+      async load() {
+        return { kind: "UNAUTHORIZED" as const, http_status: 401 };
+      },
+      async submit() {
+        return { kind: "UNAUTHENTICATED" as const, http_status: 401 };
+      }
+    }),
     finalization: Object.freeze({
       async end() {
         return {

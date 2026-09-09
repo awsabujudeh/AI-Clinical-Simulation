@@ -23,8 +23,10 @@ import {
   LocalizationKeySchema,
   MediaAssetIdSchema,
   ObservationProjectionDefinitionSchema,
+  PatientManifestationIdSchema,
   PatientLanguageSchema,
   PatientStateSchema,
+  PatientTruthStatusSchema,
   RealUtcTimeSchema,
   RULE_SCHEMA_VERSION,
   RuleIdSchema,
@@ -248,6 +250,7 @@ export const ClinicalFactSchema = z.strictObject({
   content_key: LocalizationKeySchema,
   disclosure_mode: FactDisclosureModeSchema,
   disclosure_reference_fact_id: FactIdSchema.optional(),
+  patient_truth_status: PatientTruthStatusSchema.optional(),
   source_ids: z.array(SourceIdSchema).max(16)
 });
 
@@ -489,6 +492,53 @@ export const AssessmentRubricModuleSchema = z.strictObject({
 });
 export type AssessmentRubricModule = z.infer<typeof AssessmentRubricModuleSchema>;
 
+export const PatientManifestationStateDimensionSchema = z.enum([
+  "clinical_phase",
+  "hemodynamic_state",
+  "cardiac_rhythm",
+  "perfusion",
+  "respiratory_state",
+  "oxygenation",
+  "consciousness",
+  "neurologic_state",
+  "temperature_state",
+  "metabolic_state"
+]);
+
+export const PatientManifestationSelectorSchema = z.discriminatedUnion("selector_type", [
+  z.strictObject({
+    selector_type: z.literal("STATE_VALUE_EQUALS"),
+    state_dimension: PatientManifestationStateDimensionSchema,
+    state_value: CaseControlledValueSchema
+  }),
+  z.strictObject({
+    selector_type: z.literal("PAIN_SEVERITY_RANGE"),
+    minimum: z.number().int().min(0).max(10),
+    maximum: z.number().int().min(0).max(10)
+  }).refine((value) => value.maximum >= value.minimum, {
+    message: "Pain severity maximum cannot be less than minimum.",
+    path: ["maximum"]
+  }),
+  z.strictObject({
+    selector_type: z.literal("PAIN_TREND_EQUALS"),
+    state_value: CaseControlledValueSchema
+  })
+]);
+export type PatientManifestationSelector = z.infer<
+  typeof PatientManifestationSelectorSchema
+>;
+
+export const PatientStateManifestationRuleSchema = z.strictObject({
+  manifestation_id: PatientManifestationIdSchema,
+  selector: PatientManifestationSelectorSchema,
+  truth_status: PatientTruthStatusSchema,
+  content_key: LocalizationKeySchema,
+  replaces_fact_ids: z.array(FactIdSchema).max(32)
+});
+export type PatientStateManifestationRule = z.infer<
+  typeof PatientStateManifestationRuleSchema
+>;
+
 export const DialoguePolicyModuleSchema = z.strictObject({
   ...moduleBaseShape,
   dialogue_policy_id: DialoguePolicyIdSchema,
@@ -496,7 +546,10 @@ export const DialoguePolicyModuleSchema = z.strictObject({
   forbidden_fact_ids: z.array(FactIdSchema).max(256),
   question_concept_codes: z.array(CaseControlledValueSchema).max(128),
   emotional_tone_code: CaseControlledValueSchema,
-  deterministic_fallback_key: LocalizationKeySchema
+  deterministic_fallback_key: LocalizationKeySchema,
+  patient_state_manifestations: z.array(PatientStateManifestationRuleSchema)
+    .max(128)
+    .optional()
 });
 export type DialoguePolicyModule = z.infer<typeof DialoguePolicyModuleSchema>;
 
@@ -637,7 +690,7 @@ export const InstructorNotesModuleSchema = z.strictObject({
   ...moduleBaseShape,
   facilitation_note_keys: z.array(LocalizationKeySchema).max(128),
   teaching_point_codes: z.array(CaseControlledValueSchema).max(128),
-  patient_ai_access: z.literal("FORBIDDEN")
+  patient_ai_access: z.enum(["FORBIDDEN", "ALLOWED"])
 });
 export type InstructorNotesModule = z.infer<typeof InstructorNotesModuleSchema>;
 

@@ -92,7 +92,7 @@ for (const viewport of [
   });
 }
 
-test("@v2-016 keyboard focus reaches actions and no hidden correctness or Patient AI appears", async ({ page }) => {
+test("@v2-016 keyboard focus reaches actions and no hidden correctness or provider access appears", async ({ page }) => {
   await open(page);
   await page.getByRole("tab", { name: "Examination" }).focus();
   await page.keyboard.press("Enter");
@@ -104,5 +104,5 @@ test("@v2-016 keyboard focus reaches actions and no hidden correctness or Patien
   expect(content).not.toMatch(/rubric|correct action|expected action|score/iu);
   await page.getByRole("tab", { name: "History" }).click();
   content = await page.locator("main").textContent();
-  expect(content).toContain("Free-text patient conversation is not available");
+  expect(content).toContain("Reconnect to ask a new question");
 });

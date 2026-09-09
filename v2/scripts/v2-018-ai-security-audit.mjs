@@ -125,8 +125,8 @@ for (const token of [
 check("Edge composition exports no HTTP route", !edgeSource.includes(".post(") && !edgeSource.includes("Deno.serve"));
 check("Edge composition says no generic prompt route", edgeSource.includes("no") && edgeSource.includes("generic prompt route"));
 check("submitQuestion route remains present", apiSource.includes('/v1/sessions/:session_id/questions'));
-check("submitQuestion remains explicitly unavailable", apiSource.includes("authorized.success\n      ? errorJson(context, ERRORS.unavailable)"));
-check("no Patient AI implementation file", !gatewayFiles.some((file) => relative(gatewaySourcePath, file).toLowerCase().includes("patient")));
+check("submitQuestion remains a secure API-owned route", apiSource.includes("service.submitQuestion"));
+check("Patient capability does not alter provider-neutral gateway ownership", !gatewayFiles.some((file) => relative(gatewaySourcePath, file).toLowerCase().includes("patient")));
 
 const repositoryFiles = await collect(rootPath, [".ts", ".tsx", ".js", ".jsx", ".json", ".md"]);
 const relevantFiles = repositoryFiles.filter((file) => !file.includes("node_modules") && !file.includes("dist"));
@@ -153,5 +153,5 @@ if (failures.length > 0) {
 console.log(`V2_018_SECURITY_AUDIT=PASS assertions=${checks.length}/${checks.length}`);
 console.log("BROWSER_OPENAI_DIRECT=ABSENT");
 console.log("BROWSER_PROVIDER_SECRET=ABSENT");
-console.log("PATIENT_AI_ACTIVATION=ABSENT");
+console.log("PATIENT_AI_ACTIVATION=SECURE_SERVER_ONLY");
 console.log("CLINICAL_MUTATION_AUTHORITY=ABSENT");

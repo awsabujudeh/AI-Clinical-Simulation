@@ -12,6 +12,7 @@ import {
 } from "../../../packages/session-engine/src/index.ts";
 import {
   createSecureApiApp,
+  InMemoryPatientConversationRepository,
   type ApiAuthorityRepository,
   type AuthorityResult,
   type AuthorizedProductionCase,
@@ -21,6 +22,12 @@ import {
   type SessionStartCommitResult,
   type SessionStartRepository
 } from "../../../packages/api-core/src/index.ts";
+import {
+  SecureAiGateway,
+  TrustedCapabilityRegistry,
+  type AiProvider
+} from "../../../packages/ai-gateway/src/index.ts";
+import { createPatientConversationCapability } from "../../../packages/patient-conversation/src/index.ts";
 import type {
   CompiledCasePackage,
   ReviewExecutionArtifact
@@ -29,6 +36,7 @@ import { createCompiledAssessmentCase } from "../assessment-engine/synthetic-ass
 import { prepareStemiReviewArtifact } from "../cases/stemi-review.ts";
 import { TEST_HASH_ADAPTER } from "../cases/synthetic-case.ts";
 import { DETERMINISTIC_EVENT_ID_FACTORY } from "../session-engine/synthetic-command.ts";
+import { enableSyntheticPatientConversation } from "../patient-conversation.ts";
 
 export const API_TEST_USERS = Object.freeze({
   learner: "10000000-0000-4000-8000-000000000001",
@@ -145,8 +153,11 @@ export type ApiTestHarness = Awaited<ReturnType<typeof createApiTestHarness>>;
 export async function createApiTestHarness(input?: {
   include_stemi?: boolean;
   production_package?: CompiledCasePackage;
+  enable_patient_conversation?: boolean;
 }) {
-  const productionPackage = input?.production_package ?? await createCompiledAssessmentCase();
+  const productionPackage = input?.production_package ?? await createCompiledAssessmentCase(
+    input?.enable_patient_conversation ? enableSyntheticPatientConversation : undefined
+  );
   const reviewArtifact = input?.include_stemi === false
     ? undefined
     : await prepareStemiReviewArtifact();
@@ -226,6 +237,43 @@ export async function createApiTestHarness(input?: {
     hash_adapter: TEST_HASH_ADAPTER,
     event_id_factory: DETERMINISTIC_EVENT_ID_FACTORY
   });
+  let patientProviderCalls = 0;
+  const patientProvider: AiProvider = {
+    async execute() {
+      patientProviderCalls += 1;
+      return {
+        success: true,
+        provider: "OPENAI",
+        output_text: JSON.stringify({
+          output_schema_version: "1.0",
+          utterance: "I can describe the authored synthetic concern.",
+          locale: "en-US",
+          answer_mode: "GROUNDED",
+          grounding_fact_ids: ["fact.synthetic.concern"],
+          grounding_state_refs: [],
+          safety_flags: [],
+          disclosure_status: "WITHIN_PATIENT_BOUNDARY"
+        }),
+        provider_response_id: `resp_fixture_${patientProviderCalls}`,
+        provider_model: "gpt-5.6-luna",
+        retry_count: 0
+      };
+    }
+  };
+  const patientConversationRepository = new InMemoryPatientConversationRepository(store);
+  const eventIds = new Map<string, { QUESTION: string; RESPONSE: string }>();
+  let patientIdentitySequence = 900_000;
+  function patientIds(key: string) {
+    const existing = eventIds.get(key);
+    if (existing !== undefined) return existing;
+    patientIdentitySequence += 2;
+    const created = {
+      QUESTION: `00000000-0000-4000-8000-${(patientIdentitySequence - 1).toString().padStart(12, "0")}`,
+      RESPONSE: `00000000-0000-4000-8000-${patientIdentitySequence.toString().padStart(12, "0")}`
+    };
+    eventIds.set(key, created);
+    return created;
+  }
   const app = createSecureApiApp({
     authentication_verifier: authentication,
     allowed_origins: ["http://localhost:5173"],
@@ -242,13 +290,41 @@ export async function createApiTestHarness(input?: {
         return `assessment.api.${session_id}`;
       }
     },
-    trusted_time_utc: () => trustedTime
+    trusted_time_utc: () => trustedTime,
+    ...(input?.enable_patient_conversation
+      ? {
+          patient_conversation: {
+            repository: patientConversationRepository,
+            gateway: new SecureAiGateway({
+              registry: new TrustedCapabilityRegistry([
+                createPatientConversationCapability({ enabled: true, candidate_model: "gpt-5.6-luna" })
+              ]),
+              provider: patientProvider,
+              capacity: { async authorize() { return { allowed: true as const }; } },
+              clock: { nowMilliseconds: () => 10 },
+              logger: { log() {} }
+            }),
+            create_turn_id({ idempotency_key }: { idempotency_key: string }) {
+              return `conversation-turn.api.${idempotency_key.replaceAll(/[^A-Za-z0-9]/gu, "-")}`;
+            },
+            create_event_id({ kind, idempotency_key }: { kind: "QUESTION" | "RESPONSE"; idempotency_key: string }) {
+              return patientIds(idempotency_key)[kind];
+            },
+            create_claim_token({ idempotency_key }: { idempotency_key: string }) {
+              return `claim.patient.${idempotency_key.replaceAll(/[^A-Za-z0-9]/gu, "-")}`;
+            },
+            claim_expires_at_utc() { return "2026-09-06T10:05:00Z"; }
+          }
+        }
+      : {})
   });
   return {
     app,
     store,
     productionPackage,
     reviewArtifact,
+    patientConversationRepository,
+    getPatientProviderCalls() { return patientProviderCalls; },
     setTrustedTime(value: string) { trustedTime = value; }
   };
 }

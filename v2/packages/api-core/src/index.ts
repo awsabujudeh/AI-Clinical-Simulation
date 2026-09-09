@@ -5,4 +5,7 @@ export * from "./authorization/postgres-api-authority.ts";
 export * from "./errors/api-service-error.ts";
 export * from "./http/create-api-app.ts";
 export * from "./persistence/session-start.ts";
+export * from "./patient-conversation/repository.ts";
+export * from "./patient-conversation/in-memory-repository.ts";
+export * from "./patient-conversation/postgres-repository.ts";
 export * from "./service/secure-api-service.ts";

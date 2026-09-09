@@ -298,10 +298,20 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
     if (context.get("authority").idempotency_key === undefined) {
       return errorJson(context, ERRORS.malformed);
     }
-    const authorized = await service.authorizeAndLoad(context.get("authority"), path.data.session_id);
-    return authorized.success
-      ? errorJson(context, ERRORS.unavailable)
-      : errorJson(context, authorized.error);
+    return respond(context, await service.submitQuestion({
+      authority: context.get("authority"),
+      session_id: path.data.session_id,
+      request: body.data
+    }));
+  });
+
+  app.get("/v1/sessions/:session_id/questions", async (context) => {
+    const path = SessionPathParametersSchema.safeParse(context.req.param());
+    if (!path.success) return errorJson(context, ERRORS.malformed);
+    return respond(context, await service.getPatientConversation(
+      context.get("authority"),
+      path.data.session_id
+    ));
   });
 
   app.post("/v1/faculty/cases", (context) => errorJson(context, ERRORS.unavailable));

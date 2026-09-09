@@ -37,7 +37,8 @@ const APPLICATION_TABLES = [
   "assessments",
   "assessment_domain_scores",
   "assessment_findings",
-  "assessment_debriefs"
+  "assessment_debriefs",
+  "patient_conversation_turns"
 ];
 
 const EXPECTED_POLICIES = [
@@ -827,7 +828,7 @@ async function main() {
 
     await seedDatabase(full);
 
-    await check("all 28 application tables retain RLS", async () => {
+    await check("all 29 application tables retain RLS", async () => {
       const result = await full.query(`
         select relname
         from pg_class
@@ -835,18 +836,18 @@ async function main() {
         where nspname = 'public' and relkind = 'r' and relrowsecurity
         order by relname
       `);
-      assert(result.rows.length === 28, `Expected 28 RLS tables, got ${result.rows.length}.`);
+      assert(result.rows.length === 29, `Expected 29 RLS tables, got ${result.rows.length}.`);
       assert(JSON.stringify(result.rows.map(({ relname }) => relname)) === JSON.stringify([...APPLICATION_TABLES].sort()), "RLS table inventory mismatch.");
     });
 
-    await check("all 28 application tables use FORCE RLS", async () => {
+    await check("all 29 application tables use FORCE RLS", async () => {
       const result = await full.query(`
         select count(*)::int as count
         from pg_class
         join pg_namespace on pg_namespace.oid = pg_class.relnamespace
         where nspname = 'public' and relkind = 'r' and relforcerowsecurity
       `);
-      assert(result.rows[0].count === 28, `Expected 28 FORCE RLS tables, got ${result.rows[0].count}.`);
+      assert(result.rows[0].count === 29, `Expected 29 FORCE RLS tables, got ${result.rows[0].count}.`);
     });
 
     await check("the exact 14-policy inventory is installed", async () => {

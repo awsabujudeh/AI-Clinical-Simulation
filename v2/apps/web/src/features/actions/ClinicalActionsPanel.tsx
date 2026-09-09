@@ -17,6 +17,7 @@ import {
   type ActionDomain,
   type ActionParameterIssue
 } from "./action-model";
+import { PatientConversationPanel } from "../conversation/PatientConversationPanel";
 
 const domainMessageKeys: Record<ActionDomain, MessageKey> = {
   HISTORY: "navHistory",
@@ -276,10 +277,11 @@ export function ClinicalActionsPanel({
         aria-labelledby={`tab-${domain.toLowerCase()}`}
       >
         {domain === "HISTORY" ? (
-          <div className="action-unavailable" role="status">
-            <strong>{t("historyStructuredUnavailable")}</strong>
-            <p>{t("patientAiDeferred")}</p>
-          </div>
+          <PatientConversationPanel
+            state={state}
+            service={services.patient_conversation}
+            enabled={enabled}
+          />
         ) : (
           <>
             <label className="action-search">

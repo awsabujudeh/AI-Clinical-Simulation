@@ -163,6 +163,14 @@ export type CorrelationId = z.infer<typeof CorrelationIdSchema>;
 export const IdempotencyKeySchema = opaqueOperationalIdentifier("idempotency key").brand<"IdempotencyKey">();
 export type IdempotencyKey = z.infer<typeof IdempotencyKeySchema>;
 
+export const ConversationTurnIdSchema = prefixedIdentifier("conversation-turn")
+  .brand<"ConversationTurnId">();
+export type ConversationTurnId = z.infer<typeof ConversationTurnIdSchema>;
+
+export const PatientManifestationIdSchema = prefixedIdentifier("patient-manifestation")
+  .brand<"PatientManifestationId">();
+export type PatientManifestationId = z.infer<typeof PatientManifestationIdSchema>;
+
 export const ActorIdSchema = opaqueOperationalIdentifier("actor identifier").brand<"ActorId">();
 export type ActorId = z.infer<typeof ActorIdSchema>;
 

@@ -68,8 +68,8 @@ check("no institution authority in request construction", !/request:\s*\{[^}]*in
 check("no package authority in request construction", !/request:\s*\{[^}]*package_hash:/su.test(service));
 check("no Patient State in request construction", !/request:\s*\{[^}]*patient_state:/su.test(service));
 check("no effects in request construction", !/request:\s*\{[^}]*effects:/su.test(service));
-check("History free text remains deferred", component.includes("patientAiDeferred"));
-check("no Patient AI endpoint", !web.includes("/questions"));
+check("History uses the injected Patient Conversation service", component.includes("PatientConversationPanel") && component.includes("services.patient_conversation"));
+check("no direct Patient provider or HTTP endpoint", !web.includes("/questions") && !web.includes("api.openai.com"));
 check("no fake diagnostic result", !/fabricated_result|fake_result|client_result/u.test(actions));
 check("no disease-specific action conditional", !/\bSTEMI\b|anaphylaxis|myocardial infarction/iu.test(actions));
 check("no correct-action ranking", !/expected_action|correct_action|rubric|score_weight/iu.test(actions));

@@ -205,7 +205,10 @@ function headers(idempotency) {
 
 async function main() {
   const allMigrations = await migrations();
-  assert(allMigrations.at(-1)?.name === "202609060006_v2_013_api_session_start_finalize.sql", "V2-013 migration must be additive tail.");
+  assert(
+    allMigrations.some((migration) => migration.name === "202609060006_v2_013_api_session_start_finalize.sql"),
+    "V2-013 migration must remain in the additive migration history."
+  );
   const port = await findFreePort();
   const databaseDir = await mkdtemp(join(tmpdir(), "v2-013-native-api-"));
   const postgres = new EmbeddedPostgres({

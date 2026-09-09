@@ -7,10 +7,12 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@ai-clinical-simulation/ai-gateway": "0.1.0",
     "@ai-clinical-simulation/assessment-engine": "0.1.0",
     "@ai-clinical-simulation/case-schema": "0.1.0",
     "@ai-clinical-simulation/clinical-engine": "0.1.0",
     "@ai-clinical-simulation/contracts": "0.1.0",
+    "@ai-clinical-simulation/patient-conversation": "0.1.0",
     "@ai-clinical-simulation/session-engine": "0.1.0",
     "hono": "4.13.7",
     "zod": "4.5.4"

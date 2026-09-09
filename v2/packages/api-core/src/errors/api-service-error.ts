@@ -47,6 +47,8 @@ export const ERRORS = Object.freeze({
   ended: apiError({ code: "SESSION_ENDED", http_status: 409, message_key: "api.error.session-ended", retryable: false }),
   domainRejected: apiError({ code: "DOMAIN_REQUEST_REJECTED", http_status: 422, message_key: "api.error.domain-rejected", retryable: false }),
   resultPending: apiError({ code: "RESULT_PENDING", http_status: 422, message_key: "api.error.result-pending", retryable: true }),
+  conversationInProgress: apiError({ code: "PATIENT_RESPONSE_PENDING", http_status: 409, message_key: "api.error.patient-response-pending", retryable: true }),
+  patientConversationUnavailable: apiError({ code: "PATIENT_CONVERSATION_UNAVAILABLE", http_status: 503, message_key: "api.error.patient-conversation-unavailable", retryable: true }),
   assessmentPending: apiError({ code: "ASSESSMENT_PENDING", http_status: 422, message_key: "api.error.assessment-pending", retryable: true }),
   unavailable: apiError({ code: "FEATURE_NOT_AVAILABLE", http_status: 503, message_key: "api.error.feature-not-available", retryable: false }),
   persistence: apiError({ code: "CORE_UNAVAILABLE", http_status: 503, message_key: "api.error.core-unavailable", retryable: true }),

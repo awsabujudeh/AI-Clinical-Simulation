@@ -7,6 +7,7 @@ const assessmentEngineSourceRoot = new URL("../packages/assessment-engine/src/",
 const apiCoreSourceRoot = new URL("../packages/api-core/src/", import.meta.url);
 const recoveryCoreSourceRoot = new URL("../packages/recovery-core/src/", import.meta.url);
 const aiGatewaySourceRoot = new URL("../packages/ai-gateway/src/", import.meta.url);
+const patientConversationSourceRoot = new URL("../packages/patient-conversation/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
@@ -16,7 +17,8 @@ const portableSourceRoots = [
   assessmentEngineSourceRoot,
   apiCoreSourceRoot,
   recoveryCoreSourceRoot,
-  aiGatewaySourceRoot
+  aiGatewaySourceRoot,
+  patientConversationSourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -250,3 +252,28 @@ console.log("RECOVERY_CORE_PORTABILITY_GUARD=PASS");
 console.log("RECOVERY_CORE_SERVER_AUTHORITY_GUARD=PASS");
 console.log("RECOVERY_CONTRACT_AUTHORITY_GUARD=PASS count=1");
 console.log("AI_GATEWAY_EDGE_PORTABILITY_GUARD=PASS");
+
+const patientConversationSourceFiles = await collectTypeScriptFiles(patientConversationSourceRoot);
+const patientConversationViolations = [];
+const forbiddenPatientCapabilities = /\b(?:RAG|embedding|vector\s+search|clinical\s+interpreter|previous_response_id)\b/iu;
+const patientRuntimeNondeterminism = /\b(?:Math\.random|Date\.now|performance\.now|setTimeout|setInterval|crypto\.getRandomValues|crypto\.randomUUID)\s*\(/u;
+for (const fileUrl of patientConversationSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+  if (diseaseSpecificTerms.test(source)) {
+    patientConversationViolations.push(`Disease-specific patient behavior: ${fileUrl.pathname}`);
+  }
+  if (patientRuntimeNondeterminism.test(source)) {
+    patientConversationViolations.push(`Patient conversation runtime nondeterminism: ${fileUrl.pathname}`);
+  }
+  if (forbiddenPatientCapabilities.test(source)) {
+    patientConversationViolations.push(`Forbidden patient capability: ${fileUrl.pathname}`);
+  }
+}
+if (patientConversationViolations.length > 0) {
+  throw new Error(
+    `Patient Conversation boundary violations:\n${patientConversationViolations.join("\n")}`
+  );
+}
+console.log("PATIENT_CONVERSATION_PORTABILITY_GUARD=PASS");
+console.log("PATIENT_CONVERSATION_DISEASE_NEUTRALITY_GUARD=PASS");
+console.log("PATIENT_CONVERSATION_NO_RAG_INTERPRETER_GUARD=PASS");

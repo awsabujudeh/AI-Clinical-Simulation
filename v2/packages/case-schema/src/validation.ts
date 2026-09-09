@@ -1471,6 +1471,11 @@ function validateParsedCase(
     (objective) => objective.objective_id
   );
   const sourceIds = casePackage.validation.sources.map((source) => source.source_id);
+  const manifestationRules = casePackage.dialogue_policy.patient_state_manifestations ?? [];
+  const manifestationIds = manifestationRules.map((entry) => entry.manifestation_id);
+  const localizationKeys = new Set(
+    casePackage.localization.entries.map((entry) => entry.key)
+  );
 
   addDuplicateIssues(issues, factIds, "DUPLICATE_FACT_ID", "clinical_facts", "$.clinical_facts.facts", "Fact ID");
   addDuplicateIssues(issues, actionIds, "DUPLICATE_ACTION_ID", "action_catalogue", "$.action_catalogue.actions", "Action ID");
@@ -1479,6 +1484,14 @@ function validateParsedCase(
   addDuplicateIssues(issues, mediaAssetIds, "DUPLICATE_MEDIA_ASSET_ID", "visual_manifest", "$.visual_manifest.media_assets", "Media Asset ID");
   addDuplicateIssues(issues, objectiveIds, "DUPLICATE_OBJECTIVE_ID", "curriculum_mappings", "$.curriculum_mappings.objectives", "objective ID");
   addDuplicateIssues(issues, sourceIds, "DUPLICATE_SOURCE_ID", "validation", "$.validation.sources", "Source ID");
+  addDuplicateIssues(
+    issues,
+    manifestationIds,
+    "DUPLICATE_PATIENT_MANIFESTATION_ID",
+    "dialogue_policy",
+    "$.dialogue_policy.patient_state_manifestations",
+    "Patient manifestation ID"
+  );
   addDuplicateIssues(
     issues,
     casePackage.validation.reviewers.map((reviewer) => reviewer.reviewer_ref_id),
@@ -1516,6 +1529,37 @@ function validateParsedCase(
     "$.presentation",
     "Fact ID"
   );
+  for (const [manifestationIndex, manifestation] of manifestationRules.entries()) {
+    addDanglingIssues(
+      issues,
+      manifestation.replaces_fact_ids,
+      facts,
+      "DANGLING_PATIENT_MANIFESTATION_FACT_REFERENCE",
+      "dialogue_policy",
+      `$.dialogue_policy.patient_state_manifestations[${manifestationIndex}].replaces_fact_ids`,
+      "Fact ID"
+    );
+    if (!localizationKeys.has(manifestation.content_key)) {
+      issues.push(issue({
+        code: "DANGLING_PATIENT_MANIFESTATION_LOCALIZATION_KEY",
+        severity: "ERROR",
+        module: "dialogue_policy",
+        path: `$.dialogue_policy.patient_state_manifestations[${manifestationIndex}].content_key`,
+        relatedIds: [manifestation.manifestation_id, manifestation.content_key],
+        message: "Patient manifestation content must reference authored localization."
+      }));
+    }
+  }
+  if (!localizationKeys.has(casePackage.dialogue_policy.deterministic_fallback_key)) {
+    issues.push(issue({
+      code: "DANGLING_PATIENT_FALLBACK_LOCALIZATION_KEY",
+      severity: "ERROR",
+      module: "dialogue_policy",
+      path: "$.dialogue_policy.deterministic_fallback_key",
+      relatedIds: [casePackage.dialogue_policy.deterministic_fallback_key],
+      message: "Patient fallback copy must reference authored localization."
+    }));
+  }
   addDanglingIssues(
     issues,
     [...casePackage.dialogue_policy.disclosable_fact_ids, ...casePackage.dialogue_policy.forbidden_fact_ids],
@@ -1525,6 +1569,19 @@ function validateParsedCase(
     "$.dialogue_policy",
     "Fact ID"
   );
+  const forbiddenPatientFacts = new Set(casePackage.dialogue_policy.forbidden_fact_ids);
+  for (const factId of casePackage.dialogue_policy.disclosable_fact_ids) {
+    if (forbiddenPatientFacts.has(factId)) {
+      issues.push(issue({
+        code: "PATIENT_DISCLOSURE_POLICY_CONFLICT",
+        severity: "ERROR",
+        module: "dialogue_policy",
+        path: "$.dialogue_policy",
+        relatedIds: [factId],
+        message: "A Patient fact cannot be both disclosable and forbidden."
+      }));
+    }
+  }
 
   for (const fact of casePackage.clinical_facts.facts) {
     if (fact.disclosure_reference_fact_id !== undefined) {

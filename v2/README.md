@@ -158,6 +158,7 @@ npm run test:v2-015
 npm run test:v2-016
 npm run test:v2-017
 npm run test:v2-018
+npm run test:v2-019a
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -185,7 +186,7 @@ npm exec playwright install chromium
 
 `npm run test:v2-011a` applies all migrations to two independent PGlite databases and runs permanent structural, immutability, authority-binding, and real-contract round-trip checks. `npm run test:v2-011b` uses exact-pinned native PostgreSQL 16.14 to prove real roles, grants, `SET ROLE`, `row_security`, `FORCE ROW LEVEL SECURITY`, Supabase-compatible `auth.uid()` request context, empty/upgrade/reset migration paths, and JU/JUST adversarial isolation. Both runtimes are local test dependencies; no remote Supabase project or region is selected.
 
-All 28 application tables have RLS enabled and forced. V2-011B adds 14 explicit least-privilege policies and one hardened membership helper. Raw governance, Session, Event, checkpoint, and Assessment access remains denied until trusted mutation and disclosure-safe API boundaries exist. **RLS SECURITY GATE: PASS.** V2-012 will own persistent atomic Session commit orchestration.
+All 28 V2-011 application tables have RLS enabled and forced. V2-011B adds 14 explicit least-privilege policies and one hardened membership helper. Raw governance, Session, Event, checkpoint, and Assessment access remains denied until trusted mutation and disclosure-safe API boundaries exist. **RLS SECURITY GATE: PASS.** V2-012 will own persistent atomic Session commit orchestration.
 
 ## V2-012A atomic persistent Session foundation
 
@@ -245,7 +246,13 @@ The monitor includes no fabricated ECG or client medical thresholds. Timeline re
 
 `packages/ai-gateway/` provides the server-only, Edge-portable capability router, provider interface, direct OpenAI Responses API adapter, strict Structured Outputs plus local Zod validation, bounded input/output/timeout/retry policy, typed failures, and data-minimized audit metadata. The provider request forces `store: false`, has no provider-owned conversation authority, and defaults to no tools.
 
-Trusted server configuration owns capability, prompt/schema versions, candidate model, and operational budgets. Luna and Terra remain evaluation candidates; V2-018 selects no production winner and performs no silent model failover. The browser has no provider key, URL, prompt, routing, or SDK, and `submitQuestion` remains unavailable. No Patient AI, RAG, Case Builder, AI scoring, clinical mutation, remote Supabase resource, or deployment is included. Run `npm run test:v2-018`; design and verification records are under `planning_input/v2-018/`.
+Trusted server configuration owns capability, prompt/schema versions, candidate model, and operational budgets. Luna and Terra remain evaluation candidates; V2-018 selects no production winner and performs no silent model failover. The browser has no provider key, URL, prompt, routing, or SDK. V2-019A activates `submitQuestion` only through the secure server capability boundary. No RAG, Case Builder, AI scoring, clinical mutation, remote Supabase resource, or deployment is included. Run `npm run test:v2-018`; design and verification records are under `planning_input/v2-018/`.
+
+## V2-019A patient conversation core
+
+`packages/patient-conversation/` builds a minimized patient-safe context from Case-authored `on_direct_question` facts, the dialogue-policy allowlist, and explicit current-state manifestation mappings. It sends that context through the V2-018 server gateway with a tool-free, versioned capability and validates every returned grounding reference locally. The model receives no whole Case Package, raw Patient State, rubric, hidden diagnosis, future rules, or clinical-action authority. Questions add no question-specific Clinical-Time duration, and provider latency cannot advance Clinical Time.
+
+The secure API persists `QUESTION_ASKED` before the provider call, then commits a validated patient response and causally linked Event before HTTP success. Exact retries replay the stored response without a second provider call. The 29th application table is server-only with ENABLE + FORCE RLS, immutable completed turns, per-Session ordering, and a pending-turn finalization guard. The History surface provides localized `ar-JO`/RTL and `en-US`/LTR patient conversation with explicit offline, unavailable, and ended read-only states. Run `npm run test:v2-019a`; evidence is under repository-root `planning_input/v2-019/`. V2-019 remains open for the separate V2-019B evaluation slice.
 
 ## Source of Truth and rollback
 

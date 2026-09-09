@@ -18,6 +18,9 @@ export const APPROVED_EVALUATION_MODEL_CANDIDATES = [
 export const AiEvaluationModelCandidateSchema = z.enum(
   APPROVED_EVALUATION_MODEL_CANDIDATES
 );
+export type AiEvaluationModelCandidate = z.infer<
+  typeof AiEvaluationModelCandidateSchema
+>;
 
 export const TrustedModelPolicySchema = z.strictObject({
   model_policy_id: AiModelPolicyIdSchema,

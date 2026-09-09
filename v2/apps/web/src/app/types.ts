@@ -8,6 +8,8 @@ import {
   type SafeLearnerTimelineProjection,
   type LastKnownSafeSessionProjection,
   type PatientLanguage,
+  type PatientConversationTranscript,
+  type SafePatientConversationTurn,
   type SafeSessionProjection,
   type SessionMode,
   type StartSessionRequest
@@ -138,6 +140,26 @@ export interface StudentAssessmentService {
   load(sessionId: string): Promise<AssessmentLoadResult>;
 }
 
+export type PatientConversationLoadResult =
+  | Readonly<{ kind: "AVAILABLE"; transcript: PatientConversationTranscript }>
+  | Readonly<{ kind: "UNAUTHENTICATED" | "UNAUTHORIZED" | "NOT_FOUND" | "UNAVAILABLE"; http_status?: number }>;
+
+export type PatientQuestionIntent = Readonly<{
+  session_id: string;
+  locale: PatientLanguage;
+  text: string;
+  source: "TEXT" | "STT";
+}>;
+
+export type PatientQuestionResult =
+  | Readonly<{ kind: "COMMITTED"; replayed: boolean; turn: SafePatientConversationTurn }>
+  | Readonly<{ kind: "INVALID" | "IN_PROGRESS" | "IDEMPOTENCY_CONFLICT" | "UNAUTHENTICATED" | "UNAUTHORIZED" | "ENDED" | "UNAVAILABLE"; http_status?: number }>;
+
+export interface StudentPatientConversationService {
+  load(sessionId: string): Promise<PatientConversationLoadResult>;
+  submit(intent: PatientQuestionIntent): Promise<PatientQuestionResult>;
+}
+
 export type StudentFinalizationIntent = Readonly<{
   principal_user_id: string;
   session_id: string;
@@ -179,6 +201,7 @@ export type StudentUiServices = Readonly<{
   actions: StudentClinicalActionService;
   timeline: StudentTimelineService;
   assessment: StudentAssessmentService;
+  patient_conversation?: StudentPatientConversationService;
   finalization: StudentFinalizationService;
 }>;
 
