@@ -11,6 +11,7 @@ import type {
 import { Button, Panel, SectionHeader, StatusBadge } from "../../components/ui";
 import {
   ACTION_DOMAINS,
+  actionDomain,
   actionsForDomain,
   learnerActionLabel,
   validateLearnerActionParameters,
@@ -18,6 +19,7 @@ import {
   type ActionParameterIssue
 } from "./action-model";
 import { PatientConversationPanel } from "../conversation/PatientConversationPanel";
+import { ClinicalInterpreterPanel } from "./ClinicalInterpreterPanel";
 
 const domainMessageKeys: Record<ActionDomain, MessageKey> = {
   HISTORY: "navHistory",
@@ -202,6 +204,15 @@ export function ClinicalActionsPanel({
     setPhase("IDLE");
   }
 
+  function useInterpretedAction(action: SafeLearnerAction, parameters: JsonObject) {
+    if (locked) return;
+    setDomain(actionDomain(action));
+    setSelectedActionId(action.action_id);
+    setValues({ ...parameters });
+    setIssues([]);
+    setPhase("IDLE");
+  }
+
   async function submitValidated(action: SafeLearnerAction, parameters: JsonObject) {
     if (submitting.current) return;
     submitting.current = true;
@@ -284,6 +295,15 @@ export function ClinicalActionsPanel({
           />
         ) : (
           <>
+            <ClinicalInterpreterPanel
+              service={services.clinical_interpreter}
+              sessionId={state.projection.session_id}
+              stateVersion={state.projection.state_version}
+              locale={locale}
+              actions={actions}
+              enabled={enabled && state.kind !== "ENDED"}
+              onRecognized={useInterpretedAction}
+            />
             <label className="action-search">
               <span>{t("actionSearch")}</span>
               <input

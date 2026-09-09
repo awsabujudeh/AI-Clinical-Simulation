@@ -12,6 +12,7 @@ import {
   PatientConversationTurnSchema,
   SafePatientConversationTurnSchema,
   RealUtcTimeSchema,
+  SubmitClinicalInterpretationResponseDataSchema,
   SubmitQuestionResponseDataSchema,
   SafeFinalAssessmentProjectionSchema,
   SafeInvestigationProjectionSchema,
@@ -26,10 +27,12 @@ import {
   type HashAdapter,
   type SafeFinalAssessmentProjection,
   type SafeLearnerTimelineItem,
+  type SafeLearnerActionCatalogue,
   type SafeLearnerTimelineProjection,
   type SafeSessionProjection,
   type StartSessionRequest,
   type SubmitClinicalActionRequest,
+  type SubmitClinicalInterpretationRequest,
   type SubmitQuestionRequest
 } from "../../../contracts/src/index.ts";
 import { canonicalSerialize } from "../../../case-schema/src/index.ts";
@@ -57,6 +60,10 @@ import {
   buildPatientConversationContext,
   executePatientConversation
 } from "../../../patient-conversation/src/index.ts";
+import {
+  buildClinicalInterpreterContext,
+  executeClinicalInterpreter
+} from "../../../clinical-interpreter/src/index.ts";
 
 import type { VerifiedPrincipal } from "../auth/verified-principal.ts";
 import type {
@@ -256,6 +263,9 @@ export type SecureApiDependencies = Readonly<{
     create_claim_token(input: { session_id: string; idempotency_key: string }): unknown;
     claim_expires_at_utc(claimedAtUtc: string): unknown;
   }>;
+  clinical_interpreter?: Readonly<{
+    gateway: SecureAiGateway;
+  }>;
 }>;
 
 function sessionFailure(issues: readonly { code: string }[]): ApiServiceResult<never> {
@@ -337,23 +347,17 @@ function activeAssessmentProjection(
   return disclosure.success ? disclosure.projection : undefined;
 }
 
-function safeSessionProjection(
+function safeLearnerActionCatalogue(
   session: InMemorySessionAggregate,
-  authorization: AuthorizedSession,
-  assessmentId: string
-): ApiServiceResult<SafeSessionProjection> {
-  const observations = projectObservations(
-    session.patient_state,
-    session.pinned_case.clinical_policy.observation_projection
-  );
-  if (!observations.success) return { success: false, error: ERRORS.internal };
+  authorization: AuthorizedSession
+): ApiServiceResult<SafeLearnerActionCatalogue> {
   const caseActions = "review_execution_hash" in authorization.artifact
     ? authorization.artifact.source_case.action_catalogue.actions
     : authorization.artifact.action_catalogue.actions;
   const pinnedActionIds = new Set(
     session.pinned_case.action_catalogue.map((action) => action.action_id)
   );
-  const learnerActionCatalogue = SafeLearnerActionCatalogueSchema.safeParse({
+  const catalogue = SafeLearnerActionCatalogueSchema.safeParse({
     catalogue_schema_version: "1.0",
     actions: caseActions
       .filter((action) => pinnedActionIds.has(action.action_id))
@@ -365,14 +369,34 @@ function safeSessionProjection(
             ? []
             : [{ locale: alias.locale, label: alias.phrases[0] }])
           .sort((left, right) => left.locale < right.locale ? -1 : left.locale > right.locale ? 1 : 0),
+        aliases: action.aliases.map((alias) => ({
+          locale: alias.locale,
+          phrases: alias.phrases
+        })),
         parameter_definitions: action.parameter_definitions,
         confirmation_policy: action.confirmation_policy,
         repeat_policy: action.repeat_policy
       }))
       .sort((left, right) => left.action_id < right.action_id ? -1 : left.action_id > right.action_id ? 1 : 0)
   });
+  return catalogue.success
+    ? { success: true, data: catalogue.data }
+    : { success: false, error: ERRORS.internal };
+}
+
+function safeSessionProjection(
+  session: InMemorySessionAggregate,
+  authorization: AuthorizedSession,
+  assessmentId: string
+): ApiServiceResult<SafeSessionProjection> {
+  const observations = projectObservations(
+    session.patient_state,
+    session.pinned_case.clinical_policy.observation_projection
+  );
+  if (!observations.success) return { success: false, error: ERRORS.internal };
+  const learnerActionCatalogue = safeLearnerActionCatalogue(session, authorization);
   if (!learnerActionCatalogue.success) {
-    return { success: false, error: ERRORS.internal };
+    return learnerActionCatalogue;
   }
   const projection = SafeSessionProjectionSchema.safeParse({
     session_id: session.session_id,
@@ -813,6 +837,58 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       replayed: result.status === "REPLAYED",
       committed_event_ids: result.command_result.committed_events.map((event) => event.event_id),
       session: projected.data
+    });
+    return response.success
+      ? { success: true, data: response.data } as const
+      : { success: false, error: ERRORS.internal } as const;
+  }
+
+  async function interpretClinicalAction(input: {
+    authority: ApiRequestAuthority;
+    session_id: string;
+    request: SubmitClinicalInterpretationRequest;
+  }) {
+    const capability = dependencies.clinical_interpreter;
+    if (capability === undefined) {
+      return { success: false, error: ERRORS.clinicalInterpreterUnavailable } as const;
+    }
+    const loaded = await authorizeAndLoad(input.authority, input.session_id);
+    if (!loaded.success) return loaded;
+    if (loaded.data.session.status === "ENDED") {
+      return { success: false, error: ERRORS.ended } as const;
+    }
+    const catalogue = safeLearnerActionCatalogue(
+      loaded.data.session,
+      loaded.data.authorization
+    );
+    if (!catalogue.success) return catalogue;
+    const context = buildClinicalInterpreterContext({
+      locale: input.request.locale,
+      learner_action_catalogue: catalogue.data
+    });
+    if (!context.success) {
+      return { success: false, error: ERRORS.domainRejected } as const;
+    }
+    const workflow = await executeClinicalInterpreter({
+      gateway: capability.gateway,
+      request_id: input.authority.request_id,
+      correlation_id: input.authority.correlation_id,
+      utterance: input.request.text,
+      locale: input.request.locale,
+      context: context.context
+    });
+    if (!workflow.success) {
+      return {
+        success: false,
+        error: workflow.code === "INTERPRETER_GATEWAY_UNAVAILABLE"
+          ? ERRORS.clinicalInterpreterUnavailable
+          : ERRORS.domainRejected
+      } as const;
+    }
+    const response = SubmitClinicalInterpretationResponseDataSchema.safeParse({
+      interpretation: workflow.interpretation,
+      grounded_state_version: loaded.data.session.patient_state.state_version,
+      catalogue_schema_version: catalogue.data.catalogue_schema_version
     });
     return response.success
       ? { success: true, data: response.data } as const
@@ -1263,6 +1339,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     startSession,
     getPatientState,
     submitClinicalAction,
+    interpretClinicalAction,
     getInvestigationResult,
     endSimulation,
     getAssessment,

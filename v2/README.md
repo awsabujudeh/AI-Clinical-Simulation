@@ -159,6 +159,7 @@ npm run test:v2-016
 npm run test:v2-017
 npm run test:v2-018
 npm run test:v2-019a
+npm run test:v2-019b1
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -253,6 +254,12 @@ Trusted server configuration owns capability, prompt/schema versions, candidate 
 `packages/patient-conversation/` builds a minimized patient-safe context from Case-authored `on_direct_question` facts, the dialogue-policy allowlist, and explicit current-state manifestation mappings. It sends that context through the V2-018 server gateway with a tool-free, versioned capability and validates every returned grounding reference locally. The model receives no whole Case Package, raw Patient State, rubric, hidden diagnosis, future rules, or clinical-action authority. Questions add no question-specific Clinical-Time duration, and provider latency cannot advance Clinical Time.
 
 The secure API persists `QUESTION_ASKED` before the provider call, then commits a validated patient response and causally linked Event before HTTP success. Exact retries replay the stored response without a second provider call. The 29th application table is server-only with ENABLE + FORCE RLS, immutable completed turns, per-Session ordering, and a pending-turn finalization guard. The History surface provides localized `ar-JO`/RTL and `en-US`/LTR patient conversation with explicit offline, unavailable, and ended read-only states. Run `npm run test:v2-019a`; evidence is under repository-root `planning_input/v2-019/`. V2-019 remains open for the separate V2-019B evaluation slice.
+
+## V2-019B1 clinical interpreter core
+
+`packages/clinical-interpreter/` maps explicit learner clinical-command language to non-authoritative, catalogue-bound `MATCH`, `AMBIGUOUS`, or `NO_MATCH` results through the server-owned Secure AI Gateway capability. Its context contains only canonical locale and the authorized learner-safe action catalogue; it contains no Patient State, rubric, expected action, hidden Case truth, scheduler, or scoring data. Provider output uses one strict top-level object and is reconciled locally against current action and parameter contracts.
+
+The interpreter is a separate Clinical Actions surface and cannot execute. A current recognized candidate only populates the existing manual action form; Case-owned confirmation policy, `ActionRequest`, `/actions/propose`, recovery, idempotency, Session Coordinator, and Clinical Engine remain the sole execution path. Patient Conversation remains dialogue-only, and provider failure leaves manual actions available. The deterministic 54-case corpus and metrics schemas prepare V2-019B2; Luna and Terra remain candidates and no winner is selected. Evidence is under repository-root `planning_input/v2-019/`.
 
 ## Source of Truth and rollback
 

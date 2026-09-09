@@ -8,6 +8,7 @@ const apiCoreSourceRoot = new URL("../packages/api-core/src/", import.meta.url);
 const recoveryCoreSourceRoot = new URL("../packages/recovery-core/src/", import.meta.url);
 const aiGatewaySourceRoot = new URL("../packages/ai-gateway/src/", import.meta.url);
 const patientConversationSourceRoot = new URL("../packages/patient-conversation/src/", import.meta.url);
+const clinicalInterpreterSourceRoot = new URL("../packages/clinical-interpreter/src/", import.meta.url);
 const portableSourceRoots = [
   new URL("../packages/portability-smoke/src/", import.meta.url),
   new URL("../packages/contracts/src/", import.meta.url),
@@ -18,7 +19,8 @@ const portableSourceRoots = [
   apiCoreSourceRoot,
   recoveryCoreSourceRoot,
   aiGatewaySourceRoot,
-  patientConversationSourceRoot
+  patientConversationSourceRoot,
+  clinicalInterpreterSourceRoot
 ];
 
 const forbiddenPatterns = [
@@ -277,3 +279,27 @@ if (patientConversationViolations.length > 0) {
 console.log("PATIENT_CONVERSATION_PORTABILITY_GUARD=PASS");
 console.log("PATIENT_CONVERSATION_DISEASE_NEUTRALITY_GUARD=PASS");
 console.log("PATIENT_CONVERSATION_NO_RAG_INTERPRETER_GUARD=PASS");
+
+const clinicalInterpreterSourceFiles = await collectTypeScriptFiles(clinicalInterpreterSourceRoot);
+const clinicalInterpreterViolations = [];
+const forbiddenInterpreterAuthority = /(?:session-engine|assessment-engine|patient-conversation|submitClinicalAction|actions\/propose|PatientState|patient_state|clinical_time|RAG|embedding|vector\s+search)/iu;
+for (const fileUrl of clinicalInterpreterSourceFiles) {
+  const source = await readFile(fileUrl, "utf8");
+  if (diseaseSpecificTerms.test(source)) {
+    clinicalInterpreterViolations.push(`Disease-specific interpreter behavior: ${fileUrl.pathname}`);
+  }
+  if (patientRuntimeNondeterminism.test(source)) {
+    clinicalInterpreterViolations.push(`Interpreter runtime nondeterminism: ${fileUrl.pathname}`);
+  }
+  if (forbiddenInterpreterAuthority.test(source)) {
+    clinicalInterpreterViolations.push(`Forbidden interpreter authority or context: ${fileUrl.pathname}`);
+  }
+}
+if (clinicalInterpreterViolations.length > 0) {
+  throw new Error(
+    `Clinical Interpreter boundary violations:\n${clinicalInterpreterViolations.join("\n")}`
+  );
+}
+console.log("CLINICAL_INTERPRETER_PORTABILITY_GUARD=PASS");
+console.log("CLINICAL_INTERPRETER_NON_AUTHORITY_GUARD=PASS");
+console.log("CLINICAL_INTERPRETER_DISEASE_NEUTRALITY_GUARD=PASS");

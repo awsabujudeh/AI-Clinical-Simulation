@@ -657,14 +657,15 @@ async function main() {
         "/v1/faculty/cases",
         "/v1/review-sessions",
         "/v1/sessions",
+        "/v1/sessions/{session_id}/actions/interpret",
         "/v1/sessions/{session_id}/actions/propose",
         "/v1/sessions/{session_id}/assessment",
         "/v1/sessions/{session_id}/debriefs",
         "/v1/sessions/{session_id}/end",
         "/v1/sessions/{session_id}/investigations/{result_id}",
         "/v1/sessions/{session_id}/questions",
-        "/v1/sessions/{session_id}/state"
-        ,"/v1/sessions/{session_id}/timeline"
+        "/v1/sessions/{session_id}/state",
+        "/v1/sessions/{session_id}/timeline"
       ].sort();
       assert(JSON.stringify(paths) === JSON.stringify(expected), JSON.stringify(paths));
     });

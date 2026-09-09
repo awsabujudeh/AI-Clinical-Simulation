@@ -104,6 +104,11 @@ export const LearnerActionLocalizedLabelSchema = z.strictObject({
   label: z.string().trim().min(1).max(160)
 });
 
+export const LearnerActionAliasSchema = z.strictObject({
+  locale: PatientLanguageSchema,
+  phrases: z.array(z.string().trim().min(1).max(160)).min(1).max(64)
+});
+
 export const LearnerActionParameterDefinitionSchema = z.strictObject({
   parameter_code: CaseControlledValueSchema,
   value_type: z.enum(["STRING", "NUMBER", "INTEGER", "BOOLEAN", "CODE"]),
@@ -133,6 +138,7 @@ export const SafeLearnerActionSchema = z.strictObject({
   action_id: ActionIdSchema,
   action_type: ActionTypeSchema,
   labels: z.array(LearnerActionLocalizedLabelSchema).max(2),
+  aliases: z.array(LearnerActionAliasSchema).max(16).optional(),
   parameter_definitions: z.array(LearnerActionParameterDefinitionSchema).max(32),
   confirmation_policy: z.enum([
     "NONE",
@@ -163,6 +169,17 @@ export const SafeLearnerActionSchema = z.strictObject({
       });
     }
     parameterCodes.add(parameter.parameter_code);
+  }
+  const aliasLocales = new Set<string>();
+  for (const [index, alias] of (value.aliases ?? []).entries()) {
+    if (aliasLocales.has(alias.locale)) {
+      context.addIssue({
+        code: "custom",
+        path: ["aliases", index, "locale"],
+        message: "Learner action alias groups must have unique locales."
+      });
+    }
+    aliasLocales.add(alias.locale);
   }
 });
 export type SafeLearnerAction = z.infer<typeof SafeLearnerActionSchema>;

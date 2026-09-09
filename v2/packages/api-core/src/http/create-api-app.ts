@@ -12,6 +12,7 @@ import {
   SessionPathParametersSchema,
   StartSessionRequestSchema,
   SubmitClinicalActionRequestSchema,
+  SubmitClinicalInterpretationRequestSchema,
   SubmitQuestionRequestSchema,
   createApiV1SuccessEnvelopeSchema
 } from "../../../contracts/src/index.ts";
@@ -239,6 +240,18 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
     const body = await parseJsonBody(context, SubmitClinicalActionRequestSchema);
     if (!body.success) return errorJson(context, body.error);
     return respond(context, await service.submitClinicalAction({
+      authority: context.get("authority"),
+      session_id: path.data.session_id,
+      request: body.data
+    }));
+  });
+
+  app.post("/v1/sessions/:session_id/actions/interpret", async (context) => {
+    const path = SessionPathParametersSchema.safeParse(context.req.param());
+    if (!path.success) return errorJson(context, ERRORS.malformed);
+    const body = await parseJsonBody(context, SubmitClinicalInterpretationRequestSchema);
+    if (!body.success) return errorJson(context, body.error);
+    return respond(context, await service.interpretClinicalAction({
       authority: context.get("authority"),
       session_id: path.data.session_id,
       request: body.data

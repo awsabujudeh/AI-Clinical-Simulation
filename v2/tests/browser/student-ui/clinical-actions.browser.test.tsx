@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ClinicalInterpretationSchema,
   InDoubtRecoveryJournalEntrySchema,
   IdempotencyKeySchema,
   PatientLanguageSchema,
@@ -55,12 +56,17 @@ const identity = {
   }
 };
 
+function clinicalInterpretation(input: unknown) {
+  return ClinicalInterpretationSchema.parse(input);
+}
+
 let host: HTMLDivElement;
 let root: Root;
 
 function authenticatedServices(input?: {
   load?: StudentUiServices["sessions"]["load"];
   submit?: StudentUiServices["actions"]["submit"];
+  interpret?: NonNullable<StudentUiServices["clinical_interpreter"]>["interpret"];
 }): StudentUiServices {
   return {
     auth: {
@@ -91,6 +97,9 @@ function authenticatedServices(input?: {
         projection: SYNTHETIC_SAFE_SESSION
       }))
     },
+    ...(input?.interpret === undefined
+      ? {}
+      : { clinical_interpreter: { interpret: input.interpret } }),
     timeline: { async load() { return { kind: "UNAVAILABLE" }; } },
     assessment: { async load() { return { kind: "PENDING" }; } },
     finalization: {
@@ -137,6 +146,16 @@ async function setInput(name: string, value: string) {
       ? HTMLSelectElement.prototype
       : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(prototype, "value")?.set?.call(field, value);
+    field?.dispatchEvent(new Event("input", { bubbles: true }));
+    field?.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
+async function setInterpreterText(value: string) {
+  const field = host.querySelector<HTMLTextAreaElement>(".clinical-interpreter textarea");
+  expect(field).not.toBeNull();
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, value);
     field?.dispatchEvent(new Event("input", { bubbles: true }));
     field?.dispatchEvent(new Event("change", { bubbles: true }));
   });
@@ -533,5 +552,146 @@ describe("V2-016 recovery-backed clinical action service", () => {
       action: { ...action, effects: [] } as never
     })).toMatchObject({ kind: "INVALID" });
     expect(sends).toBe(0);
+  });
+
+  it("keeps Patient Conversation and Clinical Interpreter on distinct input surfaces", async () => {
+    await render(authenticatedServices({
+      interpret: async () => ({
+        kind: "COMPLETED",
+        grounded_state_version: 3,
+        interpretation: clinicalInterpretation({
+          interpretation_schema_version: "1.0",
+          authority: "NON_AUTHORITATIVE",
+          status: "NO_MATCH",
+          no_match_reason: "NO_ACTIONABLE_COMMAND"
+        })
+      })
+    }));
+    expect(text()).toContain("Talk with the patient");
+    expect(text()).not.toContain("Describe a clinical action");
+    await click("Examination");
+    expect(text()).toContain("Describe a clinical action");
+    expect(text()).not.toContain("Question for the patient");
+  });
+
+  it("previews a recognized action without submitting or mutating until manual proposal", async () => {
+    let submits = 0;
+    await render(authenticatedServices({
+      submit: async () => {
+        submits += 1;
+        return { kind: "COMMITTED", replayed: false, idempotency_key: "idempotency.ui.interpreted", committed_event_ids: ["00000000-0000-4000-8000-000000000015"], projection: SYNTHETIC_SAFE_SESSION };
+      },
+      interpret: async () => ({
+        kind: "COMPLETED",
+        grounded_state_version: 3,
+        interpretation: clinicalInterpretation({
+          interpretation_schema_version: "1.0",
+          authority: "NON_AUTHORITATIVE",
+          status: "MATCH",
+          candidate: {
+            action_id: "examination.synthetic-check",
+            parameters: {},
+            unresolved_required_parameters: [],
+            confirmation_policy: "NONE"
+          }
+        })
+      })
+    }));
+    await click("Examination");
+    await setInterpreterText("Perform the synthetic examination");
+    await click("Interpret command");
+    await settle(() => text().includes("Recognized for your review"));
+    expect(text()).toContain("Perform synthetic examination");
+    expect(submits).toBe(0);
+    await click("Propose action");
+    await settle(() => submits === 1);
+  });
+
+  it("preserves the existing confirmation policy for interpreted medication intent", async () => {
+    let submits = 0;
+    await render(authenticatedServices({
+      submit: async () => {
+        submits += 1;
+        return { kind: "COMMITTED", replayed: false, idempotency_key: "idempotency.ui.interpreted-medication", committed_event_ids: ["00000000-0000-4000-8000-000000000015"], projection: SYNTHETIC_SAFE_SESSION };
+      },
+      interpret: async () => ({
+        kind: "COMPLETED",
+        grounded_state_version: 3,
+        interpretation: clinicalInterpretation({
+          interpretation_schema_version: "1.0",
+          authority: "NON_AUTHORITATIVE",
+          status: "MATCH",
+          candidate: {
+            action_id: "medication.synthetic-study-agent",
+            parameters: { dose: 10, unit: "unit.synthetic-small", route: "route.synthetic-a" },
+            unresolved_required_parameters: [],
+            confirmation_policy: "EXPLICIT_ADMINISTRATION"
+          }
+        })
+      })
+    }));
+    await click("Medications");
+    await setInterpreterText("Propose synthetic study medication");
+    await click("Interpret command");
+    await settle(() => text().includes("Recognized for your review"));
+    await click("Propose action");
+    expect(text()).toContain("Confirm this proposal");
+    expect(submits).toBe(0);
+    await click("Confirm and send");
+    await settle(() => submits === 1);
+  });
+
+  it("shows ambiguity and provider failure without hiding the manual catalogue", async () => {
+    const ambiguousServices = authenticatedServices({
+      interpret: async () => ({
+        kind: "COMPLETED",
+        grounded_state_version: 3,
+        interpretation: clinicalInterpretation({
+          interpretation_schema_version: "1.0",
+          authority: "NON_AUTHORITATIVE",
+          status: "AMBIGUOUS",
+          ambiguity_reason: "MULTIPLE_ACTIONS",
+          candidates: [
+            { action_id: "examination.synthetic-check", parameters: {}, unresolved_required_parameters: [], confirmation_policy: "NONE" },
+            { action_id: "investigation.synthetic-panel", parameters: {}, unresolved_required_parameters: [], confirmation_policy: "NONE" }
+          ]
+        })
+      })
+    });
+    await render(ambiguousServices);
+    await click("Examination");
+    await setInterpreterText("Do the test");
+    await click("Interpret command");
+    await settle(() => text().includes("More than one available action"));
+    expect(text()).toContain("Perform synthetic examination");
+
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await render(authenticatedServices({ interpret: async () => ({ kind: "UNAVAILABLE" }) }));
+    await click("Examination");
+    await setInterpreterText("Perform the examination");
+    await click("Interpret command");
+    await settle(() => text().includes("Interpreter unavailable"));
+    expect(text()).toContain("Search available actions");
+  });
+
+  it("rejects a stale interpretation before it can populate the action form", async () => {
+    await render(authenticatedServices({
+      interpret: async () => ({
+        kind: "COMPLETED",
+        grounded_state_version: 2,
+        interpretation: clinicalInterpretation({
+          interpretation_schema_version: "1.0",
+          authority: "NON_AUTHORITATIVE",
+          status: "MATCH",
+          candidate: { action_id: "examination.synthetic-check", parameters: {}, unresolved_required_parameters: [], confirmation_policy: "NONE" }
+        })
+      })
+    }));
+    await click("Examination");
+    await setInterpreterText("Perform the examination");
+    await click("Interpret command");
+    await settle(() => text().includes("Session changed"));
+    expect(text()).not.toContain("This proposal has no learner-entered fields");
   });
 });

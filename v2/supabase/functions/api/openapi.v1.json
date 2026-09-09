@@ -90,6 +90,22 @@
         }
       }
     },
+    "/v1/sessions/{session_id}/actions/interpret": {
+      "post": {
+        "operationId": "interpretClinicalAction",
+        "x-delivery-status": "DELIVERED_V2_019B1",
+        "description": "Returns a non-authoritative, Session-catalogue-bound interpretation candidate. This endpoint cannot execute actions or mutate Session clinical state.",
+        "security": [{ "supabaseBearer": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SessionId" }],
+        "requestBody": { "$ref": "#/components/requestBodies/StrictJson" },
+        "responses": {
+          "200": { "description": "Validated MATCH, AMBIGUOUS, or NO_MATCH interpretation for learner review" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "422": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/v1/sessions/{session_id}/investigations/{result_id}": {
       "get": {
         "operationId": "getInvestigationResult",

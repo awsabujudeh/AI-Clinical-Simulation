@@ -340,6 +340,11 @@ export function createUnconfiguredStudentUiServices(): StudentUiServices {
         };
       }
     }),
+    clinical_interpreter: Object.freeze({
+      async interpret() {
+        return { kind: "UNAUTHENTICATED" as const, http_status: 401 };
+      }
+    }),
     timeline: Object.freeze({
       async load() {
         return { kind: "UNAUTHORIZED" as const, http_status: 401 };

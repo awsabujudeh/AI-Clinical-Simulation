@@ -28,6 +28,7 @@ import {
   type AiProvider
 } from "../../../packages/ai-gateway/src/index.ts";
 import { createPatientConversationCapability } from "../../../packages/patient-conversation/src/index.ts";
+import { createClinicalInterpreterCapability } from "../../../packages/clinical-interpreter/src/index.ts";
 import type {
   CompiledCasePackage,
   ReviewExecutionArtifact
@@ -154,6 +155,7 @@ export async function createApiTestHarness(input?: {
   include_stemi?: boolean;
   production_package?: CompiledCasePackage;
   enable_patient_conversation?: boolean;
+  enable_clinical_interpreter?: boolean;
 }) {
   const productionPackage = input?.production_package ?? await createCompiledAssessmentCase(
     input?.enable_patient_conversation ? enableSyntheticPatientConversation : undefined
@@ -261,6 +263,31 @@ export async function createApiTestHarness(input?: {
     }
   };
   const patientConversationRepository = new InMemoryPatientConversationRepository(store);
+  let interpreterProviderCalls = 0;
+  let interpreterOutput: unknown = {
+    output_schema_version: "1.0",
+    status: "MATCH",
+    ambiguity_reason: null,
+    no_match_reason: null,
+    candidates: [{
+      action_id: "examination.synthetic-check",
+      parameters: {},
+      unresolved_required_parameters: []
+    }]
+  };
+  const interpreterProvider: AiProvider = {
+    async execute() {
+      interpreterProviderCalls += 1;
+      return {
+        success: true,
+        provider: "OPENAI",
+        output_text: JSON.stringify(interpreterOutput),
+        provider_response_id: `resp_interpreter_fixture_${interpreterProviderCalls}`,
+        provider_model: "gpt-5.6-luna",
+        retry_count: 0
+      };
+    }
+  };
   const eventIds = new Map<string, { QUESTION: string; RESPONSE: string }>();
   let patientIdentitySequence = 900_000;
   function patientIds(key: string) {
@@ -316,6 +343,21 @@ export async function createApiTestHarness(input?: {
             claim_expires_at_utc() { return "2026-09-06T10:05:00Z"; }
           }
         }
+      : {}),
+    ...(input?.enable_clinical_interpreter
+      ? {
+          clinical_interpreter: {
+            gateway: new SecureAiGateway({
+              registry: new TrustedCapabilityRegistry([
+                createClinicalInterpreterCapability({ enabled: true, candidate_model: "gpt-5.6-luna" })
+              ]),
+              provider: interpreterProvider,
+              capacity: { async authorize() { return { allowed: true as const }; } },
+              clock: { nowMilliseconds: () => 10 },
+              logger: { log() {} }
+            })
+          }
+        }
       : {})
   });
   return {
@@ -325,6 +367,8 @@ export async function createApiTestHarness(input?: {
     reviewArtifact,
     patientConversationRepository,
     getPatientProviderCalls() { return patientProviderCalls; },
+    getInterpreterProviderCalls() { return interpreterProviderCalls; },
+    setInterpreterOutput(value: unknown) { interpreterOutput = value; },
     setTrustedTime(value: string) { trustedTime = value; }
   };
 }

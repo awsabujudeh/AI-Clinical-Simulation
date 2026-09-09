@@ -4,6 +4,7 @@ export * from "./adapters.ts";
 export * from "./ai.ts";
 export * from "./api.ts";
 export * from "./api-v1.ts";
+export * from "./clinical-interpreter.ts";
 export * from "./diagnostics.ts";
 export * from "./events.ts";
 export * from "./ids.ts";

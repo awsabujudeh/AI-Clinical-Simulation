@@ -57,11 +57,15 @@ describe("V2-016 disclosure-safe learner action discovery", () => {
       expect(Object.keys(action).sort()).toEqual([
         "action_id",
         "action_type",
+        "aliases",
         "confirmation_policy",
         "labels",
         "parameter_definitions",
         "repeat_policy"
       ]);
+      for (const alias of action.aliases) {
+        expect(Object.keys(alias).sort()).toEqual(["locale", "phrases"]);
+      }
     }
     expect(serialized).not.toMatch(
       /rubric|expected_action|correct_action|rule_id|effect|patient_state|precondition|clinical_fact|scheduled|package_hash|review_status|approval/iu

@@ -1,0 +1,16 @@
+{
+  "name": "@ai-clinical-simulation/clinical-interpreter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ai-clinical-simulation/ai-gateway": "0.1.0",
+    "@ai-clinical-simulation/case-schema": "0.1.0",
+    "@ai-clinical-simulation/contracts": "0.1.0",
+    "zod": "4.5.4"
+  }
+}

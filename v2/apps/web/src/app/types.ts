@@ -1,6 +1,7 @@
 import {
   type ConnectivityState,
   type JsonObject,
+  type ClinicalInterpretation,
   PatientLanguageSchema,
   type SafeLearnerAction,
   type SafeAssessmentApiProjection,
@@ -118,6 +119,29 @@ export interface StudentClinicalActionService {
   submit(intent: StudentClinicalActionIntent): Promise<StudentClinicalActionResult>;
 }
 
+export type StudentClinicalInterpretationIntent = Readonly<{
+  session_id: string;
+  locale: PatientLanguage;
+  text: string;
+}>;
+
+export type StudentClinicalInterpretationResult =
+  | Readonly<{
+      kind: "COMPLETED";
+      interpretation: ClinicalInterpretation;
+      grounded_state_version: number;
+    }>
+  | Readonly<{
+      kind: "INVALID" | "UNAUTHENTICATED" | "UNAUTHORIZED" | "ENDED" | "UNAVAILABLE";
+      http_status?: number;
+    }>;
+
+export interface StudentClinicalInterpreterService {
+  interpret(
+    intent: StudentClinicalInterpretationIntent
+  ): Promise<StudentClinicalInterpretationResult>;
+}
+
 export type TimelineLoadResult =
   | Readonly<{ kind: "AVAILABLE"; projection: SafeLearnerTimelineProjection }>
   | Readonly<{
@@ -199,6 +223,7 @@ export type StudentUiServices = Readonly<{
   auth: StudentAuthService;
   sessions: StudentSessionService;
   actions: StudentClinicalActionService;
+  clinical_interpreter?: StudentClinicalInterpreterService;
   timeline: StudentTimelineService;
   assessment: StudentAssessmentService;
   patient_conversation?: StudentPatientConversationService;
