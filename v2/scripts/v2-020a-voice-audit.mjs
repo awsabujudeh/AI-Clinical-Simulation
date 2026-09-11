@@ -54,6 +54,7 @@ const artifacts = [...await files(join(root, "apps/web/src")), ...await files(jo
 try { artifacts.push(...await files(join(root, "apps/web/dist"))); } catch { /* pre-build source audit; final verify builds first */ }
 for (const file of artifacts) {
   const text = await readFile(file, "utf8");
+  if (/AZURE_SPEECH_KEY|synthetic-runtime-key-not-a-credential/u.test(text)) throw Error("Server configuration/credential marker in client or evaluation artifact");
   if (/sk-[A-Za-z0-9_-]{24,}|-----BEGIN .*PRIVATE KEY-----|https:\/\/[a-z0-9-]+\.supabase\.co/u.test(text)) throw Error("Secret/remote signature in voice artifacts");
   if (file.includes("dist") && /synthetic-test-secret-not-real|Ocp-Apim-Subscription-Key|AZURE_SPEECH_KEY/u.test(text)) throw Error("Server credential marker in bundle");
 }

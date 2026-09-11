@@ -1,10 +1,11 @@
 import type { SpeechTokenProvider } from "./token-broker.ts";
+import { isAzureSpeechRegion } from "./runtime-config.ts";
 
 /** Server infrastructure only. Construct from trusted secret injection, never browser/request data. */
 export function createAzureSpeechTokenProvider(input: {
   subscription_key: string; region: string; fetch: typeof fetch;
 }): SpeechTokenProvider {
-  if (!/^[a-z][a-z0-9]{1,31}$/u.test(input.region) || input.subscription_key.trim().length === 0) {
+  if (!isAzureSpeechRegion(input.region) || input.subscription_key.trim().length === 0) {
     throw new Error("Invalid server Speech configuration.");
   }
   return Object.freeze({

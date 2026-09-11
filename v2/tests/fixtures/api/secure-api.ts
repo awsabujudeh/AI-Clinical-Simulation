@@ -20,6 +20,7 @@ import {
   type AuthorizedSession,
   type AuthenticationVerifier,
   type SpeechTokenBroker,
+  type SecureApiAppDependencies,
   type SessionStartCommitResult,
   type SessionStartRepository
 } from "../../../packages/api-core/src/index.ts";
@@ -302,7 +303,7 @@ export async function createApiTestHarness(input?: {
     eventIds.set(key, created);
     return created;
   }
-  const app = createSecureApiApp({
+  const dependencies: SecureApiAppDependencies = {
     speech_token_broker: input?.speech_token_broker,
     authentication_verifier: authentication,
     allowed_origins: ["http://localhost:5173"],
@@ -361,9 +362,11 @@ export async function createApiTestHarness(input?: {
           }
         }
       : {})
-  });
+  };
+  const app = createSecureApiApp(dependencies);
   return {
     app,
+    dependencies,
     store,
     productionPackage,
     reviewArtifact,
