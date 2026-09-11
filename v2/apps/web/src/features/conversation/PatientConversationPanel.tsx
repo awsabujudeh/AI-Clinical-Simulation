@@ -8,21 +8,27 @@ import type {
   StudentPatientConversationService
 } from "../../app/types";
 import { Button, StatusBadge } from "../../components/ui";
+import { VoiceCapture } from "../voice/VoiceCapture";
+import { PatientSpeech } from "../voice/PatientSpeech";
+import type { StudentVoiceServices } from "../voice/voice-services";
 
 type Phase = "LOADING" | "READY" | "SUBMITTING" | "UNAVAILABLE" | "INVALID" | "ENDED";
 
 export function PatientConversationPanel({
   state,
   service,
-  enabled
+  enabled,
+  voice
 }: {
   state: SessionPresentationState;
   service?: StudentPatientConversationService;
   enabled: boolean;
+  voice?: StudentVoiceServices;
 }) {
   const { locale, t } = useLocalization();
   const [transcript, setTranscript] = useState<Extract<PatientConversationLoadResult, { kind: "AVAILABLE" }>["transcript"]>();
   const [question, setQuestion] = useState("");
+  const [source, setSource] = useState<"TEXT" | "STT">("TEXT");
   const [phase, setPhase] = useState<Phase>(state.kind === "ENDED" ? "ENDED" : "LOADING");
   const mounted = useRef(true);
 
@@ -60,7 +66,7 @@ export function PatientConversationPanel({
         session_id: state.projection.session_id,
         locale,
         text,
-        source: "TEXT"
+        source
       });
     } catch {
       setPhase("UNAVAILABLE");
@@ -73,6 +79,7 @@ export function PatientConversationPanel({
         turns: [...(current?.turns ?? []), result.turn]
       }));
       setQuestion("");
+      setSource("TEXT");
       setPhase("READY");
     } else if (result.kind === "ENDED") setPhase("ENDED");
     else if (result.kind === "INVALID") setPhase("INVALID");
@@ -98,6 +105,7 @@ export function PatientConversationPanel({
               <article key={turn.turn_id} className="patient-conversation__turn">
                 <p><strong>{t("learnerSaid")}</strong> {turn.learner_utterance}</p>
                 <p><strong>{t("patientSaid")}</strong> {turn.patient_utterance}</p>
+                {voice ? <PatientSpeech voice={voice} turn={turn} /> : null}
               </article>
             ))}
       </div>
@@ -105,6 +113,8 @@ export function PatientConversationPanel({
       {phase === "ENDED" ? <p role="status">{t("patientConversationEnded")}</p> : null}
       {phase === "INVALID" ? <p role="alert">{t("patientConversationInvalid")}</p> : null}
       <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <VoiceCapture voice={voice} sessionId={state.projection.session_id} locale={locale} enabled={!blocked}
+          onReviewed={(text) => { setQuestion(text); setSource("STT"); }} />
         <label>
           <span>{t("patientQuestionLabel")}</span>
           <textarea

@@ -1,0 +1,40 @@
+import { test, expect } from "@playwright/test";
+test("Patient voice edits final text, uses existing question service, plays exact approved response", async ({ page }) => {
+  await page.goto("/tests/browser/v2-020a-e2e/voice-harness.html");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.evaluate(() => window.__VOICE_TEST__.speech.listener().partial("not final"));
+  expect(await page.evaluate(() => window.__VOICE_TEST__.calls.questions)).toBe(0);
+  await page.evaluate(() => window.__VOICE_TEST__.speech.listener().final("wrong text"));
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await page.evaluate(() => window.__VOICE_TEST__.speech.listener().ended());
+  await page.getByLabel("Review final transcript").fill("Reviewed question");
+  await page.getByRole("button", { name: "Use reviewed text" }).click();
+  await expect(page.getByLabel("Question for the patient")).toHaveValue("Reviewed question");
+  await page.getByRole("button", { name: "Ask patient" }).click();
+  await expect(page.getByText("Approved synthetic patient reply.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Play patient audio" }).click();
+  expect(await page.evaluate(() => window.__VOICE_TEST__.speech.synthesis[0]?.text)).toBe("Approved synthetic patient reply.");
+  expect(await page.evaluate(() => window.__VOICE_TEST__.calls.source)).toBe("STT");
+});
+test("spoken medication requires Interpreter and confirmation, not direct execution", async ({ page }) => {
+  await page.goto("/tests/browser/v2-020a-e2e/voice-harness.html");
+  await page.getByRole("tab", { name: "Medications" }).click();
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.evaluate(() => window.__VOICE_TEST__.speech.listener().final("Give synthetic study agent"));
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await page.evaluate(() => window.__VOICE_TEST__.speech.listener().ended());
+  await page.getByRole("button", { name: "Use reviewed text" }).click();
+  expect(await page.evaluate(() => window.__VOICE_TEST__.calls.interpretations)).toBe(0);
+  await page.getByRole("button", { name: "Interpret command" }).click();
+  await page.getByRole("button", { name: "Propose action" }).click();
+  await expect(page.getByText("Confirm this proposal", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__VOICE_TEST__.calls.executions)).toBe(0);
+});
+test("microphone failure leaves typed question fully usable", async ({ page }) => {
+  await page.goto("/tests/browser/v2-020a-e2e/voice-harness.html?scenario=permission");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await expect(page.getByText(/PERMISSION_DENIED/)).toBeVisible();
+  await page.getByLabel("Question for the patient").fill("Typed fallback");
+  await page.getByRole("button", { name: "Ask patient" }).click();
+  await expect(page.locator(".patient-conversation__turn")).toContainText("Approved synthetic patient reply.");
+});

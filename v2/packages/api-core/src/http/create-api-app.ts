@@ -14,10 +14,12 @@ import {
   SubmitClinicalActionRequestSchema,
   SubmitClinicalInterpretationRequestSchema,
   SubmitQuestionRequestSchema,
+  SpeechTokenRequestSchema,
   createApiV1SuccessEnvelopeSchema
 } from "../../../contracts/src/index.ts";
 
 import type { AuthenticationVerifier } from "../auth/verified-principal.ts";
+import type { SpeechTokenBroker } from "../voice/token-broker.ts";
 import {
   ERRORS,
   apiErrorResponse,
@@ -39,6 +41,7 @@ type AppVariables = {
 export type SecureApiAppDependencies = SecureApiDependencies & Readonly<{
   authentication_verifier: AuthenticationVerifier;
   allowed_origins: readonly string[];
+  speech_token_broker?: SpeechTokenBroker;
 }>;
 
 function requestIdentity(context: Context): { request_id: string; correlation_id: string } {
@@ -194,6 +197,22 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
       }
     }
     await next();
+  });
+
+  app.post("/v1/voice/token", async (context) => {
+    context.header("Cache-Control", "no-store");
+    context.header("Pragma", "no-cache");
+    const body = await parseJsonBody(context, SpeechTokenRequestSchema);
+    if (!body.success) return errorJson(context, body.error);
+    const authority = context.get("authority");
+    if (authority.idempotency_key === undefined) return errorJson(context, ERRORS.malformed);
+    const loaded = await service.authorizeAndLoad(authority, body.data.session_id);
+    if (!loaded.success) return errorJson(context, loaded.error);
+    if (loaded.data.session.status === "ENDED") return errorJson(context, ERRORS.ended);
+    if (!dependencies.speech_token_broker) return errorJson(context, ERRORS.unavailable);
+    return respond(context, await dependencies.speech_token_broker.issue(
+      authority.principal.user_id, body.data, authority.idempotency_key
+    ));
   });
 
   app.post("/v1/sessions", async (context) => {

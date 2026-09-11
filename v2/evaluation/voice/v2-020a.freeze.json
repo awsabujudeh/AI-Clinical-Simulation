@@ -1,0 +1,13 @@
+{
+  "freeze_version": "1.0",
+  "provider": "AZURE",
+  "status": "FROZEN_BEFORE_LIVE_EVIDENCE",
+  "utterance_definitions": 52,
+  "ar_JO_definitions": 50,
+  "en_US_definitions": 2,
+  "policy_sha256": "38e86b2cfd199c4fdf35e244bd6cfc0e1dd576266ea67d795c4bd66bd84374a7",
+  "corpus_sha256": "3425bf5fc5fd9ab264263e7c215d8e72f4c3bb9ab9e099386bda4d86d9371f42",
+  "live_records": 0,
+  "tts_human_reviews": 0,
+  "provider_switch": "NOT_AUTHORIZED"
+}

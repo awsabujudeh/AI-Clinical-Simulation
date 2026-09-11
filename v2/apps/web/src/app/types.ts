@@ -15,6 +15,7 @@ import {
   type SessionMode,
   type StartSessionRequest
 } from "@ai-clinical-simulation/contracts";
+import type { StudentVoiceServices } from "../features/voice/voice-services";
 
 /*
  * These are parsed once from the shared contract; the UI does not define a
@@ -220,6 +221,7 @@ export interface StudentFinalizationService {
 }
 
 export type StudentUiServices = Readonly<{
+  voice?: StudentVoiceServices;
   auth: StudentAuthService;
   sessions: StudentSessionService;
   actions: StudentClinicalActionService;

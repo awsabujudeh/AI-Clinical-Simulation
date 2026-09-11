@@ -51,7 +51,9 @@ check("no Assessment Engine dependency", !joined.includes("assessment-engine"));
 check("no API core dependency", !joined.includes("api-core"));
 check("no localStorage Session truth", !joined.includes("localStorage"));
 check("no optimistic Query mutation", !joined.includes("onMutate") && !joined.includes("setQueryData"));
-check("no local Clinical-Time timer", !/Date\.now|performance\.now|setInterval|setTimeout/u.test(joined));
+// V2-020 allows bounded presentation-only recording/playback deadlines, never Clinical Time.
+check("no local Clinical-Time timer", !source.filter((entry) => !entry.file.startsWith("apps/web/src/features/voice/"))
+  .some((entry) => /Date\.now|performance\.now|setInterval|setTimeout/u.test(entry.text)));
 check("no client-side random medical state", !joined.includes("Math.random"));
 check("no internal UJ identifier", !/\bUJ\b/u.test(joined));
 check("no legacy patient-locale literal", !/["']en["']/u.test(joined));

@@ -19,6 +19,7 @@ import {
   type AuthorizedReviewCase,
   type AuthorizedSession,
   type AuthenticationVerifier,
+  type SpeechTokenBroker,
   type SessionStartCommitResult,
   type SessionStartRepository
 } from "../../../packages/api-core/src/index.ts";
@@ -155,6 +156,7 @@ export async function createApiTestHarness(input?: {
   include_stemi?: boolean;
   production_package?: CompiledCasePackage;
   enable_patient_conversation?: boolean;
+  speech_token_broker?: SpeechTokenBroker;
   enable_clinical_interpreter?: boolean;
 }) {
   const productionPackage = input?.production_package ?? await createCompiledAssessmentCase(
@@ -301,6 +303,7 @@ export async function createApiTestHarness(input?: {
     return created;
   }
   const app = createSecureApiApp({
+    speech_token_broker: input?.speech_token_broker,
     authentication_verifier: authentication,
     allowed_origins: ["http://localhost:5173"],
     authority_repository: authority,

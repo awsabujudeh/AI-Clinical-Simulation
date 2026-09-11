@@ -18,3 +18,4 @@ export * from "./patient-conversation.ts";
 export * from "./recovery.ts";
 export * from "./rules.ts";
 export * from "./session-clock.ts";
+export * from "./voice.ts";

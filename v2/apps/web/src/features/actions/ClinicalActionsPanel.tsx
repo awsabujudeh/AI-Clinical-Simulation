@@ -289,6 +289,7 @@ export function ClinicalActionsPanel({
       >
         {domain === "HISTORY" ? (
           <PatientConversationPanel
+            voice={services.voice}
             state={state}
             service={services.patient_conversation}
             enabled={enabled}
@@ -296,6 +297,7 @@ export function ClinicalActionsPanel({
         ) : (
           <>
             <ClinicalInterpreterPanel
+              voice={services.voice}
               service={services.clinical_interpreter}
               sessionId={state.projection.session_id}
               stateVersion={state.projection.state_version}

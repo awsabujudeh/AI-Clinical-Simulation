@@ -9,3 +9,5 @@ export * from "./patient-conversation/repository.ts";
 export * from "./patient-conversation/in-memory-repository.ts";
 export * from "./patient-conversation/postgres-repository.ts";
 export * from "./service/secure-api-service.ts";
+export * from "./voice/token-broker.ts";
+export * from "./voice/azure-token-provider.ts";

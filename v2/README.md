@@ -273,3 +273,8 @@ Run `npm run test:v2-019b2` for the offline freeze, grader, policy, and security
 The two files under repository-root `planning_input/` are frozen, read-only Architecture Source of Truth documents. They are not copied into this workspace.
 
 V2-001 is reversible by removing `v2/` and the V2-scoped `.github/workflows/v2-001.yml` workflow. V1 requires no rollback because V2-001 does not modify it.
+# V2-020A voice checkpoint
+
+Voice is opt-in input/presentation only: partials are never submitted; reviewed finals enter the existing Patient/Interpreter text paths, and validated Patient text alone enters optional TTS. Text/manual controls remain independent. The Azure key is injected only into the server token provider; browser SDK 1.51.0 receives an eight-minute in-memory token through the authenticated Session token route. Presentation voice profiles are explicit and do not amend Case truth. No live Azure calls or human voice results exist in this checkpoint.
+
+Run `npm run test:v2-020a` for focused Browser/Deno, token, safety and mocked Playwright checks. Final `npm run verify` includes the new tests/audit. See [voice boundary](../planning_input/v2-020/V2-020A_VOICE_BOUNDARY.md) and [frozen evaluation protocol](../planning_input/v2-020/V2-020A_EVALUATION_PROTOCOL.md). V2-020 is **NOT CLOSED**, pending live Jordanian semantic/latency and TTS human review.

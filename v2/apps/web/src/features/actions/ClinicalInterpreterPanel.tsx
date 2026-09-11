@@ -11,6 +11,8 @@ import type {
 } from "../../app/types";
 import { Button, StatusBadge } from "../../components/ui";
 import { learnerActionLabel } from "./action-model";
+import { VoiceCapture } from "../voice/VoiceCapture";
+import type { StudentVoiceServices } from "../voice/voice-services";
 
 type InterpreterPhase =
   | "IDLE"
@@ -28,6 +30,7 @@ export function ClinicalInterpreterPanel({
   locale,
   actions,
   enabled,
+  voice,
   onRecognized
 }: {
   service?: StudentClinicalInterpreterService;
@@ -36,6 +39,7 @@ export function ClinicalInterpreterPanel({
   locale: PatientLanguage;
   actions: readonly SafeLearnerAction[];
   enabled: boolean;
+  voice?: StudentVoiceServices;
   onRecognized(action: SafeLearnerAction, parameters: JsonObject): void;
 }) {
   const { t } = useLocalization();
@@ -54,7 +58,9 @@ export function ClinicalInterpreterPanel({
     pending.current = true;
     setPhase("INTERPRETING");
     setAmbiguousActionIds([]);
-    const result = await service.interpret({ session_id: sessionId, locale, text: utterance });
+    let result;
+    try { result = await service.interpret({ session_id: sessionId, locale, text: utterance }); }
+    catch { setPhase("UNAVAILABLE"); pending.current = false; return; }
     if (result.kind !== "COMPLETED") {
       setPhase(result.kind === "ENDED" ? "STALE" : "UNAVAILABLE");
       pending.current = false;
@@ -109,6 +115,8 @@ export function ClinicalInterpreterPanel({
         <h3 id="clinical-interpreter-title">{t("interpreterTitle")}</h3>
         <p>{t("interpreterBoundary")}</p>
       </div>
+      <VoiceCapture voice={voice} sessionId={sessionId} locale={locale} enabled={enabled && phase !== "INTERPRETING"}
+        onReviewed={(reviewed) => { setText(reviewed); setPhase("IDLE"); }} />
       <label>
         <span>{t("interpreterInputLabel")}</span>
         <textarea
