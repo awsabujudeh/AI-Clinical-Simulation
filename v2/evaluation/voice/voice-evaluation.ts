@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { PatientLanguageSchema } from "../../packages/contracts/src/locales.ts";
+import { SpeechVoiceIdSchema } from "../../packages/contracts/src/voice.ts";
 
 export const VOICE_EVALUATION_POLICY = Object.freeze({
-  version: "1.0", provider: "AZURE", minimum_utterances: 50, minimum_speakers: 3,
+  version: "1.0", provider: "ELEVENLABS", minimum_utterances: 50, minimum_speakers: 3,
   usable_percentage: 90, consequential_safe_percentage: 100,
   first_partial_ms: { p50: 800, p95: 1500 }, final_after_release_ms: { p50: 1200, p95: 3000 },
   tts_first_audio_ms: { p50: 1200, p95: 2500 }, full_question_p95_ms: 8000,
@@ -33,11 +34,13 @@ export const VoiceHumanEvidenceSchema = z.strictObject({
   full_question_ms: z.number().finite().nonnegative().optional()
 });
 export const TtsHumanReviewSchema = z.strictObject({
-  voice_id: z.enum(["ar-JO-TaimNeural", "ar-JO-SanaNeural"]),
+  provider: z.literal("ELEVENLABS"), model_id: z.literal("eleven_v3_conversational"), voice_id: SpeechVoiceIdSchema,
   reviewer_id: z.string().min(1).max(80), text_reference: z.string().min(1).max(80),
   natural_jordanian_acceptability: z.number().int().min(1).max(5),
   intelligibility: z.number().int().min(1).max(5), medical_english_pronunciation: z.number().int().min(1).max(5),
   pacing: z.number().int().min(1).max(5), emotional_appropriateness: z.number().int().min(1).max(5),
+  age_appropriateness: z.number().int().min(1).max(5), presentation_suitability: z.number().int().min(1).max(5),
+  consistency: z.number().int().min(1).max(5), robotic_artifacts: z.boolean(),
   pronunciation_failure: z.boolean(), first_audio_ms: z.number().finite().nonnegative(),
   notes: z.string().max(1_000)
 });

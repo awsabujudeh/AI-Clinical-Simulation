@@ -4,18 +4,18 @@ import { fileURLToPath } from "node:url";
 
 // Isolated child environments only: never read, inherit, replace or print a host Speech secret.
 const scenarios = [
-  [{ AZURE_SPEECH_KEY: "synthetic-runtime-key-not-a-credential", AZURE_SPEECH_REGION: " UAENORTH " }, true],
-  [{ AZURE_SPEECH_REGION: "uaenorth" }, false],
-  [{ AZURE_SPEECH_KEY: "synthetic-runtime-key-not-a-credential" }, false]
+  [{ ELEVENLABS_API_KEY: "synthetic-runtime-key-not-a-credential" }, true],
+  [{}, false],
+  [{ ELEVENLABS_API_KEY: " " }, false]
 ];
 for (const [environment, available] of scenarios) {
   const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
-    import { readLocalAzureSpeechRuntimeConfig, createNodeAzureSpeechSecureApi } from './runtime/azure-speech-node.mjs';
+    import { readLocalVoiceRuntimeConfig, createNodeElevenLabsSecureApi } from './runtime/elevenlabs-voice-node.mjs';
     import { createApiTestHarness } from './tests/fixtures/api/secure-api.ts';
-    const config = readLocalAzureSpeechRuntimeConfig();
+    const config = readLocalVoiceRuntimeConfig();
     if (config.success !== ${available}) throw Error('Configuration availability mismatch');
     const h = await createApiTestHarness({ include_stemi: false });
-    const root = createNodeAzureSpeechSecureApi({ dependencies: h.dependencies, now: () => 1000,
+    const root = createNodeElevenLabsSecureApi({ dependencies: h.dependencies, now: () => 1000,
       fetch: async () => { throw Error('Unexpected network attempt'); } });
     if (root.voice.available !== ${available}) throw Error('Composition availability mismatch');
     if ((await root.app.request('/v1/voice/token', { method: 'POST' })).status !== 401) throw Error('Auth bypass');

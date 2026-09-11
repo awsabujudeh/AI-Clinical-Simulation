@@ -2,8 +2,8 @@ import type { SpeechAdapter } from "../../../apps/web/src/features/voice/voice-s
 import type { VoiceClock } from "../../../apps/web/src/features/voice/capture-controller.ts";
 import { PatientVoiceProfileSchema } from "../../../packages/contracts/src/voice.ts";
 export const SYNTHETIC_VOICE_PROFILE = PatientVoiceProfileSchema.parse({
-  profile_id: "voice-profile.synthetic", profile_version: "1.0",
-  voices: { "ar-JO": "ar-JO-TaimNeural", "en-US": "en-US-JennyNeural" }
+  profile_id: "voice-profile.synthetic", profile_version: "2.0", provider: "ELEVENLABS", model_id: "eleven_v3_conversational",
+  voices: { "ar-JO": "syntheticArabicVoice", "en-US": "syntheticEnglishVoice" }
 });
 export function mockSpeech() {
   let listener: Parameters<SpeechAdapter["recognize"]>[0] | undefined;

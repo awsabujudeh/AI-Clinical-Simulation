@@ -1,0 +1,15 @@
+{
+  "freeze_version": "1.0",
+  "provider": "ELEVENLABS",
+  "status": "FROZEN_BEFORE_LIVE_EVIDENCE",
+  "utterance_definitions": 52,
+  "ar_JO_definitions": 50,
+  "en_US_definitions": 2,
+  "policy_sha256": "e5fbc6f3849509f24060c22da4a639e24e1b420e6d349a27b088ab805333b3de",
+  "corpus_sha256": "3425bf5fc5fd9ab264263e7c215d8e72f4c3bb9ab9e099386bda4d86d9371f42",
+  "live_records": 0,
+  "tts_human_reviews": 0,
+  "provider_switch": "ADR-VOICE-PROVIDER-001",
+  "stt_model": "scribe_v2_realtime",
+  "tts_model": "eleven_v3_conversational"
+}

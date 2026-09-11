@@ -4,24 +4,32 @@ import { PatientLanguageSchema } from "./locales.ts";
 
 export const VOICE_SCHEMA_VERSION = "1.0" as const;
 export const VoiceCapabilitySchema = z.enum(["STT", "TTS"]);
-export const SpeechTokenRequestSchema = z.strictObject({
-  session_id: SessionIdSchema,
-  locale: PatientLanguageSchema,
-  capability: VoiceCapabilitySchema
-});
+export const VoiceProfileIdSchema = z.string().regex(/^voice-profile\.[a-z0-9-]+$/u);
+export const SpeechVoiceIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/u);
+export const SpeechTokenRequestSchema = z.discriminatedUnion("capability", [
+  z.strictObject({ session_id: SessionIdSchema, locale: PatientLanguageSchema, capability: z.literal("STT") }),
+  z.strictObject({ session_id: SessionIdSchema, locale: PatientLanguageSchema, capability: z.literal("TTS"), voice_profile_id: VoiceProfileIdSchema })
+]);
 export type SpeechTokenRequest = z.infer<typeof SpeechTokenRequestSchema>;
-/** Ephemeral bearer credential. Never persist or include in telemetry. */
-export const SpeechTokenResponseSchema = z.strictObject({
-  voice_schema_version: z.literal(VOICE_SCHEMA_VERSION),
+/** Version 2: one connection attempt only. Never persist/cache for replay or put in telemetry. */
+const tokenFields = {
+  voice_schema_version: z.literal("2.0"),
+  provider: z.literal("ELEVENLABS"),
   session_id: SessionIdSchema,
   locale: PatientLanguageSchema,
-  capability: VoiceCapabilitySchema,
-  authorization_token: z.string().min(1).max(8_192).regex(/^[\x21-\x7e]+$/u),
-  region: z.string().regex(/^[a-z][a-z0-9]{1,31}$/u),
+  single_use_token: z.string().min(1).max(8_192).regex(/^[\x21-\x7e]+$/u),
   issued_at_ms: z.number().int().nonnegative().safe(),
   expires_at_ms: z.number().int().nonnegative().safe()
-}).refine((value) => value.expires_at_ms > value.issued_at_ms
-  && value.expires_at_ms - value.issued_at_ms <= 480_000);
+};
+export const SpeechTokenResponseSchema = z.discriminatedUnion("capability", [
+  z.strictObject({ ...tokenFields, capability: z.literal("STT"), token_type: z.literal("realtime_scribe"),
+    model_id: z.literal("scribe_v2_realtime"), language_code: z.enum(["ar", "en"]), secondary_languages: z.array(z.enum(["ar", "en"])).max(1) }),
+  z.strictObject({ ...tokenFields, capability: z.literal("TTS"), token_type: z.literal("tts_websocket"),
+    model_id: z.literal("eleven_v3_conversational"), voice_profile_id: VoiceProfileIdSchema, voice_id: SpeechVoiceIdSchema })
+]).refine(value => value.expires_at_ms > value.issued_at_ms && value.expires_at_ms - value.issued_at_ms <= 900_000)
+  .refine(value => value.capability !== "STT" || (value.locale === "ar-JO"
+    ? value.language_code === "ar" && value.secondary_languages.length === 1 && value.secondary_languages[0] === "en"
+    : value.language_code === "en" && value.secondary_languages.length === 0));
 export type SpeechTokenResponse = z.infer<typeof SpeechTokenResponseSchema>;
 export const VoiceFailureCodeSchema = z.enum([
   "PERMISSION_DENIED", "DEVICE_UNAVAILABLE", "TOKEN_UNAVAILABLE", "TOKEN_EXPIRED",
@@ -54,11 +62,13 @@ export type VoiceTelemetry = z.infer<typeof VoiceTelemetrySchema>;
 
 /** Presentation choice only; no sex/gender inference or Case schema amendment. */
 export const PatientVoiceProfileSchema = z.strictObject({
-  profile_id: z.string().regex(/^voice-profile\.[a-z0-9-]+$/u),
-  profile_version: z.literal("1.0"),
+  profile_id: VoiceProfileIdSchema,
+  profile_version: z.literal("2.0"),
+  provider: z.literal("ELEVENLABS"),
+  model_id: z.literal("eleven_v3_conversational"),
   voices: z.strictObject({
-    "ar-JO": z.enum(["ar-JO-TaimNeural", "ar-JO-SanaNeural"]),
-    "en-US": z.enum(["en-US-JennyNeural", "en-US-GuyNeural"])
+    "ar-JO": SpeechVoiceIdSchema,
+    "en-US": SpeechVoiceIdSchema
   })
 });
 export type PatientVoiceProfile = z.infer<typeof PatientVoiceProfileSchema>;

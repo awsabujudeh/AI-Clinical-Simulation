@@ -54,8 +54,13 @@ describe("Voice presentation core", () => {
     const req = { session_id: "session.voice", locale: "ar-JO", capability: "STT" };
     expect(SpeechTokenRequestSchema.safeParse(req).success).toBe(true);
     for (const locale of ["ar", "en", "ar-SA", "en-GB"]) expect(SpeechTokenRequestSchema.safeParse({ ...req, locale }).success).toBe(false);
-    expect(SpeechTokenRequestSchema.safeParse({ ...req, azure_key: "not-real" }).success).toBe(false);
-    expect(SpeechTokenResponseSchema.safeParse({ ...req, voice_schema_version: "1.0", authorization_token: "x".repeat(8193), region: "region", issued_at_ms: 0, expires_at_ms: 480000 }).success).toBe(false);
+    expect(SpeechTokenRequestSchema.safeParse({ ...req, api_key: "not-real" }).success).toBe(false);
+    const token = { ...req, voice_schema_version: "2.0", provider: "ELEVENLABS", token_type: "realtime_scribe",
+      model_id: "scribe_v2_realtime", language_code: "ar", secondary_languages: ["en"], single_use_token: "synthetic-token", issued_at_ms: 0, expires_at_ms: 900000 };
+    expect(SpeechTokenResponseSchema.safeParse(token).success).toBe(true);
+    for (const invalid of [{ single_use_token: "x".repeat(8193) }, { voice_schema_version: "1.0" }, { model_id: "other" }, { language_code: "en" }, { secret: true }]) {
+      expect(SpeechTokenResponseSchema.safeParse({ ...token, ...invalid }).success).toBe(false);
+    }
     expect(VoiceTelemetrySchema.safeParse({ raw_audio: "forbidden" }).success).toBe(false);
   });
   it("freezes 50 Arabic plus two English definitions, without live results", () => {
@@ -74,7 +79,7 @@ describe("Voice presentation core", () => {
     expect(evaluateVoiceEvidence(VOICE_EVALUATION_CORPUS, records).status).toBe("MEETS_STT_TARGETS");
     expect(evaluateVoiceEvidence(VOICE_EVALUATION_CORPUS, records.slice(1)).status).toBe("INCOMPLETE");
     expect(evaluateVoiceEvidence(VOICE_EVALUATION_CORPUS, [...records, records[0]]).status).toBe("INVALID_EVIDENCE");
-    expect(evaluateVoiceEvidence(VOICE_EVALUATION_CORPUS, [{ ...records[0], provenance: "AZURE_TTS" }]).status).toBe("INVALID_EVIDENCE");
+    expect(evaluateVoiceEvidence(VOICE_EVALUATION_CORPUS, [{ ...records[0], provenance: "GENERATED_TTS" }]).status).toBe("INVALID_EVIDENCE");
     records[30]!.semantic_verdict = "MEANING_CHANGED";
     expect(evaluateVoiceEvidence(VOICE_EVALUATION_CORPUS, records).status).toBe("BELOW_STT_TARGETS");
   });

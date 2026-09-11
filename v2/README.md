@@ -273,8 +273,19 @@ Run `npm run test:v2-019b2` for the offline freeze, grader, policy, and security
 The two files under repository-root `planning_input/` are frozen, read-only Architecture Source of Truth documents. They are not copied into this workspace.
 
 V2-001 is reversible by removing `v2/` and the V2-scoped `.github/workflows/v2-001.yml` workflow. V1 requires no rollback because V2-001 does not modify it.
-# V2-020A voice checkpoint
+## V2-020C1/C1A unified speech boundary
 
-Voice is opt-in input/presentation only: partials are never submitted; reviewed finals enter the existing Patient/Interpreter text paths, and validated Patient text alone enters optional TTS. Text/manual controls remain independent. The Azure key is injected only into the server token provider; browser SDK 1.51.0 receives an eight-minute in-memory token through the authenticated Session token route. Presentation voice profiles are explicit and do not amend Case truth. No live Azure calls or human voice results exist in this checkpoint.
+Provider selection: CLOSED.
+ElevenLabs provider quality: APPROVED.
+Corpus role: SAFETY / INTEGRATION REGRESSION CORPUS.
+Full 52-live provider-quality retest required: NO.
 
-Run `npm run test:v2-020a` for focused Browser/Deno, token, safety and mocked Playwright checks. Final `npm run verify` includes the new tests/audit. See [voice boundary](../planning_input/v2-020/V2-020A_VOICE_BOUNDARY.md) and [frozen evaluation protocol](../planning_input/v2-020/V2-020A_EVALUATION_PROTOCOL.md). V2-020 is **NOT CLOSED**, pending live Jordanian semantic/latency and TTS human review.
+ElevenLabs is the sole active speech provider (ADR-VOICE-PROVIDER-001): Scribe v2 Realtime `scribe_v2_realtime` for STT and `eleven_v3_conversational` exact-text dialogue WebSocket for TTS. Voice never owns Patient truth, clinical intent/execution, time or assessment. Partial transcripts remain display-only; committed transcripts require learner review/edit before the existing Patient/Interpreter submit paths. Approved Patient text alone enters optional TTS. Mute/replay/text/manual fallback remain independent.
+
+The server alone reads `ELEVENLABS_API_KEY`. Authenticated Session `POST /v1/voice/token` returns version-2.0 capability-specific single-use credentials. No token replay/cache: each connection needs a fresh issuance key, bounded to six attempts per principal/Session per ten minutes. Trusted presentation profiles own voice IDs; none is configured by default. No agent SDK or silent fallback. Native speech-only browser protocol adapters keep provider packages out of the portable core.
+
+Run `npm run test:v2-020c1` after a production build for focused checks; `npm run verify` includes the whole gate. Existing V2-020A/B test command names now test the active provider, not the retired implementation. Future explicitly authorized local smoke: `npm run dev:v2-020:voice-smoke`, loopback `http://127.0.0.1:4182/__dev/voice-smoke`. The DEV launcher requires `V2_ALLOW_LIVE_ELEVENLABS_VOICE_SMOKE=1`; see [migration and credential instructions](../planning_input/v2-020/V2-020_ELEVENLABS_PROVIDER_MIGRATION.md). No live call is part of tests/CI. The production build excludes this route.
+
+The unchanged 52 synthetic definitions, hashes and semantic/safety thresholds are offline/integration regression evidence, not another provider-quality qualification. The product owner has approved Jordanian/Arabic STT and TTS through direct hands-on use. The only remaining V2-020 closure gates are credential/token integration, one real integrated STT smoke, one real exact-text/configured-voice TTS smoke, green safety/integration regressions, server-only permanent key, text/manual fallback, and final verify plus exact-SHA CI. See the migration document for the exact A–G checklist. No live request runs in C1/C1A tests. V2-020 is **NOT CLOSED** pending integration/verification, not quality approval.
+
+Provider default retention may apply; Zero Retention is not claimed. Synthetic educational data only until institutional retention/BAA/privacy/residency review. That restriction on future sensitive data does not reopen the provider decision or add a synthetic quality gate.

@@ -11,7 +11,7 @@ export interface SpeechAdapter {
   }): Promise<RecognitionHandle>;
   synthesize(input: {
     session_id: string; locale: PatientLanguage; voice_id: string;
-    text: string; signal: AbortSignal; firstAudio(ms: number): void;
+    text: string; voice_profile_id: string; signal: AbortSignal; firstAudio(ms: number): void;
   }): Promise<{ play(): Promise<void>; close(): void }>;
 }
 export interface StudentVoiceServices {

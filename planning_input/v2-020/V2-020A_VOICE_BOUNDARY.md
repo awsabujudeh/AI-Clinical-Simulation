@@ -1,3 +1,7 @@
+> HISTORICAL / SUPERSEDED PROVIDER RECORD: Azure-specific runtime, credential and command instructions below are not active. ADR-VOICE-PROVIDER-001 supersedes the provider choice. Use V2-020_ELEVENLABS_PROVIDER_MIGRATION.md for current instructions. This banner does not retroactively change the historical test evidence or reviewed semantic thresholds.
+>
+> C1A CLOSURE SUPERSESSION: Provider selection is CLOSED; ElevenLabs Jordanian/Arabic STT and TTS quality is APPROVED by the product owner. The unchanged 52 fixtures/hashes are SAFETY / INTEGRATION REGRESSION CORPUS, not a required live quality retest. Historical quality, multi-speaker and multi-voice gates below are not current closure requirements. Only the A–G integration/verification checklist in ADR-VOICE-PROVIDER-001 and V2-020_ELEVENLABS_PROVIDER_MIGRATION.md is active.
+
 # V2-020A — Safe Voice Foundation
 
 Implementation checkpoint within V2-020; **V2-020 is NOT CLOSED**. No live Azure calls, credentials, resources, human recordings, or voice-quality claims belong to this checkpoint.

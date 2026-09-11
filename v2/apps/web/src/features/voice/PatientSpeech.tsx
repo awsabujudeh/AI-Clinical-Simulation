@@ -34,7 +34,7 @@ export function PatientSpeech({ voice, turn }: { voice?: StudentVoiceServices; t
     timer.current = setTimeout(() => { if (own === generation.current) { stop(); setPhase("TTS_TIMEOUT"); reportFailure("TTS_TIMEOUT"); } }, 12_000);
     try {
       const ready = audio.current ?? await voice.adapter.synthesize({
-        session_id: parsed.data.session_id, locale: parsed.data.locale,
+        session_id: parsed.data.session_id, locale: parsed.data.locale, voice_profile_id: profile.data.profile_id,
         text: parsed.data.patient_utterance, voice_id: parsed.data.locale === "ar-JO" ? profile.data.voices["ar-JO"] : profile.data.voices["en-US"], signal: active.current.signal,
         firstAudio(ms) {
           const event = VoiceTelemetrySchema.safeParse({ voice_schema_version: "1.0", utterance_id: `tts.${turn.turn_id}`,
