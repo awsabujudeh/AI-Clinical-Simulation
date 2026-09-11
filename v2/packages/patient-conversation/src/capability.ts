@@ -4,6 +4,7 @@ import {
 } from "@ai-clinical-simulation/contracts";
 import {
   AiEvaluationModelCandidateSchema,
+  SELECTED_AI_MODEL_POLICY,
   defineTrustedCapability,
   type AiEvaluationModelCandidate
 } from "@ai-clinical-simulation/ai-gateway";
@@ -57,4 +58,13 @@ export function createPatientConversationCapability(input: {
     max_input_characters: 32_000,
     tools: []
   }, PatientAgentOutputSchema);
+}
+
+export function createSelectedPatientConversationCapability(input: {
+  enabled: boolean;
+}) {
+  return createPatientConversationCapability({
+    enabled: input.enabled,
+    candidate_model: SELECTED_AI_MODEL_POLICY.PATIENT_CONVERSATION
+  });
 }

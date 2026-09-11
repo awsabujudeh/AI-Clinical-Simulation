@@ -90,7 +90,7 @@ export const AiGatewaySafeMetadataSchema = z.strictObject({
   provider_response_id: z.string().min(1).max(160).optional(),
   provider_model: z.string().min(1).max(160).optional(),
   response_status: z.enum(["COMPLETED", "FAILED", "INCOMPLETE", "REFUSED"]),
-  reasoning_effort: z.enum(["minimal", "low", "medium", "high"]).optional(),
+  reasoning_effort: z.enum(["none", "minimal", "low", "medium", "high"]).optional(),
   latency_ms: z.number().finite().nonnegative(),
   retry_count: z.number().int().nonnegative().max(1),
   usage: AiUsageMetadataSchema.optional()

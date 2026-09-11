@@ -27,8 +27,8 @@ import {
   TrustedCapabilityRegistry,
   type AiProvider
 } from "../../../packages/ai-gateway/src/index.ts";
-import { createPatientConversationCapability } from "../../../packages/patient-conversation/src/index.ts";
-import { createClinicalInterpreterCapability } from "../../../packages/clinical-interpreter/src/index.ts";
+import { createSelectedPatientConversationCapability } from "../../../packages/patient-conversation/src/index.ts";
+import { createSelectedClinicalInterpreterCapability } from "../../../packages/clinical-interpreter/src/index.ts";
 import type {
   CompiledCasePackage,
   ReviewExecutionArtifact
@@ -257,7 +257,7 @@ export async function createApiTestHarness(input?: {
           disclosure_status: "WITHIN_PATIENT_BOUNDARY"
         }),
         provider_response_id: `resp_fixture_${patientProviderCalls}`,
-        provider_model: "gpt-5.6-luna",
+        provider_model: "gpt-5.6-terra",
         retry_count: 0
       };
     }
@@ -265,14 +265,13 @@ export async function createApiTestHarness(input?: {
   const patientConversationRepository = new InMemoryPatientConversationRepository(store);
   let interpreterProviderCalls = 0;
   let interpreterOutput: unknown = {
-    output_schema_version: "1.0",
+    output_schema_version: "2.0",
     status: "MATCH",
     ambiguity_reason: null,
     no_match_reason: null,
     candidates: [{
       action_id: "examination.synthetic-check",
-      parameters: {},
-      unresolved_required_parameters: []
+      parameters: []
     }]
   };
   const interpreterProvider: AiProvider = {
@@ -324,7 +323,7 @@ export async function createApiTestHarness(input?: {
             repository: patientConversationRepository,
             gateway: new SecureAiGateway({
               registry: new TrustedCapabilityRegistry([
-                createPatientConversationCapability({ enabled: true, candidate_model: "gpt-5.6-luna" })
+                createSelectedPatientConversationCapability({ enabled: true })
               ]),
               provider: patientProvider,
               capacity: { async authorize() { return { allowed: true as const }; } },
@@ -349,7 +348,7 @@ export async function createApiTestHarness(input?: {
           clinical_interpreter: {
             gateway: new SecureAiGateway({
               registry: new TrustedCapabilityRegistry([
-                createClinicalInterpreterCapability({ enabled: true, candidate_model: "gpt-5.6-luna" })
+                createSelectedClinicalInterpreterCapability({ enabled: true })
               ]),
               provider: interpreterProvider,
               capacity: { async authorize() { return { allowed: true as const }; } },

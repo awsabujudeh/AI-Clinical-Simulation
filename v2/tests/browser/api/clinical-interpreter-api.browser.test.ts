@@ -47,7 +47,7 @@ describe("V2-019B1 secure Clinical Interpreter API", () => {
 
   it("fails closed as NO_MATCH when the provider proposes an unlisted action", async () => {
     const { harness, sessionId } = await startInterpreterSession();
-    harness.setInterpreterOutput({ output_schema_version: "1.0", status: "MATCH", ambiguity_reason: null, no_match_reason: null, candidates: [{ action_id: "procedure.hidden-action", parameters: {}, unresolved_required_parameters: [] }] });
+    harness.setInterpreterOutput({ output_schema_version: "2.0", status: "MATCH", ambiguity_reason: null, no_match_reason: null, candidates: [{ action_id: "procedure.hidden-action", parameters: [] }] });
     const response = await harness.app.request(`/v1/sessions/${sessionId}/actions/interpret`, { method: "POST", headers: apiHeaders(), body: JSON.stringify(interpretationBody()) });
     const body = await response.json() as any;
     expect(response.status).toBe(200);
@@ -56,7 +56,7 @@ describe("V2-019B1 secure Clinical Interpreter API", () => {
 
   it("rejects malformed provider output through second local validation", async () => {
     const { harness, sessionId } = await startInterpreterSession();
-    harness.setInterpreterOutput({ output_schema_version: "1.0", status: "MATCH", ambiguity_reason: null, no_match_reason: null, candidates: [{ action_id: "examination.synthetic-check", parameters: {}, unresolved_required_parameters: [], execute: true }] });
+    harness.setInterpreterOutput({ output_schema_version: "2.0", status: "MATCH", ambiguity_reason: null, no_match_reason: null, candidates: [{ action_id: "examination.synthetic-check", parameters: [], execute: true }] });
     const response = await harness.app.request(`/v1/sessions/${sessionId}/actions/interpret`, { method: "POST", headers: apiHeaders(), body: JSON.stringify(interpretationBody()) });
     expect(response.status).toBe(422);
   });

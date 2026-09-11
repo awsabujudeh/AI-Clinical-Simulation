@@ -24,7 +24,9 @@ const OpenAiOutputItemSchema = z.looseObject({
   content: z.array(OpenAiContentPartSchema).optional()
 });
 
-const OpenAiUsageSchema = z.looseObject({
+// The provider may add nested usage details. Normalize to the stable public
+// token totals instead of forwarding provider-specific keys into strict contracts.
+const OpenAiUsageSchema = z.object({
   input_tokens: z.number().int().nonnegative(),
   output_tokens: z.number().int().nonnegative(),
   total_tokens: z.number().int().nonnegative()

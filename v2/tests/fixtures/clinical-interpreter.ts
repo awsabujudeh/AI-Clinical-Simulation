@@ -1,8 +1,10 @@
 import {
+  CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION,
   ClinicalInterpretationSchema,
   ClinicalInterpreterModelOutputSchema,
   SafeLearnerActionCatalogueSchema,
   type ClinicalInterpreterModelOutput,
+  type ClinicalInterpreterProviderParameterEntry,
   type SafeLearnerActionCatalogue
 } from "../../packages/contracts/src/index.ts";
 import {
@@ -73,21 +75,46 @@ export function modelMatch(input?: {
   parameters?: Record<string, unknown>;
   missing?: string[];
 }): ClinicalInterpreterModelOutput {
+  const actionId = input?.action_id ?? "medication.synthetic-alpha";
+  const action = SYNTHETIC_INTERPRETER_CATALOGUE.actions.find(
+    (candidate) => candidate.action_id === actionId
+  );
+  const definitions = new Map(
+    (action ?? SYNTHETIC_INTERPRETER_CATALOGUE.actions[0]!).parameter_definitions.map(
+      (definition) => [definition.parameter_code, definition] as const
+    )
+  );
+  const parameters = Object.entries(input?.parameters ?? {}).map(
+    ([parameterId, value]): ClinicalInterpreterProviderParameterEntry => {
+      const definition = definitions.get(parameterId as never);
+      const valueType = definition?.value_type
+        ?? (typeof value === "boolean" ? "BOOLEAN"
+          : typeof value === "number" ? "NUMBER" : "STRING");
+      return {
+        parameter_id: parameterId as never,
+        value_type: valueType,
+        string_value: valueType === "STRING" ? value as string : null,
+        number_value: valueType === "NUMBER" ? value as number : null,
+        integer_value: valueType === "INTEGER" ? value as number : null,
+        boolean_value: valueType === "BOOLEAN" ? value as boolean : null,
+        code_value: valueType === "CODE" ? value as never : null
+      };
+    }
+  );
   return {
-    output_schema_version: "1.0",
+    output_schema_version: CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION,
     status: "MATCH",
     ambiguity_reason: null,
     no_match_reason: null,
     candidates: [{
-      action_id: (input?.action_id ?? "medication.synthetic-alpha") as never,
-      parameters: (input?.parameters ?? {}) as never,
-      unresolved_required_parameters: (input?.missing ?? []) as never
+      action_id: actionId as never,
+      parameters
     }]
   };
 }
 
 export const MODEL_NO_MATCH: ClinicalInterpreterModelOutput = {
-  output_schema_version: "1.0",
+  output_schema_version: CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION,
   status: "NO_MATCH",
   ambiguity_reason: null,
   no_match_reason: "NO_ACTIONABLE_COMMAND",
@@ -95,20 +122,18 @@ export const MODEL_NO_MATCH: ClinicalInterpreterModelOutput = {
 };
 
 export const MODEL_AMBIGUOUS: ClinicalInterpreterModelOutput = ClinicalInterpreterModelOutputSchema.parse({
-  output_schema_version: "1.0",
+  output_schema_version: CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION,
   status: "AMBIGUOUS",
   ambiguity_reason: "MULTIPLE_INTENTS",
   no_match_reason: null,
   candidates: [
     {
       action_id: "medication.synthetic-alpha",
-      parameters: {},
-      unresolved_required_parameters: ["dose", "unit"]
+      parameters: []
     },
     {
       action_id: "investigation.synthetic-trace",
-      parameters: {},
-      unresolved_required_parameters: []
+      parameters: []
     }
   ]
 });
@@ -149,12 +174,20 @@ function expectedFor(category: typeof categories[number]) {
       authority: "NON_AUTHORITATIVE",
       status: "AMBIGUOUS",
       ambiguity_reason: "MULTIPLE_INTENTS",
-      candidates: MODEL_AMBIGUOUS.candidates.map((candidate) => ({
-        ...candidate,
-        confirmation_policy: candidate.action_id === "medication.synthetic-alpha"
-          ? "EXPLICIT_ADMINISTRATION"
-          : "NONE"
-      }))
+      candidates: [
+        {
+          action_id: "medication.synthetic-alpha",
+          parameters: {},
+          unresolved_required_parameters: ["dose", "unit"],
+          confirmation_policy: "EXPLICIT_ADMINISTRATION"
+        },
+        {
+          action_id: "investigation.synthetic-trace",
+          parameters: {},
+          unresolved_required_parameters: [],
+          confirmation_policy: "NONE"
+        }
+      ]
     });
   }
   if (["NO_MATCH", "NEGATION", "HYPOTHETICAL", "PAST_TENSE", "PROMPT_INJECTION", "UNAVAILABLE_ACTION", "MALFORMED_INPUT"].includes(category)) {

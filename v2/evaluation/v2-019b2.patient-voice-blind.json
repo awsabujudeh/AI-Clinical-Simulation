@@ -1,0 +1,17 @@
+{
+  "evaluation_freeze_hash": "f2ef12edf75e52016221563975da5689f698659ad12189c06cdeae88785d5523",
+  "pairs": [
+    { "evaluation_case_id": "patient-eval.case-019", "category": "KNOWN_PRESENT_FACT", "locale": "ar-JO", "question": "شو الشكوى اللي جابتك؟", "candidate_A": "عندي شكوى مؤلّفة، بس ما بحسّ بانزعاج اصطناعي هسا.", "candidate_B": "عندي شكوى اصطناعية مؤلفة." },
+    { "evaluation_case_id": "patient-eval.case-020", "category": "KNOWN_ABSENT_FACT", "locale": "ar-JO", "question": "عندك الصفة الاصطناعية المؤلفة؟", "candidate_A": "لا، ما عندي الصفة الاصطناعية المؤلفة.", "candidate_B": "لا، ما عندي هالصفة." },
+    { "evaluation_case_id": "patient-eval.case-021", "category": "UNKNOWN_FACT", "locale": "ar-JO", "question": "بتعرف التفصيل الاصطناعي المجهول؟", "candidate_A": "لا، ما بعرف هالتفصيل.", "candidate_B": "لا، ما بعرف." },
+    { "evaluation_case_id": "patient-eval.case-022", "category": "DIRECT_SYMPTOM_QUESTION", "locale": "ar-JO", "question": "حاسس بانزعاج هسا؟", "candidate_A": "لا، ما بحسّ بانزعاج هسا.", "candidate_B": "لا، ما بحس بانزعاج هسا." },
+    { "evaluation_case_id": "patient-eval.case-023", "category": "PATIENT_KNOWN_HISTORY", "locale": "ar-JO", "question": "احكيلي عن الشكوى اللي بتعرفها.", "candidate_A": "بعرف إن عندي شكوى، بس ما بعرف تفاصيلها.", "candidate_B": "عندي شكوى اصطناعية مؤلفة." },
+    { "evaluation_case_id": "patient-eval.case-024", "category": "CURRENT_MANIFESTATION", "locale": "ar-JO", "question": "كيف حاسس بهاي اللحظة؟", "candidate_A": "ما بحس بأي انزعاج هلا.", "candidate_B": "ما بحس بأي انزعاج هسا." },
+    { "evaluation_case_id": "patient-eval.case-001", "category": "KNOWN_PRESENT_FACT", "locale": "en-US", "question": "What concern brought you here?", "candidate_A": "I’m here because of a concern, but I don’t know the specific detail.", "candidate_B": "I’m here because of a synthetic presenting concern." },
+    { "evaluation_case_id": "patient-eval.case-002", "category": "KNOWN_ABSENT_FACT", "locale": "en-US", "question": "Do you have the authored synthetic feature?", "candidate_A": "No, I don’t have that feature.", "candidate_B": "No, I do not have that feature." },
+    { "evaluation_case_id": "patient-eval.case-003", "category": "UNKNOWN_FACT", "locale": "en-US", "question": "Do you know the authored unknown detail?", "candidate_A": "No, I don’t know that detail.", "candidate_B": "I do not know that detail." },
+    { "evaluation_case_id": "patient-eval.case-004", "category": "DIRECT_SYMPTOM_QUESTION", "locale": "en-US", "question": "Are you uncomfortable right now?", "candidate_A": "No, I’m not uncomfortable right now.", "candidate_B": "No, I’m not uncomfortable right now." },
+    { "evaluation_case_id": "patient-eval.case-005", "category": "PATIENT_KNOWN_HISTORY", "locale": "en-US", "question": "Please describe the concern you know about.", "candidate_A": "I know I have a presenting concern, but I don’t know the specific details about it.", "candidate_B": "I know that my presenting concern is synthetic." },
+    { "evaluation_case_id": "patient-eval.case-006", "category": "CURRENT_MANIFESTATION", "locale": "en-US", "question": "How do you feel at this moment?", "candidate_A": "I don’t have any discomfort right now.", "candidate_B": "I have no synthetic discomfort right now." }
+  ]
+}

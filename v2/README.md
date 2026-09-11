@@ -160,6 +160,7 @@ npm run test:v2-017
 npm run test:v2-018
 npm run test:v2-019a
 npm run test:v2-019b1
+npm run test:v2-019b2
 npm run test:playwright
 npm run test:portability-guard
 npm run verify
@@ -259,7 +260,13 @@ The secure API persists `QUESTION_ASKED` before the provider call, then commits 
 
 `packages/clinical-interpreter/` maps explicit learner clinical-command language to non-authoritative, catalogue-bound `MATCH`, `AMBIGUOUS`, or `NO_MATCH` results through the server-owned Secure AI Gateway capability. Its context contains only canonical locale and the authorized learner-safe action catalogue; it contains no Patient State, rubric, expected action, hidden Case truth, scheduler, or scoring data. Provider output uses one strict top-level object and is reconciled locally against current action and parameter contracts.
 
-The interpreter is a separate Clinical Actions surface and cannot execute. A current recognized candidate only populates the existing manual action form; Case-owned confirmation policy, `ActionRequest`, `/actions/propose`, recovery, idempotency, Session Coordinator, and Clinical Engine remain the sole execution path. Patient Conversation remains dialogue-only, and provider failure leaves manual actions available. The deterministic 54-case corpus and metrics schemas prepare V2-019B2; Luna and Terra remain candidates and no winner is selected. Evidence is under repository-root `planning_input/v2-019/`.
+The interpreter is a separate Clinical Actions surface and cannot execute. A current recognized candidate only populates the existing manual action form; Case-owned confirmation policy, `ActionRequest`, `/actions/propose`, recovery, idempotency, Session Coordinator, and Clinical Engine remain the sole execution path. Patient Conversation remains dialogue-only, and provider failure leaves manual actions available. Evidence is under repository-root `planning_input/v2-019/`.
+
+## V2-019B2 capability-specific model selection
+
+The frozen 648-request synthetic evaluation selects `gpt-5.6-terra` for Patient Conversation and `gpt-5.6-luna` for Clinical Interpreter. Selection is capability-specific and safety-first: Luna had one confirmed Patient unauthorized-grounding violation, while Terra had eight confirmed Interpreter malformed-input execution-intent violations. The selected models are centralized trusted server policy bound to freeze `f2ef12edf75e52016221563975da5689f698659ad12189c06cdeae88785d5523`; browser requests cannot choose a model and there is no silent fallback.
+
+Run `npm run test:v2-019b2` for the offline freeze, grader, policy, and security gate. `npm run eval:v2-019b2:analyze` reproduces aggregate analysis from the external normalized checkpoint; it sends no provider requests. Final evidence is under `planning_input/v2-019/` and `evaluation/`, with the model decision recorded in `planning_input/adr/ADR-AI-MODEL-001.md`.
 
 ## Source of Truth and rollback
 

@@ -1,0 +1,89 @@
+{
+  "freeze": {
+    "evaluation_schema_version": "1.0",
+    "harness_version": "1.2",
+    "result_normalization_version": "1.0",
+    "protocol_id": "v2-019b2.luna-vs-terra",
+    "candidates": [
+      "gpt-5.6-luna",
+      "gpt-5.6-terra"
+    ],
+    "repetitions_per_case": 3,
+    "maximum_concurrency": 2,
+    "total_planned_requests": 648,
+    "case_order_policy": "REPETITION_CAPABILITY_CASE_MODEL_PAIRED",
+    "resume_policy": "FREEZE_BOUND_COMPLETED_RECORDS_SKIP_EXACTLY",
+    "selection_hierarchy": [
+      "HARD_SAFETY",
+      "DETERMINISTIC_CORRECTNESS_RELIABILITY",
+      "PAIRED_STATISTICAL_COMPARISON",
+      "LATENCY",
+      "COST"
+    ],
+    "capabilities": [
+      {
+        "capability": "PATIENT_CONVERSATION",
+        "prompt_id": "prompt.patient-conversation",
+        "prompt_version": "1.0",
+        "prompt_sha256": "179a8e07a1d174333d574388c2c53b20699a87476593d5304511056abb38aaef",
+        "output_schema_id": "ai-schema.patient-conversation",
+        "output_schema_version": "1.0",
+        "authoritative_domain_schema_version": "1.0",
+        "output_schema_sha256": "7f6f3330231fbc5c71a12feed403354736a823e91cdbbca11c5f9fe5500014b1",
+        "reasoning_effort": "low",
+        "max_output_tokens": 256,
+        "timeout_ms": 8000,
+        "max_attempts": 2,
+        "tools": [],
+        "store": false,
+        "corpus_case_count": 54,
+        "corpus_sha256": "f7432435c624add8704eb23eaa5030fdfc21b81dd0157dbdaec48b642d532071",
+        "expected_labels_sha256": "c3544acf098a5696a4255d8329df4b6d33ae1ae315f227d3d9bee1b3be2c676a",
+        "scoring_methodology_sha256": "0345436c29dfe3408bfb0b7051c0b5e2188f4887ab88a7b70b7684a9b11a82ce"
+      },
+      {
+        "capability": "CLINICAL_INTERPRETER",
+        "prompt_id": "prompt.clinical-interpreter",
+        "prompt_version": "1.0",
+        "prompt_sha256": "276628e2e4aad5425352e6465908b6433521c44221d53ba00a600e160eb4fb71",
+        "output_schema_id": "ai-schema.clinical-interpreter",
+        "output_schema_version": "2.0",
+        "authoritative_domain_schema_version": "1.0",
+        "output_schema_sha256": "299c39c289d6e38bb9706b19cb9c7c3c57310f1aba3d0cb7170efdcbeb954885",
+        "reasoning_effort": "low",
+        "max_output_tokens": 1536,
+        "timeout_ms": 8000,
+        "max_attempts": 2,
+        "tools": [],
+        "store": false,
+        "corpus_case_count": 54,
+        "corpus_sha256": "1f8d75faff6f4a48774be5941d355e24b4e6eb72b30bdbd3d22ddf086e86606d",
+        "expected_labels_sha256": "ffb7569ac55b43d683823e41d6ab671944b11f6bfc35aa7f45c3b5573c482f53",
+        "scoring_methodology_sha256": "94eb7ac05301bdce2ccebbe31d2e622fc654336dbaa978d2c57fc3269bb4accd"
+      }
+    ],
+    "pricing": {
+      "snapshot_date": "2026-09-10",
+      "currency": "USD",
+      "unit": "PER_1M_TEXT_TOKENS",
+      "sources": [
+        "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+        "https://developers.openai.com/api/docs/models/gpt-5.6-terra"
+      ],
+      "prices": {
+        "gpt-5.6-luna": {
+          "input": 0.2,
+          "output": 1.2
+        },
+        "gpt-5.6-terra": {
+          "input": 2,
+          "output": 12
+        }
+      },
+      "hard_budget_usd": 5,
+      "cost_calculation_method": "ESTIMATED_INPUT_CHARACTERS_DIVIDED_BY_3_PLUS_MAX_OUTPUT_TOKENS_AT_SNAPSHOT_PRICES",
+      "projected_maximum_usd": 4.708684
+    }
+  },
+  "evaluation_freeze_hash": "f2ef12edf75e52016221563975da5689f698659ad12189c06cdeae88785d5523"
+}

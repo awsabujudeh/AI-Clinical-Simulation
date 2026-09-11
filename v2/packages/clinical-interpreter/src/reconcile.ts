@@ -1,8 +1,10 @@
 import {
   ClinicalInterpretationSchema,
   ClinicalInterpreterModelOutputSchema,
+  JsonObjectSchema,
   type ClinicalInterpretation,
   type ClinicalInterpreterContext,
+  type ClinicalInterpreterProviderParameterEntry,
   type JsonObject,
   type JsonValue,
   type SafeLearnerAction
@@ -36,8 +38,21 @@ function parameterMatches(
       || definition.allowed_codes.some((code) => code === value));
 }
 
+function providerParameterValue(
+  entry: ClinicalInterpreterProviderParameterEntry
+): JsonValue {
+  if (entry.value_type === "STRING") return entry.string_value!;
+  if (entry.value_type === "NUMBER") return entry.number_value!;
+  if (entry.value_type === "INTEGER") return entry.integer_value!;
+  if (entry.value_type === "BOOLEAN") return entry.boolean_value!;
+  return entry.code_value!;
+}
+
 function reconcileCandidate(
-  candidate: { action_id: string; parameters: JsonObject },
+  candidate: {
+    action_id: string;
+    parameters: readonly ClinicalInterpreterProviderParameterEntry[];
+  },
   action: SafeLearnerAction
 ) {
   const definitions = new Map<string, SafeLearnerAction["parameter_definitions"][number]>(
@@ -46,26 +61,27 @@ function reconcileCandidate(
       definition
     ])
   );
-  for (const key of Object.keys(candidate.parameters)) {
-    if (!definitions.has(key)) return undefined;
-  }
-  for (const [key, value] of Object.entries(candidate.parameters)) {
-    const definition = definitions.get(key);
-    if (definition === undefined || !parameterMatches(value, definition)) return undefined;
+  const parameters: Record<string, JsonValue> = Object.create(null) as Record<string, JsonValue>;
+  for (const entry of candidate.parameters) {
+    const definition = definitions.get(entry.parameter_id);
+    if (definition === undefined || definition.value_type !== entry.value_type) return undefined;
+    const value = providerParameterValue(entry);
+    if (!parameterMatches(value, definition)) return undefined;
     if (typeof value === "number"
       && ((definition.minimum !== undefined && value < definition.minimum)
         || (definition.maximum !== undefined && value > definition.maximum))) {
       return undefined;
     }
+    parameters[entry.parameter_id] = value;
   }
   const unresolved = action.parameter_definitions
     .filter((definition) => definition.required
-      && !Object.hasOwn(candidate.parameters, definition.parameter_code))
+      && !Object.hasOwn(parameters, definition.parameter_code))
     .map((definition) => definition.parameter_code)
     .sort();
   return {
     action_id: action.action_id,
-    parameters: candidate.parameters,
+    parameters: JsonObjectSchema.parse(parameters),
     unresolved_required_parameters: unresolved,
     confirmation_policy: action.confirmation_policy
   };

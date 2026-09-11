@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AI_GATEWAY_SCHEMA_VERSION,
+  CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION,
   ClinicalInterpretationSchema,
   ClinicalInterpreterContextSchema,
   ClinicalInterpreterModelOutputSchema,
@@ -83,8 +84,48 @@ describe("V2-019B1 Clinical Interpreter core", () => {
     expect(capability.data.capability_id).toBe(CLINICAL_INTERPRETER_CAPABILITY_ID);
     expect(capability.data.capability_id).not.toBe(PATIENT_CONVERSATION_CAPABILITY_ID);
     expect(capability.data.tools).toEqual([]);
-    expect(capability.data.model_policy.max_output_tokens).toBe(384);
+    expect(capability.data.model_policy.max_output_tokens).toBe(1_536);
+    expect(capability.data.model_policy.reasoning_effort).toBe("low");
     expect(capability.data.prompt.instructions).toMatch(/never.*execute/iu);
+    expect(capability.data.output.output_schema_version).toBe("2.0");
+  });
+
+  it("generates a finite strict provider schema without dynamic or recursive maps", () => {
+    const schema = createClinicalInterpreterCapability({
+      enabled: true,
+      candidate_model: "gpt-5.6-luna"
+    }).output_json_schema;
+    const unsupported = new Set([
+      "propertyNames", "$recursiveRef", "$recursiveAnchor", "unevaluatedProperties",
+      "patternProperties", "dependentSchemas"
+    ]);
+    function inspect(value: unknown, path = "$"): void {
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => inspect(item, `${path}[${index}]`));
+        return;
+      }
+      if (value === null || typeof value !== "object") return;
+      const object = value as Record<string, unknown>;
+      for (const key of Object.keys(object)) {
+        expect(unsupported.has(key), `${path}.${key}`).toBe(false);
+        if (key === "additionalProperties") {
+          expect(object[key], `${path}.${key}`).toBe(false);
+        }
+      }
+      if (object.type === "object") {
+        expect(object.additionalProperties, path).toBe(false);
+      }
+      Object.entries(object).forEach(([key, child]) => inspect(child, `${path}.${key}`));
+    }
+    inspect(schema);
+    const serialized = JSON.stringify(schema);
+    expect(serialized).not.toMatch(/JsonValue|z\.record|Record<string/iu);
+    expect(serialized).not.toContain('"value"');
+    expect(serialized).toContain('"string_value"');
+    expect(serialized).toContain('"number_value"');
+    expect(serialized).toContain('"integer_value"');
+    expect(serialized).toContain('"boolean_value"');
+    expect(serialized).toContain('"code_value"');
   });
 
   it("keeps Luna and Terra as candidates without choosing a winner", () => {
@@ -138,6 +179,47 @@ describe("V2-019B1 Clinical Interpreter core", () => {
     ]) {
       expect(reconcileClinicalInterpretation({ model_output: modelMatch({ parameters }), context: context() }).success).toBe(false);
     }
+  });
+
+  it("fails closed on inconsistent tagged slots, duplicate IDs, and catalogue type mismatch", () => {
+    const base = modelMatch({ parameters: { dose: 2, unit: "mg" } });
+    const candidate = base.candidates[0]!;
+    const dose = candidate.parameters[0]!;
+    expect(reconcileClinicalInterpretation({
+      model_output: {
+        ...base,
+        candidates: [{
+          ...candidate,
+          parameters: [{ ...dose, string_value: "2" }]
+        }]
+      },
+      context: context()
+    }).success).toBe(false);
+    expect(reconcileClinicalInterpretation({
+      model_output: {
+        ...base,
+        candidates: [{ ...candidate, parameters: [dose, dose] }]
+      },
+      context: context()
+    }).success).toBe(false);
+    expect(reconcileClinicalInterpretation({
+      model_output: {
+        ...base,
+        candidates: [{
+          ...candidate,
+          parameters: [{
+            parameter_id: "dose",
+            value_type: "INTEGER",
+            string_value: null,
+            number_value: null,
+            integer_value: 2,
+            boolean_value: null,
+            code_value: null
+          }]
+        }]
+      },
+      context: context()
+    }).success).toBe(false);
   });
 
   it("turns a syntactically valid but unlisted action into NO_MATCH", async () => {
@@ -203,7 +285,8 @@ describe("V2-019B1 Clinical Interpreter core", () => {
   it("fails closed on malformed model output and unknown structured fields", async () => {
     expect((await run({ status: "MATCH" })).success).toBe(false);
     expect((await run({ ...MODEL_NO_MATCH, prompt: "secret" })).success).toBe(false);
-    expect(ClinicalInterpreterModelOutputSchema.safeParse({ ...MODEL_NO_MATCH, output_schema_version: "2.0" }).success).toBe(false);
+    expect(ClinicalInterpreterModelOutputSchema.safeParse({ ...MODEL_NO_MATCH, output_schema_version: "1.0" }).success).toBe(false);
+    expect(MODEL_NO_MATCH.output_schema_version).toBe(CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION);
   });
 
   it("returns a typed failure for provider unavailability with no candidate", async () => {

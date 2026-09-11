@@ -13,7 +13,7 @@ export type AiProviderRequest = Readonly<{
   max_output_tokens: number;
   timeout_ms: number;
   max_attempts: 1 | 2;
-  reasoning_effort?: "minimal" | "low" | "medium" | "high";
+  reasoning_effort?: "none" | "minimal" | "low" | "medium" | "high";
 }>;
 
 export type AiProviderSuccess = Readonly<{

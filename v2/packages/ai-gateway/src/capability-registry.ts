@@ -25,7 +25,7 @@ export type AiEvaluationModelCandidate = z.infer<
 export const TrustedModelPolicySchema = z.strictObject({
   model_policy_id: AiModelPolicyIdSchema,
   candidate_model: AiEvaluationModelCandidateSchema,
-  reasoning_effort: z.enum(["minimal", "low", "medium", "high"]).optional(),
+  reasoning_effort: z.enum(["none", "minimal", "low", "medium", "high"]).optional(),
   max_output_tokens: z.number().int().min(1).max(4096),
   timeout_ms: z.number().int().min(50).max(45_000),
   max_attempts: z.union([z.literal(1), z.literal(2)])

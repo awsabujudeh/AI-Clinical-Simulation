@@ -99,8 +99,13 @@ describe("OpenAI Responses API adapter", () => {
         total_tokens: 26
       }
     })]);
-    expect(await new OpenAiResponsesProvider({ api_key: "test", transport }).execute(REQUEST))
-      .toMatchObject({ success: true, usage: { input_tokens: 17, output_tokens: 9, total_tokens: 26 } });
+    const result = await new OpenAiResponsesProvider({ api_key: "test", transport }).execute(REQUEST);
+    expect(result).toMatchObject({ success: true });
+    expect(result.success && result.usage).toEqual({
+      input_tokens: 17,
+      output_tokens: 9,
+      total_tokens: 26
+    });
   });
 
   it("fails closed when provider output exceeds the local output bound", async () => {

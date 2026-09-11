@@ -42,7 +42,7 @@ check("02 trusted capability ID is CLINICAL_INTERPRETER", capability.includes('C
 check("03 trusted prompt identity is server-owned", capability.includes('CLINICAL_INTERPRETER_PROMPT_ID = "prompt.clinical-interpreter"'));
 check("04 trusted prompt version is pinned", capability.includes('CLINICAL_INTERPRETER_PROMPT_VERSION = "1.0"'));
 check("05 capability has no tools", capability.includes("tools: []") && capability.includes("No tools are available"));
-check("06 output budget is small and bounded", capability.includes("max_output_tokens: 384"));
+check("06 output budget is small and bounded", capability.includes("max_output_tokens: 1_536"));
 check("07 Luna remains an evaluation candidate", corpus.includes("gpt-5.6-luna") || browserTests.includes("gpt-5.6-luna"));
 check("08 Terra remains an evaluation candidate", browserTests.includes("gpt-5.6-terra"));
 check("09 implementation selects no winner", !/winner|selected_model|production_model/iu.test(interpreterSource));
@@ -60,8 +60,8 @@ check("20 clinical effects are absent", !/applyEffect|effect_proposal|clinical_e
 check("21 RAG and retrieval are absent", !/\bRAG\b|embedding|vector search|retrieval/iu.test(interpreterSource));
 check("22 interpreter core cannot submit Clinical Actions", !/submitClinicalAction|submitAction|SessionCoordinator/u.test(interpreterSource));
 check("23 interpreter core cannot call actions/propose", !/actions\/propose/u.test(interpreterSource));
-check("24 provider output is one strict root object", contracts.includes("ClinicalInterpreterModelOutputSchema = z.strictObject"));
-check("25 provider output schema version is pinned", contracts.includes("output_schema_version: z.literal(CLINICAL_INTERPRETER_SCHEMA_VERSION)"));
+check("24 provider output is one strict root object", contracts.includes("ClinicalInterpreterProviderOutputSchema = z.strictObject"));
+check("25 provider output schema version is pinned", contracts.includes('CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION = "2.0"') && contracts.includes("output_schema_version: z.literal(CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION)"));
 check("26 provider output status is bounded", contracts.includes('status: z.enum(["MATCH", "AMBIGUOUS", "NO_MATCH"])'));
 check("27 provider status reasons are explicit nullable fields", contracts.includes("ClinicalInterpreterAmbiguityReasonSchema.nullable()") && contracts.includes("ClinicalInterpreterNoMatchReasonSchema.nullable()"));
 check("28 status-specific second refinement exists", contracts.includes(".superRefine((output, context)"));
@@ -73,7 +73,7 @@ check("33 model output rejects unknown fields", browserTests.includes("unknown s
 check("34 public interpretation declares NON_AUTHORITATIVE", contracts.includes('authority: z.literal("NON_AUTHORITATIVE")'));
 check("35 second local model-output validation exists", reconcile.includes("ClinicalInterpreterModelOutputSchema.safeParse"));
 check("36 action ID is reconciled against catalogue membership", reconcile.includes("actions.get(candidate.action_id)"));
-check("37 extra parameters fail closed", reconcile.includes("if (!definitions.has(key)) return undefined"));
+check("37 extra parameters fail closed", reconcile.includes("if (definition === undefined || definition.value_type !== entry.value_type) return undefined"));
 check("38 parameter primitive types are checked", reconcile.includes("function parameterMatches") && reconcile.includes('definition.value_type === "NUMBER"'));
 check("39 allowed code values are checked", reconcile.includes("definition.allowed_codes.some"));
 check("40 numeric bounds are checked", reconcile.includes("definition.minimum") && reconcile.includes("definition.maximum"));

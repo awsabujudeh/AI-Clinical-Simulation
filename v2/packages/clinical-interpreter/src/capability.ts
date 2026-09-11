@@ -1,9 +1,11 @@
 import {
-  ClinicalInterpreterModelOutputSchema,
+  CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION,
+  ClinicalInterpreterProviderOutputSchema,
   type AiCapabilityId
 } from "@ai-clinical-simulation/contracts";
 import {
   AiEvaluationModelCandidateSchema,
+  SELECTED_AI_MODEL_POLICY,
   defineTrustedCapability,
   type AiEvaluationModelCandidate
 } from "@ai-clinical-simulation/ai-gateway";
@@ -12,7 +14,8 @@ export const CLINICAL_INTERPRETER_CAPABILITY_ID: AiCapabilityId = "CLINICAL_INTE
 export const CLINICAL_INTERPRETER_PROMPT_ID = "prompt.clinical-interpreter" as const;
 export const CLINICAL_INTERPRETER_PROMPT_VERSION = "1.0" as const;
 export const CLINICAL_INTERPRETER_OUTPUT_SCHEMA_ID = "ai-schema.clinical-interpreter" as const;
-export const CLINICAL_INTERPRETER_OUTPUT_SCHEMA_VERSION = "1.0" as const;
+export const CLINICAL_INTERPRETER_OUTPUT_SCHEMA_VERSION =
+  CLINICAL_INTERPRETER_MODEL_OUTPUT_SCHEMA_VERSION;
 
 export const CLINICAL_INTERPRETER_TRUSTED_INSTRUCTIONS = [
   "You only parse an explicit learner clinical command into a non-authoritative candidate.",
@@ -46,7 +49,7 @@ export function createClinicalInterpreterCapability(input: {
       model_policy_id: `model-policy.clinical-interpreter-${candidate.replace("gpt-5.6-", "")}`,
       candidate_model: candidate,
       reasoning_effort: "low",
-      max_output_tokens: 384,
+      max_output_tokens: 1_536,
       timeout_ms: 8_000,
       max_attempts: 2
     },
@@ -57,5 +60,14 @@ export function createClinicalInterpreterCapability(input: {
     },
     max_input_characters: 32_000,
     tools: []
-  }, ClinicalInterpreterModelOutputSchema);
+  }, ClinicalInterpreterProviderOutputSchema);
+}
+
+export function createSelectedClinicalInterpreterCapability(input: {
+  enabled: boolean;
+}) {
+  return createClinicalInterpreterCapability({
+    enabled: input.enabled,
+    candidate_model: SELECTED_AI_MODEL_POLICY.CLINICAL_INTERPRETER
+  });
 }
