@@ -5,8 +5,8 @@ const providerResponse = z.object({ token: z.string().min(1).max(8192).regex(/^[
 export function createElevenLabsTokenProvider(input: { api_key: string; fetch: typeof fetch }): SpeechTokenProvider {
   if (!input.api_key.trim()) throw Error("Voice configuration unavailable.");
   return Object.freeze({
-    async issue(type: "realtime_scribe" | "tts_websocket") {
-      if (type !== "realtime_scribe" && type !== "tts_websocket") throw Error("Voice token unavailable.");
+    async issue(type: "realtime_scribe" | "ttd_websocket") {
+      if (type !== "realtime_scribe" && type !== "ttd_websocket") throw Error("Voice token unavailable.");
       const abort = new AbortController(); const timer = setTimeout(() => abort.abort(), 5000);
       try {
         const response = await input.fetch(`https://api.elevenlabs.io/v1/single-use-token/${type}`, {

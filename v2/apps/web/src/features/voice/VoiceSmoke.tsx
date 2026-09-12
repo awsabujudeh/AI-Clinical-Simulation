@@ -3,6 +3,7 @@ import { PatientLanguageSchema, PatientVoiceProfileSchema, SpeechTokenResponseSc
 import { createElevenLabsSpeechAdapter } from "./elevenlabs-speech-adapter";
 import { browserVoiceClock, createCaptureController, type CaptureSnapshot, type VoiceClock } from "./capture-controller";
 import type { SpeechAdapter, SpeechTokenSource } from "./voice-services";
+import { formatTtsDiagnostic, TtsDiagnostic } from "./tts-diagnostics";
 
 export const SMOKE_REFERENCE = "الألم بلش معي من حوالي ساعة وبحس إنه ضاغط على صدري";
 const HOST = "http://127.0.0.1:4183/__diagnostic/voice-smoke";
@@ -33,6 +34,7 @@ export function VoiceSmoke({ adapter, clock = browserVoiceClock, profiles: suppl
   const [profiles, setProfiles] = useState<PatientVoiceProfile[]>(supplied ?? []);
   const [profileId, setProfileId] = useState(supplied?.[0]?.profile_id ?? "");
   const [tts, setTts] = useState("NOT_REQUESTED"); const [firstAudio, setFirstAudio] = useState<number>();
+  const [ttsDiagnostic, setTtsDiagnostic] = useState("NONE");
   const audio = useRef<Awaited<ReturnType<SpeechAdapter["synthesize"]>> | undefined>(undefined);
   const attempt = useRef<AbortController | undefined>(undefined);
   const speech = useMemo(() => adapter ?? createElevenLabsSpeechAdapter(createSmokeTokenSource(setToken)), [adapter]);
@@ -54,23 +56,27 @@ export function VoiceSmoke({ adapter, clock = browserVoiceClock, profiles: suppl
       }).catch(() => { /* Safe text-only mode; no provider request. */ });
     return () => abort.abort();
   }, [supplied]);
-  useEffect(() => () => { controller.dispose(); attempt.current?.abort(); audio.current?.close(); }, [controller]);
+  useEffect(() => () => { controller.dispose(); attempt.current?.abort(); attempt.current = undefined; audio.current?.close(); audio.current = undefined; }, [controller]);
   const active = ["REQUESTING_PERMISSION", "LISTENING", "PROCESSING_FINAL"].includes(snapshot.phase);
   const permission = metrics?.permission_outcome ?? (["LISTENING", "PROCESSING_FINAL"].includes(snapshot.phase) ? "GRANTED" : "NOT_REQUESTED");
-  const stopAudio = () => { attempt.current?.abort(); audio.current?.close(); audio.current = undefined; setTts("MUTED"); };
+  const stopAudio = () => { attempt.current?.abort(); attempt.current = undefined; audio.current?.close(); audio.current = undefined; setTts("MUTED"); };
   const play = async () => {
-    try { await audio.current?.play(); setTts("PLAYING"); } catch { setTts("PLAY_REQUIRED"); }
+    const current = audio.current; if (!current) return;
+    try { await current.play(); if (audio.current === current) { setTts("PLAYING"); setTtsDiagnostic("NONE"); } }
+    catch (error) { if (audio.current === current) { setTts("PLAY_REQUIRED"); setTtsDiagnostic(formatTtsDiagnostic(error instanceof TtsDiagnostic ? error : new TtsDiagnostic("TTS_PLAYBACK_FAILED"))); } }
   };
   const generate = async () => {
+    if (attempt.current) return; // Synchronous double-click guard, before React rerenders.
     stopAudio(); const profile = profiles.find(x => x.profile_id === profileId); if (!profile) return;
-    const abort = new AbortController(); attempt.current = abort; setFirstAudio(undefined); setTts("GENERATING");
+    const abort = new AbortController(); attempt.current = abort; setFirstAudio(undefined); setTtsDiagnostic("NONE"); setTts("GENERATING");
     try {
       const result = await speech.synthesize({ session_id: "session.voice-smoke", locale: PatientLanguageSchema.parse("ar-JO"),
         voice_id: profile.voices["ar-JO"], voice_profile_id: profile.profile_id, text: SMOKE_REFERENCE,
-        signal: abort.signal, firstAudio: setFirstAudio });
+        signal: abort.signal, firstAudio: latency => { if (!abort.signal.aborted) setFirstAudio(latency); } });
       if (abort.signal.aborted) { result.close(); return; }
       audio.current = result; await play();
-    } catch { if (!abort.signal.aborted) setTts("TTS_UNAVAILABLE"); }
+    } catch (error) { if (!abort.signal.aborted) { setTts("TTS_UNAVAILABLE"); setTtsDiagnostic(formatTtsDiagnostic(error)); } }
+    finally { if (attempt.current === abort) attempt.current = undefined; }
   };
   return <main style={{ maxWidth: 760, margin: "2rem auto", padding: "1rem" }}>
     <h1>Local ElevenLabs Voice smoke</h1>
@@ -104,6 +110,7 @@ export function VoiceSmoke({ adapter, clock = browserVoiceClock, profiles: suppl
     <button onClick={stopAudio}>Mute / discard audio</button>
     {!profiles.length && <p>TTS is unavailable until trusted voice IDs are configured locally.</p>}
     <p>TTS outcome: {tts}. First audio: {firstAudio ?? "not measured"} ms. Model: eleven_v3_conversational.</p>
+    <p>TTS safe diagnostic: {ttsDiagnostic}. No raw provider messages or close reasons are displayed.</p>
     <p>No Patient/Interpreter submission exists. Closing this page discards text/audio and closes capture.</p>
   </main>;
 }

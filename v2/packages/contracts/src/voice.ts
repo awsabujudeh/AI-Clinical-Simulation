@@ -24,7 +24,7 @@ const tokenFields = {
 export const SpeechTokenResponseSchema = z.discriminatedUnion("capability", [
   z.strictObject({ ...tokenFields, capability: z.literal("STT"), token_type: z.literal("realtime_scribe"),
     model_id: z.literal("scribe_v2_realtime"), language_code: z.enum(["ar", "en"]), secondary_languages: z.array(z.enum(["ar", "en"])).max(1) }),
-  z.strictObject({ ...tokenFields, capability: z.literal("TTS"), token_type: z.literal("tts_websocket"),
+  z.strictObject({ ...tokenFields, capability: z.literal("TTS"), token_type: z.literal("ttd_websocket"),
     model_id: z.literal("eleven_v3_conversational"), voice_profile_id: VoiceProfileIdSchema, voice_id: SpeechVoiceIdSchema })
 ]).refine(value => value.expires_at_ms > value.issued_at_ms && value.expires_at_ms - value.issued_at_ms <= 900_000)
   .refine(value => value.capability !== "STT" || (value.locale === "ar-JO"

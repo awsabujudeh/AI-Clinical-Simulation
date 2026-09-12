@@ -14,7 +14,7 @@ const body = { session_id: "session.voice-smoke", locale: "ar-JO", capability: "
 let exchanges = 0;
 function make(env = environment, fetch = async (url, init) => {
   exchanges++;
-  assert.match(url, /^https:\/\/api\.elevenlabs\.io\/v1\/single-use-token\/(realtime_scribe|tts_websocket)$/u);
+  assert.match(url, /^https:\/\/api\.elevenlabs\.io\/v1\/single-use-token\/(realtime_scribe|ttd_websocket)$/u);
   assert.equal(init.redirect, "error");
   assert.equal(init.headers["xi-api-key"], key);
   return Response.json({ token: `synthetic-token-${exchanges}` });
@@ -83,7 +83,7 @@ test("loopback diagnostic HTTP boundary: origin/path/method/body, cache and sani
     for (const index of [1, 2]) {
       const tts = await call({ headers: { "Idempotency-Key": `smoke.tts.${index}` }, data: JSON.stringify({
         ...body, capability: "TTS", voice_profile_id: `voice-profile.smoke-${index}` }) });
-      assert.equal(tts.status, 200); assert.equal(JSON.parse(tts.text).token_type, "tts_websocket");
+      assert.equal(tts.status, 200); assert.equal(JSON.parse(tts.text).token_type, "ttd_websocket");
     }
   } finally { host.server.closeAllConnections(); await new Promise(resolve => host.server.close(resolve)); }
 });

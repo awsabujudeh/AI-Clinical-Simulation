@@ -1,9 +1,10 @@
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import { VoiceSmoke, createSmokeTokenSource, SMOKE_REFERENCE } from "../../../apps/web/src/features/voice/VoiceSmoke.tsx";
 import { fakeVoiceClock, mockSpeech, SYNTHETIC_VOICE_PROFILE } from "../../fixtures/voice/mock-speech.ts";
 import { SpeechTokenRequestSchema } from "../../../packages/contracts/src/voice.ts";
+import { TTS_FAILURE_CODES, TtsDiagnostic } from "../../../apps/web/src/features/voice/tts-diagnostics.ts";
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement; let root: Root;
 beforeEach(() => { host = document.createElement("div"); document.body.append(host); root = createRoot(host); });
@@ -60,6 +61,8 @@ it("token transport is fixed, carries binding only (never reference/transcript),
   expect(outcomes.at(-1)).toBe("TOKEN_UNAVAILABLE"); expect(JSON.stringify(outcomes)).not.toContain("unsafe");
   transport.mockResolvedValueOnce(new Response(JSON.stringify({ invalid: true })));
   await expect(source(request, new AbortController().signal)).rejects.toThrow("TOKEN_UNAVAILABLE");
+  const keys = transport.mock.calls.map(([, options]) => (options!.headers as Record<string, string>)["Idempotency-Key"]);
+  expect(keys).toHaveLength(3); expect(new Set(keys).size).toBe(3); expect(keys.every(key => /^[0-9a-f-]{36}$/.test(key!))).toBe(true);
 });
 
 
@@ -76,4 +79,54 @@ it("TTS failure retains fixed text and STT/manual review controls", async () => 
   await act(async () => button("Generate TTS").click());
   expect(host.textContent).toContain("TTS_UNAVAILABLE"); expect(host.textContent).toContain(SMOKE_REFERENCE);
   expect(host.textContent).not.toContain("private"); expect(button("Start recording").disabled).toBe(false);
+  expect(host.textContent).toContain("TTS_PROVIDER_ERROR");
+});
+it.each(TTS_FAILURE_CODES)("smoke exposes only the sanitized %s diagnostic, never raw provider content", async code => {
+  const speech = mockSpeech(); speech.adapter.synthesize = async () => { throw new TtsDiagnostic(code,
+    { closeCode: 1008, providerCode: "private-token-bearing-url" }); };
+  await act(async () => root.render(<VoiceSmoke adapter={speech.adapter} profiles={[SYNTHETIC_VOICE_PROFILE]} />));
+  await act(async () => button("Generate TTS").click());
+  expect(host.textContent).toContain(`${code}; close=1008; provider=OTHER`);
+  expect(host.textContent).not.toContain("private-token-bearing-url"); expect(host.textContent).toContain(SMOKE_REFERENCE);
+});
+it("confirmed invalid_token_type remains an allowlisted provider diagnostic with close 1008", async () => {
+  const speech = mockSpeech(); speech.adapter.synthesize = async () => { throw new TtsDiagnostic("TTS_PROVIDER_ERROR",
+    { closeCode: 1008, providerCode: "invalid_token_type" }); };
+  await act(async () => root.render(<VoiceSmoke adapter={speech.adapter} profiles={[SYNTHETIC_VOICE_PROFILE]} />));
+  await act(async () => button("Generate TTS").click());
+  expect(host.textContent).toContain("TTS_PROVIDER_ERROR; close=1008; provider=invalid_token_type");
+  expect(host.textContent).toContain(SMOKE_REFERENCE); expect(button("Start recording").disabled).toBe(false);
+});
+it("React StrictMode mount does not synthesize; same-render double click makes one attempt, explicit retry is fresh", async () => {
+  const speech = mockSpeech(); let reject!: (reason: unknown) => void;
+  const synthesize = vi.fn<typeof speech.adapter.synthesize>(() => new Promise((_done, fail) => { reject = fail; }));
+  speech.adapter.synthesize = synthesize;
+  await act(async () => root.render(<StrictMode><VoiceSmoke adapter={speech.adapter} profiles={[SYNTHETIC_VOICE_PROFILE]} /></StrictMode>));
+  expect(synthesize).not.toHaveBeenCalled();
+  await act(async () => { button("Generate TTS").click(); button("Generate TTS").click(); });
+  expect(synthesize).toHaveBeenCalledOnce(); const firstSignal = synthesize.mock.calls[0]![0].signal;
+  await act(async () => reject(new TtsDiagnostic("TTS_WEBSOCKET_CONNECT_FAILED")));
+  expect(synthesize).toHaveBeenCalledOnce();
+  await act(async () => button("Generate TTS").click()); expect(synthesize).toHaveBeenCalledTimes(2);
+  expect(synthesize.mock.calls[1]![0].signal).not.toBe(firstSignal);
+  await act(async () => reject(new TtsDiagnostic("TTS_TOKEN_UNAVAILABLE")));
+});
+it("autoplay failure can be replayed without a new mint/synthesis; mute releases audio and retains text", async () => {
+  const speech = mockSpeech(); const play = vi.fn().mockRejectedValueOnce(Error("private autoplay detail")).mockResolvedValue(undefined);
+  const close = vi.fn(); const synthesize = vi.fn(async () => ({ play, close })); speech.adapter.synthesize = synthesize;
+  await act(async () => root.render(<VoiceSmoke adapter={speech.adapter} profiles={[SYNTHETIC_VOICE_PROFILE]} />));
+  await act(async () => button("Generate TTS").click()); expect(host.textContent).toContain("PLAY_REQUIRED");
+  expect(host.textContent).toContain("TTS_PLAYBACK_FAILED"); expect(host.textContent).not.toContain("private autoplay detail");
+  await act(async () => button("Play / replay").click()); expect(host.textContent).toContain("PLAYING");
+  expect(host.textContent).toContain("TTS safe diagnostic: NONE"); expect(synthesize).toHaveBeenCalledOnce();
+  await act(async () => button("Mute / discard audio").click()); expect(close).toHaveBeenCalledOnce();
+  expect(button("Play / replay").disabled).toBe(true); expect(host.textContent).toContain(SMOKE_REFERENCE);
+});
+it("mute during pending playback prevents late resolution from replacing MUTED", async () => {
+  const speech = mockSpeech(); let finish!: () => void; const close = vi.fn();
+  speech.adapter.synthesize = async () => ({ play: () => new Promise<void>(resolve => { finish = resolve; }), close });
+  await act(async () => root.render(<VoiceSmoke adapter={speech.adapter} profiles={[SYNTHETIC_VOICE_PROFILE]} />));
+  await act(async () => button("Generate TTS").click());
+  await act(async () => button("Mute / discard audio").click());
+  await act(async () => finish()); expect(host.textContent).toContain("TTS outcome: MUTED"); expect(close).toHaveBeenCalledOnce();
 });

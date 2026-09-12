@@ -1,6 +1,6 @@
 # ADR-VOICE-PROVIDER-001 — ElevenLabs Unified Voice Provider
 
-Status: **ACCEPTED** — explicit product-owner decision, V2-020C1; protocol and closure clarification V2-020C1A.
+Status: **ACCEPTED** — explicit product-owner decision, V2-020C1; protocol and closure clarification V2-020C1A; live-evidence TTD token-type correction V2-020C2A.
 
 Provider selection: CLOSED.
 ElevenLabs provider quality: APPROVED.
@@ -21,7 +21,7 @@ ElevenLabs is the sole active STT and TTS provider. No Azure fallback, hybrid or
 
 - STT targets `scribe_v2_realtime`. Product locales remain `ar-JO` / `en-US`; the speech adapter uses Arabic `ar` with English `en` secondary language, or English `en` without a secondary language.
 - TTS targets `eleven_v3_conversational` through the official v3 Text-to-Dialogue WebSocket, one trusted voice per connection. Input is the exact approved Patient text; no automatic expressive tags, rewriting, summaries, inferred facts or agent conversation. Voice IDs are trusted presentation configuration, not clinical truth. The integrated TTS smoke must use the configured approved patient voice; this does not reopen provider quality. Future model changes require explicit documentation, never fallback.
-- Server-only `ELEVENLABS_API_KEY` mints `realtime_scribe` / `tts_websocket` capability tokens. Minimum necessary speech/token permissions and account-supported credit quotas are required when a key is provisioned later. No browser key or `VITE_*` secret.
+- Server-only `ELEVENLABS_API_KEY` mints `realtime_scribe` for STT and `ttd_websocket` for TTS/Text-to-Dialogue. Minimum necessary speech/token permissions and account-supported credit quotas are required when a key is provisioned later. No browser key or `VITE_*` secret. Callers choose STT/TTS capability, never a raw provider token type.
 - `/v1/voice/token` retains authentication, Session/learner/institution authorization and no-store responses. The smallest response/profile schema revision is `2.0`: provider, capability, token type, single-use material, expiry and trusted model/language/profile. TTS requests choose only an authorized presentation profile ID, not arbitrary provider/model/voice configuration.
 - A token expires after 15 minutes if unused and is consumed by one connection. The broker stores bounded issuance tombstones, **not replayable tokens**. Repeated/in-flight/failed issuance keys fail closed; ambiguity cannot replay credentials. Explicit reconnect uses a fresh key and fresh authorized issuance. Six attempts per principal/Session per ten minutes; 512-entry bounds; tombstones live 15 minutes. Multi-instance deployment requires shared quotas/tombstones. Issuance never changes clinical/Session state.
 - Browser connection attempts also reject reused credentials. Partial (including non-committed final) STT is display-only. Only committed transcripts become editable/reviewable, with explicit microphone gesture, a 15-second cap, cancel/re-record, and no automatic submission. No raw/generated audio is persisted by the application. TTS replay is in-memory presentation; failure leaves approved text and manual workflows available.
@@ -32,13 +32,15 @@ Provider default retention may apply. **Zero Retention is not claimed or verifie
 
 The original 52 synthetic definitions, hashes and semantic/safety thresholds remain unchanged as regression evidence, not provider selection or ElevenLabs quality qualification. Historical speaker/noise/quality-evaluation requirements are superseded as V2-020 closure gates, not erased from the historical record. Official speech protocols are implemented without the general agent-oriented client dependency. This clarification does not authorize live requests, deployment, voice cloning, AI-role changes or Clinical Engine changes. Privacy review before real sensitive healthcare data is a separate data-use restriction, not an extra synthetic V2-020 provider-quality gate.
 
-## Protocol alignment — C1A
+## Protocol alignment — C1A history and C2A correction
 
-Official documentation checked 2026-09-12: the [TTD contract](https://elevenlabs.io/docs/api-reference/text-to-dialogue/ttd-websocket) accepts `single_use_token` in the first message using the same authentication pattern as the TTS WebSocket; the [token contract](https://elevenlabs.io/docs/api-reference/tokens/create) defines `tts_websocket` as its speech-generation capability. Together these document the server-minted token path; mock integration tests prove our wiring, not live account acceptance.
+**Superseded C1/C1A assumption:** documentation inspected on 2026-09-12 was interpreted as allowing an ordinary `tts_websocket` token at TTD because both use first-message `single_use_token` authentication. Mocks proved that wiring, not live acceptance. The product owner's subsequent live TTD error disproves token-type interchangeability: close `1008`, code `invalid_token_type`, message `Token type mismatch: expected 'ttd_websocket', got 'tts_websocket'.` This is preserved attributed live evidence, not an API call performed during the correction.
 
-TTS uses `wss://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=eleven_v3_conversational&output_format=mp3_44100_128`, never the standard non-v3 TTS endpoint. Setup contains one approved voice and single-use authorization; the next frame contains the unchanged approved text and `close_socket`. Playback waits for the full socket final, not just a turn-final marker; audio buffering and timeout remain bounded. STT uses `wss://api.elevenlabs.io/v1/speech-to-text/realtime`, `scribe_v2_realtime` and a `realtime_scribe` token in the `token` query parameter. `ar-JO` maps to `ar` with secondary `en`. Partial text is display-only; committed text enters editable review, never automatic clinical submission.
+**Active C2A contract:** the trusted server maps STT to `POST https://api.elevenlabs.io/v1/single-use-token/realtime_scribe` and TTS/Text-to-Dialogue to `POST https://api.elevenlabs.io/v1/single-use-token/ttd_websocket`. Ordinary `tts_websocket` is not accepted by the active TTD response contract or provider. The browser cannot override token type/provider/model. Fresh issuance, server-only key and one-token/one-attempt semantics are unchanged. The [TTD authentication field](https://elevenlabs.io/docs/api-reference/text-to-dialogue/ttd-websocket) remains `single_use_token`; shared authentication syntax does not imply shared token scope.
 
-## Remaining V2-020 closure gates — only A–G
+TTS uses `wss://api.elevenlabs.io/v1/text-to-dialogue/stream-input?model_id=eleven_v3_conversational&output_format=mp3_44100_128`, never the standard non-v3 TTS endpoint. Setup contains one approved voice and single-use authorization; the next frame contains the unchanged approved text in `inputs`, followed by a separate `{close_socket: true}` frame. Playback waits for the full socket final, not just a turn-final marker; audio buffering and timeout remain bounded. STT uses `wss://api.elevenlabs.io/v1/speech-to-text/realtime`, `scribe_v2_realtime` and a `realtime_scribe` token in the `token` query parameter. `ar-JO` maps to `ar` with secondary `en`. Partial text is display-only; committed text enters editable review, never automatic clinical submission.
+
+## V2-020 closure criteria — only A–G
 
 A. Credential/token integration works end-to-end.
 B. One real integrated STT smoke: microphone → partial → committed editable transcript, without clinical execution.
@@ -49,6 +51,18 @@ F. Text/manual fallback remains available.
 G. Final `npm run verify` and exact-SHA CI pass.
 
 Provider quality is not an open gate. V2-020 remains open only until these integration/verification requirements are met; no live smoke is executed or authorized by C1A itself.
+
+## Final integration evidence
+
+The product owner subsequently confirmed both live browser integrations PASS.
+STT produced a committed editable `ar-JO` transcript with no automatic submission.
+After the C2A token correction, exactly one corrected browser TTD smoke generated
+playable audio using the same approved voice and `eleven_v3_conversational`.
+Human quality remains EXCELLENT / APPROVED. The approximate 1–2 second TTS readiness
+is one user-perceived observation, not a measured population statistic.
+See [final closure report](../v2-020/V2-020_FINAL_CLOSURE_REPORT.md) for attributed
+evidence, safeguards and verification requirements. Overall V2-020 closure requires
+the final commit, normal push and successful exact-SHA CI; no quality retest remains.
 
 ## Primary references
 

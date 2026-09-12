@@ -2,7 +2,7 @@ import { SpeechTokenRequestSchema, SpeechTokenResponseSchema, IdempotencyKeySche
   type PatientVoiceProfile, type SpeechTokenRequest, type SpeechTokenResponse } from "../../../contracts/src/index.ts";
 import { ERRORS, apiError, type ApiServiceResult } from "../errors/api-service-error.ts";
 export interface SpeechTokenProvider {
-  issue(type: "realtime_scribe" | "tts_websocket"): Promise<{ single_use_token: string }>;
+  issue(type: "realtime_scribe" | "ttd_websocket"): Promise<{ single_use_token: string }>;
 }
 export interface SpeechTokenBroker {
   issue(principalId: string, request: SpeechTokenRequest, key: string): Promise<ApiServiceResult<SpeechTokenResponse>>;
@@ -36,7 +36,7 @@ export function createMemorySpeechTokenBroker(provider: SpeechTokenProvider, now
     quota.count++; quotas.set(owner, quota); attempts.set(id, time + 900_000);
     const policy = request.capability === "STT"
       ? { token_type: "realtime_scribe" as const, model_id: "scribe_v2_realtime", language_code: request.locale === "ar-JO" ? "ar" : "en", secondary_languages: request.locale === "ar-JO" ? ["en"] : [] }
-      : { token_type: "tts_websocket" as const, model_id: profile!.model_id, voice_id: request.locale === "ar-JO" ? profile!.voices["ar-JO"] : profile!.voices["en-US"] };
+      : { token_type: "ttd_websocket" as const, model_id: profile!.model_id, voice_id: request.locale === "ar-JO" ? profile!.voices["ar-JO"] : profile!.voices["en-US"] };
     try {
       const token = await provider.issue(policy.token_type);
       const response = SpeechTokenResponseSchema.safeParse({ voice_schema_version: "2.0", provider: "ELEVENLABS", ...request,

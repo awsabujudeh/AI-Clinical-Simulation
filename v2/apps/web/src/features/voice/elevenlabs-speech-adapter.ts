@@ -1,6 +1,7 @@
 import { SpeechTokenResponseSchema } from "@ai-clinical-simulation/contracts";
 import type { SpeechAdapter, SpeechTokenSource } from "./voice-services";
 import { openPcmMicrophone, type PcmMicrophone } from "./pcm-microphone";
+import { TtsDiagnostic, providerTtsDiagnostic } from "./tts-diagnostics";
 
 export interface SpeechBrowserRuntime {
   socket(url: string): WebSocket;
@@ -12,8 +13,13 @@ const browserRuntime: SpeechBrowserRuntime = {
   socket: url => new WebSocket(url), microphone: openPcmMicrophone, now: () => Date.now(),
   audio(bytes) {
     const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" }));
-    const player = new Audio(url); let closed = false;
-    return { async play() { if (closed) throw Error("TTS_FAILED"); player.currentTime = 0; await player.play(); },
+    let player: HTMLAudioElement;
+    try { player = new Audio(url); } catch { URL.revokeObjectURL(url); throw new TtsDiagnostic("TTS_PLAYBACK_FAILED"); }
+    let closed = false;
+    return { async play() {
+      try { if (closed) throw Error(); player.currentTime = 0; await player.play(); }
+      catch { throw new TtsDiagnostic(player.error?.code === 3 || player.error?.code === 4 ? "TTS_AUDIO_DECODE_FAILED" : "TTS_PLAYBACK_FAILED"); }
+    },
       close() { if (closed) return; closed = true; player.pause(); player.removeAttribute("src"); URL.revokeObjectURL(url); } };
   }
 };
@@ -89,40 +95,65 @@ export function createElevenLabsSpeechAdapter(tokens: SpeechTokenSource, runtime
       return handle;
     },
     async synthesize(input) {
-      if (!input.text.trim() || input.text.length > 4000) throw Error("TTS_FAILED");
+      if (!input.text.trim() || input.text.length > 4000) throw new TtsDiagnostic("TTS_PROTOCOL_ERROR");
       const began = runtime.now();
       let token;
       try { token = await acquire({ session_id: input.session_id as never, locale: input.locale, capability: "TTS", voice_profile_id: input.voice_profile_id }, input.signal); }
-      catch { throw Error("TTS_FAILED"); }
-      if (token.capability !== "TTS" || token.voice_id !== input.voice_id || token.voice_profile_id !== input.voice_profile_id) throw Error("TTS_FAILED");
+      catch { throw new TtsDiagnostic("TTS_TOKEN_UNAVAILABLE"); }
+      if (token.capability !== "TTS" || token.voice_id !== input.voice_id || token.voice_profile_id !== input.voice_profile_id) throw new TtsDiagnostic("TTS_TOKEN_UNAVAILABLE");
       return new Promise((resolve, reject) => {
-        let socket: WebSocket; let settled = false; let bytes = 0; let first = true; const chunks: Uint8Array[] = [];
-        const timer = setTimeout(() => fail("TTS_TIMEOUT"), 10000);
-        const release = () => { clearTimeout(timer); input.signal.removeEventListener("abort", abort); socket?.close(); };
-        const fail = (code = "TTS_FAILED") => { if (settled) return; settled = true; release(); chunks.length = 0; reject(Error(code)); };
-        const abort = () => fail();
+        let socket: WebSocket; let settled = false; let opened = false; let bytes = 0; let first = true;
+        let pendingError: TtsDiagnostic | undefined; let closeTimer: ReturnType<typeof setTimeout> | undefined;
+        const chunks: Uint8Array[] = [];
+        const timer = setTimeout(() => fail(pendingError ?? new TtsDiagnostic("TTS_TIMEOUT")), 10000);
+        const release = () => { clearTimeout(timer); clearTimeout(closeTimer); input.signal.removeEventListener("abort", abort); socket?.close(); };
+        const fail = (error: TtsDiagnostic) => { if (settled) return; settled = true; release(); chunks.length = 0; reject(error); };
+        // A provider error precedes its close frame. Briefly retain ONLY sanitized metadata,
+        // never audio/raw error text, so the peer's numeric close code is not lost.
+        const awaitClose = (error: TtsDiagnostic) => {
+          if (settled || pendingError) return; pendingError = error; chunks.length = 0;
+          closeTimer = setTimeout(() => fail(error), 250);
+        };
+        const abort = () => fail(new TtsDiagnostic("TTS_PROTOCOL_ERROR"));
         input.signal.addEventListener("abort", abort, { once: true });
         try {
-          if (input.signal.aborted) { fail(); return; }
+          if (input.signal.aborted) { abort(); return; }
           const url = new URL("wss://api.elevenlabs.io/v1/text-to-dialogue/stream-input");
           url.searchParams.set("model_id", token.model_id); url.searchParams.set("output_format", "mp3_44100_128");
           socket = runtime.socket(url.toString());
           socket.onopen = () => {
-            if (settled) return;
+            if (settled || pendingError || opened) return; opened = true;
             try {
               socket.send(JSON.stringify({ voices: [token.voice_id], single_use_token: token.single_use_token }));
-              socket.send(JSON.stringify({ inputs: [{ text: input.text, voice_id: token.voice_id }], close_socket: true }));
-            } catch { fail(); }
+              socket.send(JSON.stringify({ inputs: [{ text: input.text, voice_id: token.voice_id }] }));
+              socket.send(JSON.stringify({ close_socket: true }));
+            } catch { fail(new TtsDiagnostic("TTS_PROTOCOL_ERROR")); }
           };
-          socket.onerror = () => fail(); socket.onclose = () => { if (!settled) fail(); };
-          socket.onmessage = event => {
+          // Browser handshake errors are opaque: do not guess authentication from code 1006.
+          socket.onerror = () => awaitClose(new TtsDiagnostic("TTS_WEBSOCKET_CONNECT_FAILED"));
+          socket.onclose = event => {
             if (settled) return;
+            const code = pendingError?.code ?? (event.code === 1011 ? "TTS_PROVIDER_ERROR"
+              : !opened || event.code === 1006 ? "TTS_WEBSOCKET_CONNECT_FAILED" : "TTS_PROTOCOL_ERROR");
+            fail(new TtsDiagnostic(code, { closeCode: event.code, providerCode: pendingError?.providerCode }));
+          };
+          socket.onmessage = event => {
+            if (settled || pendingError) return;
             try {
               if (typeof event.data !== "string" || event.data.length > 6000000) throw Error();
               const message = JSON.parse(event.data);
-              if (message.error) throw Error();
+              if (!message || typeof message !== "object" || Array.isArray(message)) throw Error();
+              if (message.error) {
+                awaitClose(providerTtsDiagnostic(message.code ?? message.error?.code ?? message.error?.type ?? message.error)); return;
+              }
+              if (!opened || (message.audio !== undefined && typeof message.audio !== "string")
+                || (message.is_final !== undefined && typeof message.is_final !== "boolean")
+                || (message.is_final_audio_for_turn !== undefined && typeof message.is_final_audio_for_turn !== "boolean")) throw Error();
+              if (message.audio === undefined && message.is_final !== true && message.is_final_audio_for_turn !== true) throw Error();
               if (typeof message.audio === "string" && message.audio.length) {
-                const binary = atob(message.audio); bytes += binary.length;
+                let binary: string;
+                try { binary = atob(message.audio); } catch { fail(new TtsDiagnostic("TTS_AUDIO_DECODE_FAILED")); return; }
+                bytes += binary.length;
                 if (bytes > 4000000) throw Error();
                 chunks.push(Uint8Array.from(binary, c => c.charCodeAt(0)));
                 if (first) { first = false; input.firstAudio(runtime.now() - began); }
@@ -131,11 +162,13 @@ export function createElevenLabsSpeechAdapter(tokens: SpeechTokenSource, runtime
                 if (!bytes) throw Error();
                 const result = new Uint8Array(bytes); let offset = 0;
                 for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
-                const audio = runtime.audio(result); settled = true; release(); chunks.length = 0; resolve(audio);
+                let audio;
+                try { audio = runtime.audio(result); } catch { fail(new TtsDiagnostic("TTS_PLAYBACK_FAILED")); return; }
+                settled = true; release(); chunks.length = 0; resolve(audio);
               }
-            } catch { fail(); }
+            } catch { fail(new TtsDiagnostic("TTS_PROTOCOL_ERROR")); }
           };
-        } catch { fail(); }
+        } catch { fail(new TtsDiagnostic("TTS_WEBSOCKET_CONNECT_FAILED")); }
       });
     }
   };

@@ -20,7 +20,7 @@ export async function speechTokenPortability() {
   }
   return canonicalSerialize(results);
 }
-export const TOKEN_PORTABILITY_EXPECTED = '[["ELEVENLABS","STT","realtime_scribe","scribe_v2_realtime",901000,["ar-JO","ar",["en"]]],["ELEVENLABS","STT","realtime_scribe","scribe_v2_realtime",901000,["en-US","en",[]]],["ELEVENLABS","TTS","tts_websocket","eleven_v3_conversational",901000,"syntheticArabicVoice"]]';
+export const TOKEN_PORTABILITY_EXPECTED = '[["ELEVENLABS","STT","realtime_scribe","scribe_v2_realtime",901000,["ar-JO","ar",["en"]]],["ELEVENLABS","STT","realtime_scribe","scribe_v2_realtime",901000,["en-US","en",[]]],["ELEVENLABS","TTS","ttd_websocket","eleven_v3_conversational",901000,"syntheticArabicVoice"]]';
 export async function voicePortability() {
   const mock = mockSpeech(); const time = fakeVoiceClock();
   const controller = createCaptureController({ adapter: mock.adapter, clock: time.clock,

@@ -50,7 +50,7 @@ describe("authorized single-use speech tokens", () => {
     expect((await t.send({ ...t.req, capability: "TTS", voice_profile_id: "voice-profile.unknown" })).status).toBe(503);
     expect(t.calls()).toBe(0);
     const response = await t.send({ ...t.req, capability: "TTS", voice_profile_id: SYNTHETIC_VOICE_PROFILE.profile_id });
-    expect(response.status).toBe(200); expect(t.types).toEqual(["tts_websocket"]);
+    expect(response.status).toBe(200); expect(t.types).toEqual(["ttd_websocket"]);
     expect((await response.json() as any).data).toMatchObject({ model_id: "eleven_v3_conversational", voice_id: "syntheticArabicVoice" });
   });
   it("rate limits bound fresh/prototype keys and retain no clinical authority", async () => {
@@ -63,7 +63,7 @@ describe("authorized single-use speech tokens", () => {
     const broker = createMemorySpeechTokenBroker({ async issue() { return { single_use_token: "x".repeat(8193) }; } }, () => 100);
     expect((await broker.issue("constructor", SpeechTokenRequestSchema.parse({ session_id: "constructor", locale: "ar-JO", capability: "STT" }), "constructor")).success).toBe(false);
   });
-  it.each(["realtime_scribe", "tts_websocket"] as const)("official %s mint is fixed, no redirects/retries/secrets in output", async type => {
+  it.each(["realtime_scribe", "ttd_websocket"] as const)("active %s mint is fixed, no redirects/retries/secrets in output", async type => {
     let calls = 0;
     const provider = createElevenLabsTokenProvider({ api_key: "synthetic-secret", fetch: async (url, init) => {
       calls++; expect(url).toBe(`https://api.elevenlabs.io/v1/single-use-token/${type}`);
@@ -73,5 +73,35 @@ describe("authorized single-use speech tokens", () => {
     expect(await provider.issue(type)).toEqual({ single_use_token: "synthetic-token" }); expect(calls).toBe(1);
     const failing = createElevenLabsTokenProvider({ api_key: "synthetic-secret", fetch: async () => { throw Error("private"); } });
     await expect(failing.issue(type)).rejects.toThrow("Voice token unavailable.");
+  });
+  it.each(["tts_websocket", "ttd_websocket", "realtime_scribe"])("caller token_type override %s is rejected for both capabilities before minting", async token_type => {
+    const t = await setup();
+    for (const body of [t.req, { ...t.req, capability: "TTS", voice_profile_id: SYNTHETIC_VOICE_PROFILE.profile_id }]) {
+      expect((await t.send({ ...body, token_type })).status).toBe(400);
+    }
+    expect(t.calls()).toBe(0);
+  });
+  it("TTS requests cannot override trusted provider/model/voice", async () => {
+    const t = await setup();
+    for (const override of [{ provider: "ELEVENLABS" }, { model_id: "eleven_v3_conversational" }, { voice_id: "syntheticArabicVoice" }]) {
+      expect((await t.send({ ...t.req, capability: "TTS", voice_profile_id: SYNTHETIC_VOICE_PROFILE.profile_id, ...override })).status).toBe(400);
+    }
+    expect(t.calls()).toBe(0);
+  });
+  it("ordinary TTS and arbitrary mint types are rejected by the provider before any transport", async () => {
+    let calls = 0;
+    const provider = createElevenLabsTokenProvider({ api_key: "synthetic-secret", fetch: async () => { calls++; return Response.json({ token: "synthetic-token" }); } });
+    for (const type of ["tts_websocket", "constructor", "../tts_websocket", "OTHER"]) {
+      await expect(provider.issue(type as never)).rejects.toThrow("Voice token unavailable.");
+    }
+    expect(calls).toBe(0);
+  });
+  it("TTS response requires ttd_websocket; an ordinary TTS token is not accepted as dialogue authorization", async () => {
+    const t = await setup();
+    const response = await t.send({ ...t.req, capability: "TTS", voice_profile_id: SYNTHETIC_VOICE_PROFILE.profile_id });
+    const token = (await response.json() as any).data;
+    expect(SpeechTokenResponseSchema.safeParse(token).success).toBe(true);
+    expect(token.token_type).toBe("ttd_websocket");
+    expect(SpeechTokenResponseSchema.safeParse({ ...token, token_type: "tts_websocket" }).success).toBe(false);
   });
 });

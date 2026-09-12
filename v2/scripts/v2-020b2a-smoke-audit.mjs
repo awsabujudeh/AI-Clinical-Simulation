@@ -25,7 +25,9 @@ assert.match(page, /createCaptureController\(/u);
 assert.match(page, /onClick=.*controller\.start\(\)/u);
 // Closed import allowlist: no downstream capability service can be introduced silently.
 const imports = [...page.matchAll(/from\s+"([^"]+)"/gu)].map(match => match[1]).sort();
-assert.deepEqual(imports, ["./elevenlabs-speech-adapter", "./capture-controller", "./voice-services", "@ai-clinical-simulation/contracts", "react"].sort());
+assert.deepEqual(imports, ["./elevenlabs-speech-adapter", "./capture-controller", "./voice-services", "./tts-diagnostics", "@ai-clinical-simulation/contracts", "react"].sort());
+const diagnostics = await read("apps/web/src/features/voice/tts-diagnostics.ts");
+assert.doesNotMatch(diagnostics, /\bimport\b|fetch\(|WebSocket|localStorage|indexedDB|console\.|\.reason\b/u);
 assert.doesNotMatch(page, /submitQuestion|submitInterpret|actions\/propose|clinical-engine|assessment-engine|patient-conversation|\.review\(|MediaRecorder|localStorage|indexedDB|writeFile|sendBeacon|WebSocket/u);
 assert.match(page, /text: SMOKE_REFERENCE/u);
 assert.equal([...page.matchAll(/\btransport\(/gu)].length, 1);

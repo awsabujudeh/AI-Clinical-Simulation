@@ -18,6 +18,8 @@ const read = path => readFile(join(root, path), "utf8");
 const voice = (await Promise.all((await files(join(root, "apps/web/src/features/voice"))).map(f => readFile(f, "utf8")))).join("\n");
 const provider = await read("apps/web/src/features/voice/elevenlabs-speech-adapter.ts");
 const server = await read("packages/api-core/src/voice/elevenlabs-token-provider.ts");
+const tokenBroker = await read("packages/api-core/src/voice/token-broker.ts");
+const tokenContract = await read("packages/contracts/src/voice.ts");
 const route = await read("packages/api-core/src/http/create-api-app.ts");
 const capture = await read("apps/web/src/features/voice/capture-controller.ts");
 const tts = await read("apps/web/src/features/voice/PatientSpeech.tsx");
@@ -58,6 +60,8 @@ const checks = [
   ["session authorization before token", route.includes("service.authorizeAndLoad(authority, body.data.session_id)")],
   ["token no-store", route.includes('context.header("Cache-Control", "no-store")')],
   ["server fixed token endpoint and redirect rejection", server.includes("api.elevenlabs.io/v1/single-use-token/") && server.includes('redirect: "error"')],
+  ["active TTD authorization is ttd_websocket, never ordinary TTS; STT remains realtime_scribe",
+    [server, tokenBroker, tokenContract].every(source => source.includes('"ttd_websocket"') && source.includes('"realtime_scribe"') && !source.includes('"tts_websocket"'))],
   ["key absent browser", !/api_key|xi-api-key|ELEVENLABS_API_KEY/u.test(voice)],
   ["no audio persistence", !/localStorage|indexedDB|IndexedDB|MediaRecorder|writeFile|caches\./u.test(voice)],
   ["no clinical execution", !/actions\/propose|session_coordinator|clinical-engine|assessment-engine|patient_state|clinical_time/u.test(voice)],
