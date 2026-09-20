@@ -1,5 +1,18 @@
 # AI Clinical Simulation Platform V2
 
+V2-021 Visual Patient Engine is **CLOSED for Expo scope** after human approval.
+The [closeout record](../planning_input/v2-021/V2-021_CLOSEOUT.md) records final
+live playback evidence and non-blocking POST-EXPO polish.
+V2-021 integrates the approved STEMI Visual Patient natively in the Session UI.
+It is a downstream presentation/interaction layer, never clinical authority.
+Run `npm run dev:v2-021` for the loopback-only actual-App review composition and
+`npm run test:v2-021` for focused regressions. See
+[`V2-021_INTEGRATION.md`](../planning_input/v2-021/V2-021_INTEGRATION.md) for exact
+asset provenance, the explicitly versioned conversation-enabled STEMI review
+successor, live-proof configuration, and unchanged relief/exam limitations.
+Current proof status is recorded in
+[`V2-021_PATIENT_CONVERSATION_VERIFICATION.md`](../planning_input/v2-021/V2-021_PATIENT_CONVERSATION_VERIFICATION.md).
+
 This directory is the isolated workspace for Version 2. The repository-root `README.md` and `er_sim_10.html` remain the untouched V1 fallback/reference and are not imported, moved, or converted here.
 
 V2-001 establishes the preserved portability and test baseline. V2-002 adds shared contracts and identifiers only. It does not implement a Case Schema compiler or package content, clinical/session/assessment engines, medical rules, state transitions, vital calculations, production UI, authentication, databases, AI, speech, media, faculty features, cloud resources, or deployment.

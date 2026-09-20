@@ -155,6 +155,8 @@ export type ApiTestHarness = Awaited<ReturnType<typeof createApiTestHarness>>;
 
 export async function createApiTestHarness(input?: {
   include_stemi?: boolean;
+  review_artifact?: Awaited<ReturnType<typeof prepareStemiReviewArtifact>>;
+  patient_provider?: AiProvider;
   production_package?: CompiledCasePackage;
   enable_patient_conversation?: boolean;
   speech_token_broker?: SpeechTokenBroker;
@@ -165,7 +167,7 @@ export async function createApiTestHarness(input?: {
   );
   const reviewArtifact = input?.include_stemi === false
     ? undefined
-    : await prepareStemiReviewArtifact();
+    : input?.review_artifact ?? await prepareStemiReviewArtifact();
   const store = new ApiTestSessionStore();
   const authority: ApiAuthorityRepository = {
     async resolveProductionCase({ principal_user_id, case_id }) {
@@ -329,7 +331,7 @@ export async function createApiTestHarness(input?: {
               registry: new TrustedCapabilityRegistry([
                 createSelectedPatientConversationCapability({ enabled: true })
               ]),
-              provider: patientProvider,
+              provider: input?.patient_provider ?? patientProvider,
               capacity: { async authorize() { return { allowed: true as const }; } },
               clock: { nowMilliseconds: () => 10 },
               logger: { log() {} }

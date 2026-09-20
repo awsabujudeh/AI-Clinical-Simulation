@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JsonObject, SafeLearnerAction } from "@ai-clinical-simulation/contracts";
+import { currentVisualExamSelection, type VisualExamSelection } from "../visual-patient/exam-intent";
 
 import { useLocalization, type MessageKey } from "../../app/localization";
 import type {
@@ -161,12 +162,16 @@ export function ClinicalActionsPanel({
   auth,
   state,
   enabled,
+  visualExamRequest,
+  onSpeaking,
   onAuthoritativeRefresh
 }: {
   services: StudentUiServices;
   auth: Extract<AuthSnapshot, { status: "AUTHENTICATED" }>;
   state: SessionPresentationState;
   enabled: boolean;
+  visualExamRequest?: VisualExamSelection;
+  onSpeaking?(turnId: string, speaking: boolean): void;
   onAuthoritativeRefresh(): Promise<unknown>;
 }) {
   const { locale, t } = useLocalization();
@@ -187,6 +192,13 @@ export function ClinicalActionsPanel({
   const status = statusPresentation(phase, t);
   const locked = !enabled || submitting.current
     || ["SUBMITTING", "PROCESSING", "IN_DOUBT"].includes(phase);
+
+  // Region/tool intent opens the SAME case-owned catalogue. It cannot grant a
+  // composite examination, invent an anchor finding, or bypass confirmation.
+  useEffect(() => {
+    if (!visualExamRequest || locked || !currentVisualExamSelection(visualExamRequest, state.projection)) return;
+    chooseDomain("EXAMINATION"); setSearch("");
+  }, [visualExamRequest]);
 
   function chooseDomain(next: ActionDomain) {
     setDomain(next);
@@ -287,8 +299,15 @@ export function ClinicalActionsPanel({
         role="tabpanel"
         aria-labelledby={`tab-${domain.toLowerCase()}`}
       >
+        {domain === "EXAMINATION" && visualExamRequest && currentVisualExamSelection(visualExamRequest, state.projection) ? <p role="status" data-testid="visual-exam-intent">
+          {locale === "ar-JO"
+            ? "تم تحديد موضع الفحص. اختر الإجراء السريري المناسب وأكّده؛ لا توجد نتيجة فحص ناتجة عن النقر."
+            : "Examination location selected. Choose and confirm the corresponding case-owned clinical action below. The pointer has not performed an examination or produced a finding."}
+          {visualExamRequest.request.tool === "penlight" ? (locale === "ar-JO" ? " نتيجة الحدقة غير متاحة في عقد الحالة الحالي." : " An anchor-specific pupil result is not defined in the current case contract.") : null}
+        </p> : null}
         {domain === "HISTORY" ? (
           <PatientConversationPanel
+            onSpeaking={onSpeaking}
             voice={services.voice}
             state={state}
             service={services.patient_conversation}

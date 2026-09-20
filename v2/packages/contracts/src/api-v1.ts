@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VisualPatientPresentationSchema } from "./visual-patient.ts";
 
 import { ActionTypeSchema } from "./actions.ts";
 
@@ -253,7 +254,8 @@ export const SafeSessionProjectionSchema = z.strictObject({
   clock_status: z.enum(["RUNNING", "PAUSED"]),
   observations: ObservationProjectionSchema,
   learner_action_catalogue: SafeLearnerActionCatalogueSchema,
-  assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional()
+  assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional(),
+  visual_patient: VisualPatientPresentationSchema.optional()
 });
 export type SafeSessionProjection = z.infer<typeof SafeSessionProjectionSchema>;
 

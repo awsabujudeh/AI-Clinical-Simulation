@@ -40,10 +40,28 @@ assert.match(await read("apps/web/vite.config.mjs"), /mode === "voice-smoke" \? 
 // A real completed production build is REQUIRED; includes source maps if generated.
 const built = await files(join(root, "apps/web/dist"));
 assert.ok(built.some(path => path.endsWith(".js")));
+const smokeSignatures = /__dev\/voice-smoke|__diagnostic\/voice-smoke|Local ElevenLabs Voice smoke|Capture started → first partial|V2_ALLOW_LIVE_ELEVENLABS_VOICE_SMOKE|synthetic-smoke-credential-not-real/u;
+const smokeEndpoint = /(?:https?:\/\/[^\s"'<>]+|127\.0\.0\.1|localhost|\[::1\]):4183\b/u;
+function smokeLeak(text, binaryGlb) {
+  // Geometry/animation buffers can contain the ASCII digits 4183. They are not
+  // executable port configuration. Full smoke/credential/endpoint signatures
+  // still apply to every byte-decoded asset; executable text keeps the old check.
+  return smokeSignatures.test(text) || smokeEndpoint.test(text) || (!binaryGlb && /4183/u.test(text));
+}
+assert.equal(smokeLeak("numeric geometry 0.418312", true), false);
+assert.equal(smokeLeak("const port = 4183", false), true);
+for (const binary of [false, true]) {
+  assert.equal(smokeLeak("http://127.0.0.1:4183", binary), true);
+  assert.equal(smokeLeak("/__diagnostic/voice-smoke", binary), true);
+  assert.equal(smokeLeak("synthetic-smoke-credential-not-real", binary), true);
+}
 for (const path of built) {
-  const text = await readFile(path, "utf8");
-  assert.doesNotMatch(text, /__dev\/voice-smoke|__diagnostic\/voice-smoke|Local ElevenLabs Voice smoke|Capture started → first partial|V2_ALLOW_LIVE_ELEVENLABS_VOICE_SMOKE|4183|synthetic-smoke-credential-not-real/u,
-    "Smoke route, host or test credential entered production bundle");
+  const bytes = await readFile(path);
+  const binaryGlb = path.endsWith(".glb") && bytes.length >= 12
+    && bytes.readUInt32LE(0) === 0x46546c67 && bytes.readUInt32LE(4) === 2
+    && bytes.readUInt32LE(8) === bytes.length;
+  assert.ok(!smokeLeak(bytes.toString("utf8"), binaryGlb),
+    `Smoke route, host or test credential entered production bundle: ${path}`);
 }
 for (const directory of ["apps/web/src", "apps/web/dist", "tests/fixtures/voice", "evaluation/voice"]) {
   for (const path of await files(join(root, directory))) {

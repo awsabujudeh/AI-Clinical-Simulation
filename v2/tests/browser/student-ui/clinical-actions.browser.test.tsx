@@ -366,7 +366,7 @@ describe("V2-016 generic action presentation and validation", () => {
     await click("العربية");
     expect(document.documentElement.lang).toBe("ar-JO");
     expect(document.documentElement.dir).toBe("rtl");
-    await click("الفحص");
+    await act(async () => host.querySelector<HTMLButtonElement>("#tab-examination")!.click());
     expect(text()).toContain("إجراء فحص اصطناعي");
     expect(text()).not.toMatch(/score|rubric|correct action|expected action/iu);
   });

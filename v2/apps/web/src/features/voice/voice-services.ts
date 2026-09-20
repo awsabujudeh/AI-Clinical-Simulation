@@ -2,6 +2,11 @@ import type { PatientLanguage, PatientVoiceProfile, SafePatientConversationTurn,
   SpeechTokenRequest, SpeechTokenResponse, VoiceFailureCode, VoiceTelemetry } from "@ai-clinical-simulation/contracts";
 
 export type RecognitionHandle = { stop(): void; close(): void };
+export type PatientPlaybackEvent = "START" | "END" | "CANCEL" | "ERROR";
+export interface PatientAudioHandle {
+  play(): Promise<void>; close(): void;
+  onPlayback?(listener: (event: PatientPlaybackEvent) => void): () => void;
+}
 export interface SpeechAdapter {
   recognize(input: {
     session_id: string; locale: PatientLanguage; signal: AbortSignal;
@@ -12,7 +17,7 @@ export interface SpeechAdapter {
   synthesize(input: {
     session_id: string; locale: PatientLanguage; voice_id: string;
     text: string; voice_profile_id: string; signal: AbortSignal; firstAudio(ms: number): void;
-  }): Promise<{ play(): Promise<void>; close(): void }>;
+  }): Promise<PatientAudioHandle>;
 }
 export interface StudentVoiceServices {
   adapter: SpeechAdapter;

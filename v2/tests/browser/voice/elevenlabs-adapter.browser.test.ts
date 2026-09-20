@@ -268,8 +268,8 @@ it("real browser media boundary uses MP3 Blob, ordered bytes, recoverable autopl
   const blocked = new DOMException("private", "NotAllowedError"); const play = vi.fn().mockRejectedValueOnce(blocked).mockResolvedValue(undefined);
   const urls = vi.spyOn(URL, "createObjectURL"); const revoke = vi.spyOn(URL, "revokeObjectURL");
   class Socket { constructor(url: string) { return h.runtime.socket(url); } }
-  class AudioMock { currentTime = 0; error: { code: number } | undefined; play = play; pause = vi.fn(); removeAttribute = vi.fn();
-    constructor(readonly src: string) { player = this; }
+  class AudioMock extends EventTarget { currentTime = 0; error: { code: number } | undefined; play = play; pause = vi.fn(); removeAttribute = vi.fn();
+    constructor(readonly src: string) { super(); player = this; }
   }
   vi.stubGlobal("WebSocket", Socket); vi.stubGlobal("Audio", AudioMock);
   h.tokens.mockImplementation(async request => SpeechTokenResponseSchema.parse({ ...request, voice_schema_version: "2.0",

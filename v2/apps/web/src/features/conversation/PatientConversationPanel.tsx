@@ -18,12 +18,14 @@ export function PatientConversationPanel({
   state,
   service,
   enabled,
-  voice
+  voice,
+  onSpeaking
 }: {
   state: SessionPresentationState;
   service?: StudentPatientConversationService;
   enabled: boolean;
   voice?: StudentVoiceServices;
+  onSpeaking?(turnId: string, speaking: boolean): void;
 }) {
   const { locale, t } = useLocalization();
   const [transcript, setTranscript] = useState<Extract<PatientConversationLoadResult, { kind: "AVAILABLE" }>["transcript"]>();
@@ -105,7 +107,7 @@ export function PatientConversationPanel({
               <article key={turn.turn_id} className="patient-conversation__turn">
                 <p><strong>{t("learnerSaid")}</strong> {turn.learner_utterance}</p>
                 <p><strong>{t("patientSaid")}</strong> {turn.patient_utterance}</p>
-                {voice ? <PatientSpeech voice={voice} turn={turn} /> : null}
+                {voice ? <PatientSpeech voice={voice} turn={turn} onSpeaking={onSpeaking} /> : null}
               </article>
             ))}
       </div>

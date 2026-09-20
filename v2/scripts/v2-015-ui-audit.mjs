@@ -11,7 +11,7 @@ async function sourceFiles(directory) {
   for (const entry of entries) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) files.push(...await sourceFiles(path));
-    else if ([".ts", ".tsx", ".css"].includes(extname(entry.name))) files.push(path);
+    else if ([".ts", ".tsx", ".js", ".css"].includes(extname(entry.name))) files.push(path);
   }
   return files;
 }
@@ -35,7 +35,7 @@ function check(name, condition) {
 
 check("React Router 7 is the single router dependency", /^\^7\./u.test(packageJson.dependencies["react-router-dom"]));
 check("TanStack Query 5 is the server-state dependency", /^\^5\./u.test(packageJson.dependencies["@tanstack/react-query"]));
-check("no Three.js dependency", packageJson.dependencies.three === undefined);
+check("approved V2-021 Three.js version pinned", packageJson.dependencies.three === "0.180.0");
 check("no React Three Fiber dependency", packageJson.dependencies["@react-three/fiber"] === undefined);
 check("public route exists", app.includes('path="/"'));
 check("login route exists", app.includes('path="/login"'));
@@ -52,14 +52,15 @@ check("no API core dependency", !joined.includes("api-core"));
 check("no localStorage Session truth", !joined.includes("localStorage"));
 check("no optimistic Query mutation", !joined.includes("onMutate") && !joined.includes("setQueryData"));
 // V2-020 allows bounded presentation-only recording/playback deadlines, never Clinical Time.
-check("no local Clinical-Time timer", !source.filter((entry) => !entry.file.startsWith("apps/web/src/features/voice/"))
+check("no local Clinical-Time timer", !source.filter((entry) => !entry.file.startsWith("apps/web/src/features/voice/") && !entry.file.startsWith("apps/web/src/features/visual-patient/"))
   .some((entry) => /Date\.now|performance\.now|setInterval|setTimeout/u.test(entry.text)));
 check("no client-side random medical state", !joined.includes("Math.random"));
 check("no internal UJ identifier", !/\bUJ\b/u.test(joined));
 check("no legacy patient-locale literal", !/["']en["']/u.test(joined));
 check("Arabic locale is exact", joined.includes('"ar-JO"'));
 check("English locale is exact", joined.includes('"en-US"'));
-check("no media-generation or 3D import", !/@react-three|from ["']three["']|\.glb|\.gltf|\.mp4/u.test(joined));
+check("3D confined to V2-021 presentation boundary", !source.filter(entry => !entry.file.startsWith("apps/web/src/features/visual-patient/"))
+  .some(entry => /@react-three|from ["']three["']|\.glb|\.gltf|\.mp4/u.test(entry.text)));
 check("no diagnostic media asset", !/diagnostic-media|base64,/iu.test(joined));
 check("no action execution endpoint in UI", !joined.includes("actions/propose"));
 check("no Patient AI endpoint in UI", !joined.includes("/questions"));

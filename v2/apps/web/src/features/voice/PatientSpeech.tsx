@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { PatientVoiceProfileSchema, SafePatientConversationTurnSchema, VoiceTelemetrySchema,
   type SafePatientConversationTurn, type VoiceFailureCode } from "@ai-clinical-simulation/contracts";
-import type { StudentVoiceServices } from "./voice-services";
+import type { PatientAudioHandle, StudentVoiceServices } from "./voice-services";
 
-export function PatientSpeech({ voice, turn }: { voice?: StudentVoiceServices; turn: SafePatientConversationTurn }) {
+export function PatientSpeech({ voice, turn, onSpeaking }: { voice?: StudentVoiceServices; turn: SafePatientConversationTurn; onSpeaking?(turnId: string, speaking: boolean): void }) {
   const [muted, setMuted] = useState(false);
   const [phase, setPhase] = useState("IDLE");
   const generation = useRef(0);
   const active = useRef<AbortController | undefined>(undefined);
-  const audio = useRef<{ play(): Promise<void>; close(): void } | undefined>(undefined);
+  const audio = useRef<PatientAudioHandle | undefined>(undefined);
+  const unsubscribe = useRef<(() => void) | undefined>(undefined);
+  const speakingCallback = useRef(onSpeaking); speakingCallback.current = onSpeaking;
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const textReadyAt = useRef(performance.now());
   function reportFailure(code: VoiceFailureCode) {
@@ -17,7 +19,7 @@ export function PatientSpeech({ voice, turn }: { voice?: StudentVoiceServices; t
       completion: "FAILED", edit_occurred: false, failure_code: code });
     if (event.success) { try { voice?.telemetry?.(event.data); } catch { /* optional telemetry */ } }
   }
-  function stop() { generation.current += 1; active.current?.abort(); audio.current?.close(); audio.current = undefined; clearTimeout(timer.current); }
+  function stop() { generation.current += 1; active.current?.abort(); audio.current?.close(); unsubscribe.current?.(); unsubscribe.current = undefined; audio.current = undefined; clearTimeout(timer.current); speakingCallback.current?.(turn.turn_id, false); }
   useEffect(() => {
     stop(); setPhase("IDLE"); textReadyAt.current = performance.now();
     const offline = () => { stop(); setPhase("TTS_FAILED"); };
@@ -45,8 +47,14 @@ export function PatientSpeech({ voice, turn }: { voice?: StudentVoiceServices; t
       });
       if (own !== generation.current) { ready.close(); return; }
       audio.current = ready;
+      unsubscribe.current?.();
+      unsubscribe.current = ready.onPlayback?.(event => {
+        if (own !== generation.current) return;
+        speakingCallback.current?.(turn.turn_id, event === "START");
+        setPhase(event === "START" ? "PLAYING" : event === "ERROR" ? "TTS_FAILED" : "IDLE");
+      });
       try { await ready.play(); if (own === generation.current) setPhase("PLAYING"); }
-      catch { if (own === generation.current) { setPhase("PLAYBACK_BLOCKED"); reportFailure("PLAYBACK_BLOCKED"); } }
+      catch { if (own === generation.current) { speakingCallback.current?.(turn.turn_id, false); setPhase("PLAYBACK_BLOCKED"); reportFailure("PLAYBACK_BLOCKED"); } }
     } catch (error) { if (own === generation.current) {
       const code = error instanceof Error && error.message === "TTS_TIMEOUT" ? "TTS_TIMEOUT" : "TTS_FAILED";
       setPhase(code); reportFailure(code);

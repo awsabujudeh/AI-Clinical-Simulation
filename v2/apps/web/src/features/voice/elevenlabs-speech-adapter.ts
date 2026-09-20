@@ -1,12 +1,13 @@
 import { SpeechTokenResponseSchema } from "@ai-clinical-simulation/contracts";
-import type { SpeechAdapter, SpeechTokenSource } from "./voice-services";
+import type { SpeechAdapter, SpeechTokenSource, PatientAudioHandle } from "./voice-services";
+import { observePatientAudio } from "./patient-audio-playback";
 import { openPcmMicrophone, type PcmMicrophone } from "./pcm-microphone";
 import { TtsDiagnostic, providerTtsDiagnostic } from "./tts-diagnostics";
 
 export interface SpeechBrowserRuntime {
   socket(url: string): WebSocket;
   microphone(signal: AbortSignal, chunk: (pcm: Uint8Array) => void): Promise<PcmMicrophone>;
-  audio(bytes: Uint8Array): { play(): Promise<void>; close(): void };
+  audio(bytes: Uint8Array): PatientAudioHandle;
   now(): number;
 }
 const browserRuntime: SpeechBrowserRuntime = {
@@ -15,12 +16,12 @@ const browserRuntime: SpeechBrowserRuntime = {
     const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "audio/mpeg" }));
     let player: HTMLAudioElement;
     try { player = new Audio(url); } catch { URL.revokeObjectURL(url); throw new TtsDiagnostic("TTS_PLAYBACK_FAILED"); }
-    let closed = false;
+    const handle = observePatientAudio(player, () => URL.revokeObjectURL(url));
     return { async play() {
-      try { if (closed) throw Error(); player.currentTime = 0; await player.play(); }
+      try { await handle.play(); }
       catch { throw new TtsDiagnostic(player.error?.code === 3 || player.error?.code === 4 ? "TTS_AUDIO_DECODE_FAILED" : "TTS_PLAYBACK_FAILED"); }
     },
-      close() { if (closed) return; closed = true; player.pause(); player.removeAttribute("src"); URL.revokeObjectURL(url); } };
+      close: handle.close, onPlayback: handle.onPlayback };
   }
 };
 /** Speech-only official wire protocols. No agent, LLM, tools, fallback or persistent audio. */

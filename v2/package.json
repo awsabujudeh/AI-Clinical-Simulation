@@ -18,6 +18,12 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:v2-021": "node scripts/v2-021-review-host.mjs",
+    "test:v2-021:browser": "vitest run --config vitest.config.mjs tests/browser/visual-patient",
+    "test:v2-021:playwright": "playwright test --config playwright.v2-021.config.mjs",
+    "test:v2-021:audit": "node scripts/v2-021-visual-audit.mjs",
+    "test:v2-021:live-config": "node --test scripts/v2-021-live-proof-test.mjs",
+    "test:v2-021": "npm run typecheck && npm run test:v2-021:browser && npm run test:v2-021:live-config && npm run test:v2-021:audit && npm run test:v2-021:playwright",
     "dev": "npm run dev --workspace @ai-clinical-simulation/web",
     "dev:v2-020:voice-smoke": "node scripts/v2-020c1-voice-smoke.mjs",
     "test:v2-020c1": "npm run typecheck && npm run test:v2-020a:browser && npm run test:v2-020a:deno && npm run test:v2-020b1:runtime && npm run test:v2-020b2a:host && npm run test:v2-020b2a:audit",

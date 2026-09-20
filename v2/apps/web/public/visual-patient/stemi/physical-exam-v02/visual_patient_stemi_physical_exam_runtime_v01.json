@@ -1,0 +1,1087 @@
+{
+  "schema_version": 1,
+  "patient_id": "stemi_male_01",
+  "glb": "visual_patient_stemi_physical_exam_runtime_v01.glb",
+  "authoring_fps": 30,
+  "source_master": "../blender/patient_stemi_visual_master_v01.blend",
+  "export_copy": "../blender/patient_stemi_physical_exam_runtime_v01.blend",
+  "rig": {
+    "name": "Patient_Rig",
+    "bones": 163
+  },
+  "positions": {
+    "semi_fowler": "POSITION_SemiFowler",
+    "supine": "POSITION_Supine"
+  },
+  "animations": {
+    "breathing": "Breathing_Foundation_v01",
+    "speaking": "Speaking_Foundation_v01",
+    "pain_body": "Pain_ChestContact_Idle_v01",
+    "calm_body": "STEMI_Assembly_Resting_Delta_v01",
+    "hand_gesture": "MX_LayingHandGesture_Overlay_v01",
+    "hand_correction": "STEMI_Arrival_ChestContact_Correction_v01",
+    "blink": "Speaking_Foundation_BlinkSupport_v01",
+    "gaze": "Clinical_Relieved_Gaze_Proof_v01",
+    "supine_guard_compensation": "STEMI_Assembly_SupineGuard_ReferenceCompensation_v01"
+  },
+  "facial_states": {
+    "pain": "Clinical_Pain_Strong_v01",
+    "anxious": "Clinical_Anxious_v01",
+    "relieved": "Clinical_Relieved_v01"
+  },
+  "clips": {
+    "POSITION_SemiFowler": {
+      "mode": "base",
+      "duration_seconds": 0.03333333333333333,
+      "weight_channels": {},
+      "track_count": 506
+    },
+    "POSITION_Supine": {
+      "mode": "base",
+      "duration_seconds": 0.03333333333333333,
+      "weight_channels": {},
+      "track_count": 506
+    },
+    "STEMI_Assembly_ChestGuard_Delta_v01": {
+      "mode": "delta",
+      "duration_seconds": 8.0,
+      "weight_channels": {},
+      "track_count": 23
+    },
+    "STEMI_Assembly_Resting_Delta_v01": {
+      "mode": "delta",
+      "duration_seconds": 8.0,
+      "weight_channels": {},
+      "track_count": 12
+    },
+    "MX_LayingHandGesture_Overlay_v01": {
+      "mode": "delta",
+      "duration_seconds": 1.9583333333333333,
+      "weight_channels": {},
+      "track_count": 26
+    },
+    "STEMI_Assembly_SupineGuard_ReferenceCompensation_v01": {
+      "mode": "delta",
+      "duration_seconds": 8.0,
+      "weight_channels": {},
+      "track_count": 2
+    },
+    "Clinical_Relieved_Gaze_Proof_v01": {
+      "mode": "delta",
+      "duration_seconds": 5.0,
+      "weight_channels": {},
+      "track_count": 2
+    },
+    "STEMI_Arrival_ChestContact_Correction_v01": {
+      "mode": "replace",
+      "duration_seconds": 8.0,
+      "weight_channels": {},
+      "track_count": 19
+    },
+    "Speaking_Foundation_v01": {
+      "mode": "mixed",
+      "duration_seconds": 6.0,
+      "weight_channels": {
+        "Patient_AdultMale_Body": [
+          "Jaw_Open",
+          "Mouth_Open",
+          "Lip_Compress",
+          "Speaking_Round",
+          "Speaking_Spread"
+        ],
+        "Patient_Hair_Wavy_CC0_Refined": [
+          "Jaw_Open",
+          "Mouth_Open",
+          "Lip_Compress"
+        ],
+        "Patient_Teeth_Separate_Phase2": [
+          "Jaw_Open",
+          "Mouth_Open"
+        ]
+      },
+      "track_count": 7
+    },
+    "Breathing_Foundation_v01": {
+      "mode": "channels",
+      "duration_seconds": 10.0,
+      "weight_channels": {
+        "Patient_AdultMale_Body": [
+          "Breathing_ThoracicExpansion"
+        ],
+        "Patient_Gown_AbdomenPanel": [
+          "Breathing_ThoracicExpansion"
+        ],
+        "Patient_Gown_ChestPanel": [
+          "Breathing_ThoracicExpansion"
+        ],
+        "Patient_Gown_LeftArmPanel": [
+          "Breathing_ThoracicExpansion"
+        ],
+        "Patient_Gown_RightArmPanel": [
+          "Breathing_ThoracicExpansion"
+        ],
+        "Patient_Gown_Tailored_Cotton": [
+          "Breathing_ThoracicExpansion"
+        ]
+      },
+      "track_count": 6
+    },
+    "Speaking_Foundation_BlinkSupport_v01": {
+      "mode": "channels",
+      "duration_seconds": 6.0,
+      "weight_channels": {
+        "Patient_AdultMale_Body": [
+          "Blink_Left",
+          "Blink_Right"
+        ],
+        "Patient_Eyebrows_Phase2": [
+          "Blink_Left",
+          "Blink_Right"
+        ],
+        "Patient_Hair_Wavy_CC0_Refined": [
+          "Blink_Left",
+          "Blink_Right"
+        ]
+      },
+      "track_count": 3
+    },
+    "ChestContact_SemiFowler": {
+      "mode": "replace",
+      "duration_seconds": 0.03333333333333333,
+      "weight_channels": {},
+      "track_count": 26
+    },
+    "ChestContact_Supine": {
+      "mode": "replace",
+      "duration_seconds": 0.03333333333333333,
+      "weight_channels": {},
+      "track_count": 26
+    },
+    "ChestContact_PositionTransport_v01": {
+      "mode": "replace",
+      "duration_seconds": 1.0,
+      "weight_channels": {},
+      "track_count": 26
+    },
+    "Pain_HandToChest_Enter_v01": {
+      "mode": "replace",
+      "duration_seconds": 1.8,
+      "weight_channels": {},
+      "track_count": 26
+    },
+    "Pain_HandToChest_Enter_Supine_v01": {
+      "mode": "replace",
+      "duration_seconds": 1.8,
+      "weight_channels": {},
+      "track_count": 26
+    },
+    "Pain_ChestContact_Idle_v01": {
+      "mode": "delta",
+      "duration_seconds": 6.0,
+      "weight_channels": {},
+      "track_count": 6
+    },
+    "Pain_HandChest_ToRest_v01": {
+      "mode": "replace",
+      "duration_seconds": 2.2,
+      "weight_channels": {},
+      "track_count": 26,
+      "one_shot": true
+    },
+    "Pain_HandRest_ToChest_v01": {
+      "mode": "replace",
+      "duration_seconds": 2.2,
+      "weight_channels": {},
+      "track_count": 26,
+      "one_shot": true
+    },
+    "Pain_HandChest_ToRest_Supine_v01": {
+      "mode": "replace",
+      "duration_seconds": 2.2,
+      "weight_channels": {},
+      "track_count": 26,
+      "one_shot": true
+    },
+    "Pain_HandRest_ToChest_Supine_v01": {
+      "mode": "replace",
+      "duration_seconds": 2.2,
+      "weight_channels": {},
+      "track_count": 26,
+      "one_shot": true
+    },
+    "Pain_ChestContact_Adjust_v01": {
+      "mode": "delta",
+      "duration_seconds": 1.6,
+      "weight_channels": {},
+      "track_count": 11,
+      "one_shot": true
+    },
+    "Head_Look_LeftSmall_v01": {
+      "mode": "delta",
+      "duration_seconds": 1.3,
+      "weight_channels": {},
+      "track_count": 2,
+      "one_shot": true
+    },
+    "Head_Look_RightSmall_v01": {
+      "mode": "delta",
+      "duration_seconds": 1.4,
+      "weight_channels": {},
+      "track_count": 2,
+      "one_shot": true
+    },
+    "Head_Return_Default_v01": {
+      "mode": "delta",
+      "duration_seconds": 1.1333333333333333,
+      "weight_channels": {},
+      "track_count": 2,
+      "one_shot": true
+    },
+    "Head_Nod_Subtle_v01": {
+      "mode": "delta",
+      "duration_seconds": 1.8,
+      "weight_channels": {},
+      "track_count": 2,
+      "one_shot": true
+    }
+  },
+  "morph_targets": {
+    "Blue blanket draped over lower body": [
+      "Reveal_Abdomen",
+      "Reveal_LowerLegs"
+    ],
+    "Fitted sheet contoured to mattress": [
+      "Bed_Backrest_30",
+      "Bed_Backrest_17",
+      "Bed_Backrest_5"
+    ],
+    "Mattress medical foam core": [
+      "Bed_Backrest_30",
+      "Bed_Backrest_17",
+      "Bed_Backrest_5"
+    ],
+    "Eye_Iris_L": [
+      "Pupil_Constrict",
+      "Pupil_Dilate"
+    ],
+    "Eye_Pupil_L": [
+      "Pupil_Constrict",
+      "Pupil_Dilate"
+    ],
+    "Eye_Iris_R": [
+      "Pupil_Constrict",
+      "Pupil_Dilate"
+    ],
+    "Eye_Pupil_R": [
+      "Pupil_Constrict",
+      "Pupil_Dilate"
+    ],
+    "Patient_AdultMale_Body": [
+      "Blink_Left",
+      "Blink_Right",
+      "Jaw_Open",
+      "Mouth_Open",
+      "Lip_Compress",
+      "Brow_Tension",
+      "Discomfort_Mild",
+      "Breathing_Subtle",
+      "Affect_LidSquint_Left",
+      "Affect_LidTired_Left",
+      "Affect_LidSquint_Right",
+      "Affect_LidTired_Right",
+      "Affect_Comfortable",
+      "Affect_Discomfort_Mild",
+      "Affect_Pain_Moderate",
+      "Affect_Pain_Strong",
+      "Affect_Anxious",
+      "Affect_Weak_Tired",
+      "Affect_Relieved",
+      "Speaking_Round",
+      "Speaking_Spread",
+      "Breathing_ThoracicExpansion",
+      "Clinical_Pain_Strong_v01",
+      "Clinical_Pain_LidCompression_Left",
+      "Clinical_Pain_LidCompression_Right",
+      "Clinical_Anxious_v01",
+      "Clinical_Anxious_AlertLid_Left",
+      "Clinical_Anxious_AlertLid_Right",
+      "Clinical_Relieved_v01",
+      "Clinical_Relieved_CalmLid_Left",
+      "Clinical_Relieved_CalmLid_Right",
+      "Speaking_ArticulationRound_v01",
+      "Speaking_ArticulationSpread_v01"
+    ],
+    "Patient_Eyebrows_Phase2": [
+      "Blink_Left",
+      "Blink_Right",
+      "Brow_Tension",
+      "Discomfort_Mild",
+      "Affect_Comfortable",
+      "Affect_Discomfort_Mild",
+      "Affect_Pain_Moderate",
+      "Affect_Pain_Strong",
+      "Affect_Anxious",
+      "Affect_Weak_Tired",
+      "Affect_Relieved",
+      "Clinical_Pain_Strong_v01",
+      "Clinical_Anxious_v01",
+      "Clinical_Relieved_v01"
+    ],
+    "Patient_Gown_AbdomenPanel": [
+      "Breathing_Subtle",
+      "Supine_Drape",
+      "Breathing_ThoracicExpansion"
+    ],
+    "Patient_Gown_ChestPanel": [
+      "Breathing_Subtle",
+      "Supine_Drape",
+      "Breathing_ThoracicExpansion"
+    ],
+    "Patient_Gown_LeftArmPanel": [
+      "Breathing_Subtle",
+      "Supine_Drape",
+      "Equipment_Cuff_Clearance",
+      "Breathing_ThoracicExpansion"
+    ],
+    "Patient_Gown_RightArmPanel": [
+      "Breathing_Subtle",
+      "Supine_Drape",
+      "Breathing_ThoracicExpansion"
+    ],
+    "Patient_Gown_Tailored_Cotton": [
+      "Breathing_Subtle",
+      "Supine_Drape",
+      "Breathing_ThoracicExpansion"
+    ],
+    "Patient_Hair_Wavy_CC0_Refined": [
+      "Blink_Left",
+      "Blink_Right",
+      "Jaw_Open",
+      "Mouth_Open",
+      "Lip_Compress",
+      "Brow_Tension",
+      "Discomfort_Mild"
+    ],
+    "Patient_Teeth_Separate_Phase2": [
+      "Jaw_Open",
+      "Mouth_Open",
+      "Affect_Comfortable",
+      "Affect_Discomfort_Mild",
+      "Affect_Pain_Moderate",
+      "Affect_Pain_Strong",
+      "Affect_Anxious",
+      "Affect_Weak_Tired",
+      "Affect_Relieved",
+      "Clinical_Pain_Strong_v01",
+      "Clinical_Anxious_v01",
+      "Clinical_Relieved_v01"
+    ],
+    "White sheet waist turnback": [
+      "Reveal_Abdomen"
+    ]
+  },
+  "driver_rules": {
+    "eyelids": "Clinical state helper weight = state weight * (1 - corresponding Blink weight)",
+    "speaking_correctives": "Speaking_ArticulationRound_v01 = Speaking_Round; Speaking_ArticulationSpread_v01 = Speaking_Spread",
+    "accessories": "Shared facial, jaw and blink morph names on brows/teeth/hair follow body",
+    "bed_support": "Baked into each POSITION clip; no browser medical logic"
+  },
+  "layer_order": [
+    "position TRS/bed support interpolation",
+    "periodic pain idle DELTA or approved other body",
+    "gaze OR speaking DELTA",
+    "position-aware contact REPLACE / nonloop entry",
+    "approved breathing morph channels",
+    "approved face/speaking/blink/dependent morph channels",
+    "Independent living one-shots + coordinated binocular target attention"
+  ],
+  "material_adapter": {
+    "material": "Patient_Skin_ClinicalPain_Detail_v01",
+    "tint": [
+      0.7599999904632568,
+      0.699999988079071,
+      0.6399999856948853,
+      1.0
+    ],
+    "base_normal_strength": 0.47999998927116394,
+    "pain_crease_attribute": "_CLINICALPAIN_RESTPOSITION",
+    "pain_crease_strength": 0.55,
+    "pain_crease_distance": 0.00055
+  },
+  "metrics": {
+    "glb_bytes": 65580508,
+    "triangles": 596884,
+    "nodes": 613,
+    "skin_joint_counts": [
+      163
+    ]
+  },
+  "limitations": [
+    "Blender NLA composition and drivers require the supplied runtime adapter; glTF has no native additive-layer semantics.",
+    "Evaluated viewport subdivision/solidify are baked into export geometry; authoring master remains untouched.",
+    "Four skin influences per vertex, as in the earlier browser pipeline.",
+    "Blender SSS and area-light rendering are approximated by browser PBR lighting.",
+    "Analytic pain creases use the supplied material adapter and exported bind-coordinate attribute.",
+    "This package contains the covered presentation; hidden reveal variants remain in the Blender copy."
+  ],
+  "presets": {
+    "arrival": {
+      "position": "semi_fowler",
+      "face": "pain",
+      "body": "pain_body",
+      "breathing": true,
+      "speaking": false,
+      "hand": true
+    },
+    "answering": {
+      "position": "semi_fowler",
+      "face": "pain",
+      "body": "pain_body",
+      "breathing": true,
+      "speaking": true,
+      "hand": true
+    },
+    "relieved": {
+      "position": "semi_fowler",
+      "face": "relieved",
+      "body": "calm_body",
+      "breathing": true,
+      "speaking": false,
+      "hand": false
+    }
+  },
+  "runtime_revision": 4,
+  "contact": {
+    "entry": "Pain_HandToChest_Enter_v01",
+    "entry_supine": "Pain_HandToChest_Enter_Supine_v01",
+    "idle": "Pain_ChestContact_Idle_v01",
+    "semi_fowler": "ChestContact_SemiFowler",
+    "supine": "ChestContact_Supine",
+    "position_transport": "ChestContact_PositionTransport_v01",
+    "anchor": "ChestContact_Anchor",
+    "entry_seconds": 1.8,
+    "idle_seconds": 6,
+    "position_switch_seconds": 2.5,
+    "arm_bones": [
+      "clavicle.L",
+      "shoulder01.L",
+      "upperarm01.L",
+      "upperarm02.L",
+      "lowerarm01.L",
+      "lowerarm02.L",
+      "wrist.L",
+      "finger1-1.L",
+      "finger1-2.L",
+      "finger1-3.L",
+      "metacarpal1.L",
+      "finger2-1.L",
+      "finger2-2.L",
+      "finger2-3.L",
+      "metacarpal2.L",
+      "finger3-1.L",
+      "finger3-2.L",
+      "finger3-3.L",
+      "metacarpal3.L",
+      "finger4-1.L",
+      "finger4-2.L",
+      "finger4-3.L",
+      "metacarpal4.L",
+      "finger5-1.L",
+      "finger5-2.L",
+      "finger5-3.L"
+    ],
+    "policy": "Entry once; independent contact clock; no restart on speech; periodic idle with exact equal endpoint/zero boundary velocity; torso-relative position transport."
+  },
+  "living_behavior": {
+    "name": "Living_Behavior_Foundation_v01",
+    "one_shot_clips": [
+      "Pain_HandChest_ToRest_v01",
+      "Pain_HandRest_ToChest_v01",
+      "Pain_HandChest_ToRest_Supine_v01",
+      "Pain_HandRest_ToChest_Supine_v01",
+      "Pain_ChestContact_Adjust_v01",
+      "Head_Look_LeftSmall_v01",
+      "Head_Look_RightSmall_v01",
+      "Head_Return_Default_v01",
+      "Head_Nod_Subtle_v01"
+    ],
+    "gaze_targets": [
+      "GazeTarget_Default",
+      "GazeTarget_Left",
+      "GazeTarget_Right"
+    ],
+    "head_bones": [
+      "head",
+      "neck03"
+    ],
+    "head_angles_degrees": {
+      "left": 5.5,
+      "right": 4.8,
+      "nod": 2.4
+    },
+    "hand_duration": 2.2,
+    "policy": "Presentation only. Runtime preset gates guarding. Speaking suppresses scanning and automatic hand release. Independent event clocks; seeded varied scheduler; no composite repeating clip.",
+    "eye_gaze_foundation": {
+      "name": "Eye_Gaze_Foundation_V04",
+      "baseline": "V02 eye transforms and approved gaze/speaking curves unchanged",
+      "method": "Common conjugate rotation of both eyes relative to head; zero correction at default; calibrated binocular relationship preserved",
+      "head_local_eye_center": [
+        0.08508550375699997,
+        0.039299700409173965,
+        -3.9959559217095375e-08
+      ],
+      "maximum_look_offset_degrees": 6,
+      "helper_parent": "head",
+      "target_distance_m": 2,
+      "independent_per_eye_aim": false
+    }
+  },
+  "physical_exam": {
+    "name": "Physical_Examination_Runtime_v01",
+    "regions": {
+      "DEFAULT_COVERED": {
+        "reveal": "Reveal_Default_Covered",
+        "region_ids": [],
+        "objects": []
+      },
+      "CHEST": {
+        "reveal": "Reveal_Chest",
+        "region_ids": [
+          "CHEST"
+        ],
+        "objects": [
+          "Region_CHEST"
+        ]
+      },
+      "ABDOMEN": {
+        "reveal": "Reveal_Abdomen",
+        "region_ids": [
+          "ABDOMEN"
+        ],
+        "objects": [
+          "Region_ABDOMEN"
+        ]
+      },
+      "LEFT_ARM": {
+        "reveal": "Reveal_LeftArm",
+        "region_ids": [
+          "LEFT_ARM"
+        ],
+        "objects": [
+          "Region_LEFT_ARM"
+        ]
+      },
+      "RIGHT_ARM": {
+        "reveal": "Reveal_RightArm",
+        "region_ids": [
+          "RIGHT_ARM"
+        ],
+        "objects": [
+          "Region_RIGHT_ARM"
+        ]
+      },
+      "LOWER_LEGS": {
+        "reveal": "Reveal_LowerLegs",
+        "region_ids": [
+          "LEFT_LEG",
+          "RIGHT_LEG"
+        ],
+        "objects": [
+          "Region_LEFT_LEG",
+          "Region_RIGHT_LEG"
+        ]
+      }
+    },
+    "tools": {
+      "inspection": {
+        "label": "Inspection / Pointer",
+        "exam_mode": "inspection"
+      },
+      "stethoscope": {
+        "label": "Stethoscope",
+        "exam_mode": "auscultation"
+      },
+      "penlight": {
+        "label": "Penlight",
+        "exam_mode": "penlight"
+      }
+    },
+    "anchors": {
+      "Exam_Chest_Center": {
+        "object": "Exam_Chest_Center",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 2466,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Heart_Aortic": {
+        "object": "Exam_Heart_Aortic",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 49056,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Heart_Pulmonic": {
+        "object": "Exam_Heart_Pulmonic",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 33324,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Heart_Tricuspid": {
+        "object": "Exam_Heart_Tricuspid",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 14015,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Heart_Mitral": {
+        "object": "Exam_Heart_Mitral",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 28909,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Lung_Left_Upper": {
+        "object": "Exam_Lung_Left_Upper",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 24443,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Lung_Left_Lower": {
+        "object": "Exam_Lung_Left_Lower",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 17306,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Lung_Right_Upper": {
+        "object": "Exam_Lung_Right_Upper",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 40108,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Lung_Right_Lower": {
+        "object": "Exam_Lung_Right_Lower",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 6497,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Abdomen_RUQ": {
+        "object": "Exam_Abdomen_RUQ",
+        "region_id": "ABDOMEN",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 31986,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Abdomen_LUQ": {
+        "object": "Exam_Abdomen_LUQ",
+        "region_id": "ABDOMEN",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 47653,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Abdomen_RLQ": {
+        "object": "Exam_Abdomen_RLQ",
+        "region_id": "ABDOMEN",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 23158,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Abdomen_LLQ": {
+        "object": "Exam_Abdomen_LLQ",
+        "region_id": "ABDOMEN",
+        "tools": [
+          "inspection",
+          "stethoscope"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 47725,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Carotid_Left": {
+        "object": "Exam_Carotid_Left",
+        "region_id": "NECK",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 64751,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Carotid_Right": {
+        "object": "Exam_Carotid_Right",
+        "region_id": "NECK",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "examination",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 58129,
+        "radius_m": 0.019,
+        "content_status": "provisional geometric landmark; content validation pending"
+      },
+      "Exam_Eye_Left": {
+        "object": "Exam_Eye_Left",
+        "region_id": "EYES",
+        "tools": [
+          "inspection",
+          "penlight"
+        ],
+        "kind": "eye_inspection",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 43536,
+        "radius_m": 0.014,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Exam_RadialPulse_Left": {
+        "object": "Exam_RadialPulse_Left",
+        "region_id": "LEFT_ARM",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "palpation",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 29458,
+        "radius_m": 0.019,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Exam_Eye_Right": {
+        "object": "Exam_Eye_Right",
+        "region_id": "EYES",
+        "tools": [
+          "inspection",
+          "penlight"
+        ],
+        "kind": "eye_inspection",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 23464,
+        "radius_m": 0.014,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Exam_RadialPulse_Right": {
+        "object": "Exam_RadialPulse_Right",
+        "region_id": "RIGHT_ARM",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "palpation",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 45275,
+        "radius_m": 0.019,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_HEAD": {
+        "object": "Region_HEAD",
+        "region_id": "HEAD",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 12684,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_FACE": {
+        "object": "Region_FACE",
+        "region_id": "FACE",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 210,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_EYES": {
+        "object": "Region_EYES",
+        "region_id": "EYES",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 41217,
+        "radius_m": 0.014,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_NECK": {
+        "object": "Region_NECK",
+        "region_id": "NECK",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 1530,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_CHEST": {
+        "object": "Region_CHEST",
+        "region_id": "CHEST",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 2570,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_ABDOMEN": {
+        "object": "Region_ABDOMEN",
+        "region_id": "ABDOMEN",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 49963,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_LEFT_ARM": {
+        "object": "Region_LEFT_ARM",
+        "region_id": "LEFT_ARM",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 51919,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_LEFT_HAND": {
+        "object": "Region_LEFT_HAND",
+        "region_id": "LEFT_HAND",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 67641,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_LEFT_LEG": {
+        "object": "Region_LEFT_LEG",
+        "region_id": "LEFT_LEG",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 68564,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_RIGHT_ARM": {
+        "object": "Region_RIGHT_ARM",
+        "region_id": "RIGHT_ARM",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 31696,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_RIGHT_HAND": {
+        "object": "Region_RIGHT_HAND",
+        "region_id": "RIGHT_HAND",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 61023,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      },
+      "Region_RIGHT_LEG": {
+        "object": "Region_RIGHT_LEG",
+        "region_id": "RIGHT_LEG",
+        "tools": [
+          "inspection"
+        ],
+        "kind": "interaction_region",
+        "surface_mesh": "Patient_AdultMale_Body",
+        "surface_vertex": 61865,
+        "radius_m": 0.045,
+        "content_status": "Existing geometric region; no finding"
+      }
+    },
+    "managed_garments": {
+      "Patient_Gown_AbdomenPanel": [
+        "Reveal_Default_Covered",
+        "Reveal_Chest",
+        "Reveal_LeftArm",
+        "Reveal_RightArm",
+        "Reveal_LowerLegs"
+      ],
+      "Patient_Gown_ChestPanel": [
+        "Reveal_Default_Covered",
+        "Reveal_Abdomen",
+        "Reveal_LeftArm",
+        "Reveal_RightArm",
+        "Reveal_LowerLegs"
+      ],
+      "Patient_Gown_LeftArmPanel": [
+        "Reveal_Default_Covered",
+        "Reveal_Chest",
+        "Reveal_Abdomen",
+        "Reveal_RightArm",
+        "Reveal_LowerLegs"
+      ],
+      "Patient_Gown_RightArmPanel": [
+        "Reveal_Default_Covered",
+        "Reveal_Chest",
+        "Reveal_Abdomen",
+        "Reveal_LeftArm",
+        "Reveal_LowerLegs"
+      ],
+      "Reveal_Gown_Abdomen_Folded": [
+        "Reveal_Abdomen"
+      ],
+      "Reveal_Gown_Chest_Folded": [
+        "Reveal_Chest"
+      ],
+      "Reveal_Gown_LeftArm_Folded": [
+        "Reveal_LeftArm"
+      ],
+      "Reveal_Gown_RightArm_Folded": [
+        "Reveal_RightArm"
+      ]
+    },
+    "linen_morphs": {
+      "Blue blanket draped over lower body": {
+        "Reveal_Abdomen": {
+          "Reveal_Abdomen": 1
+        },
+        "Reveal_LowerLegs": {
+          "Reveal_LowerLegs": 1
+        }
+      },
+      "White sheet waist turnback": {
+        "Reveal_Abdomen": {
+          "Reveal_Abdomen": 1
+        }
+      }
+    },
+    "folded_objects": [
+      "Reveal_Gown_Abdomen_Folded",
+      "Reveal_Gown_Chest_Folded",
+      "Reveal_Gown_LeftArm_Folded",
+      "Reveal_Gown_RightArm_Folded"
+    ],
+    "default_position": "supine",
+    "default_cover_state": "Reveal_Default_Covered",
+    "eye_region": "EYES",
+    "equipment_anchors": [
+      "Equip_Oxygen_NasalCannula",
+      "Equip_Oxygen_Mask",
+      "Equip_Defib_Sternal",
+      "Equip_Defib_Apical",
+      "Equip_ECG_V1",
+      "Equip_ECG_V2",
+      "Equip_ECG_V3",
+      "Equip_ECG_V4",
+      "Equip_ECG_V5",
+      "Equip_ECG_V6",
+      "Equip_BP_Cuff_Left",
+      "Equip_IV_Left",
+      "Equip_PulseOximeter_Left",
+      "Equip_BP_Cuff_Right",
+      "Equip_IV_Right",
+      "Equip_PulseOximeter_Right"
+    ],
+    "tools_geometry": "No existing stethoscope or penlight mesh found; lightweight cursor and temporary placement marker",
+    "reveal_operation": "Existing held garment variants / linen morphs; only one selected region. Pelvic coverage always retained.",
+    "clinical_authority": "none; emit visual_exam_request only"
+  },
+  "physical_exam_revision": 1
+}

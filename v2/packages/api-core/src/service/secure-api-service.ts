@@ -1,3 +1,4 @@
+import { projectVisualPatient } from "./visual-patient-projection.ts";
 import {
   ASSESSMENT_DISCLOSURE_SCHEMA_VERSION,
   ASSESSMENT_FINALIZATION_BOUNDARY_SCHEMA_VERSION,
@@ -413,6 +414,7 @@ function safeSessionProjection(
     event_sequence_through: session.next_sequence_no - 1,
     clock_status: session.clinical_clock.status,
     observations: observations.observations,
+    visual_patient: projectVisualPatient(session),
     learner_action_catalogue: learnerActionCatalogue.data,
     ...(session.status === "ACTIVE"
       ? { assessment_disclosure: activeAssessmentProjection(session, authorization, assessmentId) }

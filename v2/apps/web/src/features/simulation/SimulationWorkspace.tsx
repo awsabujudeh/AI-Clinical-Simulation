@@ -1,3 +1,6 @@
+import { useCallback, useState } from "react";
+import { bindVisualExamRequest, type VisualExamSelection } from "../visual-patient/exam-intent";
+import { VisualPatient } from "../visual-patient/VisualPatient";
 import { useLocalization } from "../../app/localization";
 import { formatClinicalTime, isSessionMutationEntryEnabled } from "../../app/session-presentation";
 import type { AuthSnapshot, SessionPresentationState, StudentUiServices } from "../../app/types";
@@ -78,6 +81,11 @@ export function SimulationWorkspace({
   onAuthoritativeRefresh(): Promise<unknown>;
 }) {
   const enabled = isSessionMutationEntryEnabled(state);
+  const [speakers, setSpeakers] = useState<ReadonlySet<string>>(new Set());
+  const [examRequest, setExamRequest] = useState<VisualExamSelection>();
+  const onSpeaking = useCallback((id: string, active: boolean) => {
+    setSpeakers(previous => { const next = new Set(previous); if (active) next.add(id); else next.delete(id); return next; });
+  }, []);
   return (
     <AppFrame auth={auth} onSignOut={services.auth.signOut === undefined ? undefined : () => void services.auth.signOut?.()}>
       <div className={`simulation-workspace simulation-workspace--${state.kind.toLowerCase()}`}>
@@ -85,12 +93,16 @@ export function SimulationWorkspace({
         <PatientHeader state={state} />
         <div className="workspace-grid">
           <ClinicalMonitor state={state} />
-          <VisualPatientSlot />
+          <VisualPatient key={state.projection.session_id} sessionId={state.projection.session_id}
+            presentation={state.projection.visual_patient} speaking={speakers.size > 0}
+            enabled={enabled} onExamRequest={request => setExamRequest(bindVisualExamRequest(request, state.projection))} />
           <ClinicalActionsPanel
             services={services}
             auth={auth}
             state={state}
             enabled={enabled}
+            visualExamRequest={examRequest}
+            onSpeaking={onSpeaking}
             onAuthoritativeRefresh={onAuthoritativeRefresh}
           />
           <InvestigationSlot />
