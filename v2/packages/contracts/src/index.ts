@@ -10,6 +10,7 @@ export * from "./events.ts";
 export * from "./ids.ts";
 export * from "./institutions.ts";
 export * from "./json.ts";
+export * from "./knowledge.ts";
 export * from "./lifecycle.ts";
 export * from "./locales.ts";
 export * from "./observations.ts";

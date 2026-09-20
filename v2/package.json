@@ -18,6 +18,7 @@
     "packages/*"
   ],
   "scripts": {
+    "test:v2-023": "npm run typecheck && vitest run --config vitest.config.mjs tests/browser/knowledge && deno test tests/deno/knowledge_test.ts && node scripts/v2-023-knowledge-proof.mjs && npm run test:portability-guard",
     "dev:v2-021": "node scripts/v2-021-review-host.mjs",
     "test:v2-021:browser": "vitest run --config vitest.config.mjs tests/browser/visual-patient",
     "test:v2-021:playwright": "playwright test --config playwright.v2-021.config.mjs",
