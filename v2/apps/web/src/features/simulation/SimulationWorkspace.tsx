@@ -102,6 +102,7 @@ export function SimulationWorkspace({
             state={state}
             auth={auth}
             assessmentService={services.assessment}
+            {...(services.tutor ? { tutorService: services.tutor } : {})}
             finalizationService={services.finalization}
             onAuthoritativeRefresh={onAuthoritativeRefresh}
           />

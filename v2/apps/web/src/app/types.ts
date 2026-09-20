@@ -222,6 +222,7 @@ export interface StudentFinalizationService {
 }
 
 export type StudentUiServices = Readonly<{
+  tutor?: StudentTutorService;
   investigations?: { load(sessionId: string, resultId: string): Promise<
     { kind: "AVAILABLE"; projection: SafeInvestigationProjection } | { kind: "PENDING" | "UNAVAILABLE" }> };
   voice?: StudentVoiceServices;
@@ -253,3 +254,8 @@ export type SessionEntryDefaults = Readonly<{
   mode: SessionMode;
   patient_language: PatientLanguage;
 }>;
+import type { TutorDebrief } from "@ai-clinical-simulation/contracts";
+export interface StudentTutorService {
+  generate(sessionId: string, locale: PatientLanguage): Promise<
+    { kind: "AVAILABLE"; debrief: TutorDebrief } | { kind: "UNAVAILABLE" }>;
+}

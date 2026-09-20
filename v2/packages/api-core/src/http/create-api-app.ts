@@ -6,6 +6,7 @@ import {
   ApiErrorResponseSchema,
   ApiV1RequestHeadersSchema,
   EndSimulationRequestSchema,
+  TutorDebriefRequestSchema,
   InvestigationPathParametersSchema,
   CorrelationIdSchema,
   RequestIdSchema,
@@ -311,11 +312,15 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
   app.post("/v1/sessions/:session_id/debriefs", async (context) => {
     const path = SessionPathParametersSchema.safeParse(context.req.param());
     if (!path.success) return errorJson(context, ERRORS.malformed);
-    const body = await parseJsonBody(context, z.strictObject({}));
+    const body = await parseJsonBody(context, z.union([TutorDebriefRequestSchema, z.strictObject({})]));
     if (!body.success) return errorJson(context, body.error);
     if (context.get("authority").idempotency_key === undefined) {
       return errorJson(context, ERRORS.malformed);
     }
+    if ("locale" in body.data) return respond(context, await service.getTutorDebrief(
+      context.get("authority"), path.data.session_id, body.data.locale
+    ));
+    // Backward-compatible deterministic V2-017 disclosure request.
     return respond(context, await service.getAssessment(
       context.get("authority"),
       path.data.session_id

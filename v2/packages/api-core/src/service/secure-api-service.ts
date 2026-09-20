@@ -24,6 +24,9 @@ import {
   StartSessionResponseDataSchema,
   SubmitClinicalActionResponseDataSchema,
   type EndSimulationRequest,
+  type AssessmentResult,
+  type TutorDebrief,
+  type TutorOutputLocale,
   type EventType,
   type HashAdapter,
   type SafeFinalAssessmentProjection,
@@ -57,6 +60,7 @@ import {
   type SessionCoordinator
 } from "../../../session-engine/src/index.ts";
 import type { SecureAiGateway } from "../../../ai-gateway/src/index.ts";
+import { buildTutorEvidence, generateTutorDebrief, type TutorRetrieval } from "../../../ai-gateway/src/tutor/debrief.ts";
 import {
   buildPatientConversationContext,
   executePatientConversation
@@ -256,6 +260,7 @@ export type SecureApiDependencies = Readonly<{
   hash_adapter: HashAdapter;
   id_factories: SecureApiIdFactories;
   trusted_time_utc: () => unknown;
+  tutor?: Readonly<{ gateway?: SecureAiGateway; retrieve?: TutorRetrieval }>;
   patient_conversation?: Readonly<{
     repository: PatientConversationRepository;
     gateway: SecureAiGateway;
@@ -627,6 +632,10 @@ function safePatientConversationTurn(input: unknown) {
 }
 
 export function createSecureApiService(dependencies: SecureApiDependencies) {
+  // Bounded server-instance memoization: no browser model/rubric/evidence authority.
+  const debriefs = new Map<string, Promise<TutorDebrief>>();
+  const tutorAttempts = new Map<string, number>();
+  const tutorKeys = new Map<string, { locale: string; result: Promise<ApiServiceResult<TutorDebrief>> }>();
   async function authorizeAndLoad(
     authority: ApiRequestAuthority,
     sessionId: string
@@ -974,10 +983,10 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       : { success: false, error: ERRORS.internal } as const;
   }
 
-  async function evaluateFinal(
+  async function evaluateFinalResult(
     session: InMemorySessionAggregate,
     authorization: AuthorizedSession
-  ): Promise<ApiServiceResult<SafeFinalAssessmentProjection>> {
+  ): Promise<ApiServiceResult<AssessmentResult>> {
     if (session.status !== "ENDED" || session.finalization === undefined) {
       return { success: false, error: ERRORS.assessmentPending };
     }
@@ -1014,8 +1023,77 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       finalization_boundary: boundary.data
     });
     return evaluated.success
-      ? safeFinalAssessment(evaluated.result, authorization)
+      ? { success: true, data: evaluated.result }
       : { success: false, error: ERRORS.internal };
+  }
+
+  async function evaluateFinal(session: InMemorySessionAggregate, authorization: AuthorizedSession): Promise<ApiServiceResult<SafeFinalAssessmentProjection>> {
+    const result = await evaluateFinalResult(session, authorization);
+    return result.success ? safeFinalAssessment(result.data, authorization) : result;
+  }
+
+  async function getTutorDebrief(authority: ApiRequestAuthority, sessionId: string, locale: TutorOutputLocale): Promise<ApiServiceResult<TutorDebrief>> {
+    if (!authority.idempotency_key) return { success: false, error: ERRORS.malformed };
+    const loaded = await authorizeAndLoad(authority, sessionId);
+    if (!loaded.success) return loaded;
+    const { session, authorization } = loaded.data;
+    // Production disclosure remains post-finalization only. Review results never
+    // acquire FINAL status, finalization metadata or production authority.
+    let result: AssessmentResult;
+    if (session.pinned_case.execution_authority === "REVIEW_ONLY") {
+      if (authorization.membership.role === "LEARNER" || session.mode !== "PRACTICE_DEMO"
+        || !("review_execution_hash" in authorization.artifact)) return { success: false, error: ERRORS.domainRejected };
+      const evidence = projectAssessmentEvidenceFromSession(session);
+      if (!evidence.success) return { success: false, error: ERRORS.internal };
+      const evaluated = evaluateReviewAssessment({ evaluation_schema_version: "1.0", execution_authority: "REVIEW_ONLY",
+        evaluation_phase: "LIVE", assessment_id: dependencies.id_factories.createAssessmentId({ session_id: sessionId }),
+        review_execution_artifact: authorization.artifact, session_evidence: evidence.evidence });
+      if (!evaluated.success) return { success: false, error: ERRORS.internal };
+      result = evaluated.result;
+    } else {
+      const final = await evaluateFinalResult(session, authorization);
+      if (!final.success) return final;
+      result = final.data;
+    }
+    const requestKey = canonicalSerialize([authority.principal.user_id, sessionId, authority.idempotency_key]);
+    const previousRequest = tutorKeys.get(requestKey);
+    if (previousRequest) return previousRequest.locale === locale
+      ? previousRequest.result : { success: false, error: ERRORS.idempotency };
+    async function compute(): Promise<ApiServiceResult<TutorDebrief>> {
+    let retrieval: unknown;
+    try { retrieval = await dependencies.tutor?.retrieve?.({ case_version_id: result.case_version_id,
+      institution_id: authorization.institution_id, locale, as_of: String(dependencies.trusted_time_utc()) }); } catch { /* unavailable evidence is optional */ }
+    const packet = buildTutorEvidence({ assessment: result, artifact: authorization.artifact, locale,
+      institution_id: authorization.institution_id, ...(retrieval === undefined ? {} : { retrieval }) });
+    if (!packet) return { success: false, error: ERRORS.internal };
+    const hash = await hashCanonical(dependencies.hash_adapter, packet);
+    if (!hash) return { success: false, error: ERRORS.internal };
+    const cacheKey = canonicalSerialize([authority.principal.user_id, sessionId, locale, hash, "1.0"]);
+    const previous = debriefs.get(cacheKey);
+    if (previous) return { success: true, data: await previous };
+    const budgetKey = canonicalSerialize([sessionId, locale]);
+    const attempts = tutorAttempts.get(budgetKey) ?? 0;
+    const bounded = debriefs.size < 512 && tutorKeys.size < 512;
+    const gateway = bounded && attempts < 2 ? dependencies.tutor?.gateway : undefined;
+    if (bounded) {
+      tutorAttempts.set(budgetKey, attempts + (gateway ? 1 : 0));
+    }
+    const pending = generateTutorDebrief({ packet, hash: dependencies.hash_adapter,
+      request_id: authority.request_id, correlation_id: authority.correlation_id, ...(gateway ? { gateway } : {}) });
+    if (bounded) debriefs.set(cacheKey, pending);
+    try { return { success: true, data: await pending }; }
+    catch { debriefs.delete(cacheKey); return { success: false, error: ERRORS.internal }; }
+    }
+    const promise = compute();
+    if (tutorKeys.size < 512) tutorKeys.set(requestKey, { locale, result: promise });
+    try {
+      const response = await promise;
+      if (!response.success) tutorKeys.delete(requestKey);
+      return response;
+    } catch {
+      tutorKeys.delete(requestKey);
+      return { success: false, error: ERRORS.internal };
+    }
   }
 
   async function endSimulation(input: {
@@ -1351,6 +1429,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     getInvestigationResult,
     endSimulation,
     getAssessment,
+    getTutorDebrief,
     getLearnerTimeline,
     getPatientConversation,
     submitQuestion,

@@ -12,6 +12,8 @@ import type {
 import { Button, Panel, SectionHeader, StatusBadge } from "../../components/ui";
 import { learnerLocalizedText } from "../timeline/timeline-model";
 import { assessmentFindingLabel, formatBasisPoints } from "./assessment-model";
+import { TutorDebriefPanel } from "./TutorDebriefPanel";
+import type { StudentTutorService } from "../../app/types";
 
 type EndPhase = "IDLE" | "SUBMITTING" | "IN_DOUBT" | "FAILED";
 
@@ -20,12 +22,14 @@ export function AssessmentDebriefPanel({
   auth,
   assessmentService,
   finalizationService,
+  tutorService,
   onAuthoritativeRefresh
 }: {
   state: SessionPresentationState;
   auth: Extract<AuthSnapshot, { status: "AUTHENTICATED" }>;
   assessmentService: StudentAssessmentService;
   finalizationService: StudentFinalizationService;
+  tutorService?: StudentTutorService;
   onAuthoritativeRefresh(): Promise<unknown>;
 }) {
   const { locale, t } = useLocalization();
@@ -171,6 +175,10 @@ export function AssessmentDebriefPanel({
       {endPhase === "IN_DOUBT" ? <p className="surface-state" role="status">{t("finalizationInDoubt")}</p> : null}
       {endPhase === "FAILED" ? <p className="surface-state surface-state--error" role="alert">{t("finalizationFailed")}</p> : null}
       {content}
+      {tutorService && current && (ended || (state.projection.pinned_case.execution_authority === "REVIEW_ONLY" && state.projection.mode === "PRACTICE_DEMO")) ? (
+        <TutorDebriefPanel key={state.projection.session_id} sessionId={state.projection.session_id} service={tutorService}
+          review={state.projection.pinned_case.execution_authority === "REVIEW_ONLY"} />
+      ) : null}
     </Panel>
   );
 }

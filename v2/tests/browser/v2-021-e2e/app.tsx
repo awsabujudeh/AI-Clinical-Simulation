@@ -8,6 +8,7 @@ import { createElevenLabsStudentVoiceServices } from "../../../apps/web/src/feat
 import { createFetchSpeechTokenSource } from "../../../apps/web/src/features/voice/fetch-speech-token";
 import { PatientVoiceProfileSchema } from "../../../packages/contracts/src/index.ts";
 import { createV2_021QuestionBody, createV2_021RequestIdentity } from "../../../runtime/v2-021-review-bootstrap.ts";
+import { createStudentTutorService } from "../../../apps/web/src/features/assessment/tutor-service.ts";
 
 // Review-only transport composition. Domain code stays server-side. No clinical fixtures in the browser.
 const current = await (await fetch("/__review/session")).json();
@@ -19,6 +20,7 @@ async function read(path: string, body?: unknown) {
   return await response.json();
 }
 const services: StudentUiServices = {
+  ...(current.tutor_enabled ? { tutor: createStudentTutorService(read) } : {}),
   investigations: { async load(sessionId, resultId) {
     const r = await read(`/v1/sessions/${encodeURIComponent(sessionId)}/investigations/${encodeURIComponent(resultId)}`);
     const parsed = SafeInvestigationProjectionSchema.safeParse(r.data);

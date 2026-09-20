@@ -21,3 +21,4 @@ export * from "./rules.ts";
 export * from "./session-clock.ts";
 export * from "./voice.ts";
 export * from "./visual-patient.ts";
+export * from "./tutor.ts";

@@ -8,3 +8,4 @@ export * from "./selected-model-policy.ts";
 export * from "./knowledge/retrieval.ts";
 
 export const AI_GATEWAY_RUNTIME = "SERVER_ONLY" as const;
+export * from "./tutor/debrief.ts";
