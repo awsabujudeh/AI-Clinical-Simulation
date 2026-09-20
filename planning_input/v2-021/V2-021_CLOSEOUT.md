@@ -60,6 +60,31 @@ approved V2 runtime asset copies belong to the implementation. V1, frozen
 Architecture and accepted ADRs remain unchanged. No deployment or push is part
 of closeout.
 
+## Final DEV review-session delta after ac3231
+
+V2-021 Visual Patient Engine remains **CLOSED**. The ar-JO bootstrap correction
+was already included in baseline `ac3231b37fd955bc4ef9b654e669675f72fd8123`.
+The follow-up delta adds a fresh review Session per trusted host boot and
+boot/page-scoped request identities. Old review URLs resolve to the current
+boot's Session. The consumed DEV admission guard now returns safe
+`REVIEW_PROOF_ALREADY_CONSUMED`; a page reload does not reset its budget.
+Production authorization, idempotency/replay, provider limits and voice policy
+are unchanged. STEMI 2.0.1 remains UNDER_REVIEW / REVIEW_ONLY.
+
+Two independent owner-restarted fresh-session live proofs passed with the same
+approved ar-JO history question: question HTTP 200, grounded answer, voice token
+HTTP 200 and actual unmuted ElevenLabs TTD playback through END. Audio durations
+were 4.284063 and 4.440813 seconds. Both proved Speaking ON then OFF, preserved
+Pain, breathing, blinking, chest contact and position, and the same patient
+instance with one model load. A consumed-session negative check returned the
+safe 403 without another provider invocation.
+
+Focused verification: typecheck PASS; 16/16 V2-021 Browser tests and 9/9 live
+configuration tests PASS. Reuse this unchanged-code evidence for delta closeout;
+only documentation is updated here, with a final `git diff --check`. No live
+recordings, keys, local voice IDs or tokens are included. Visual Patient and lab
+source remain untouched. No new broad test campaign is required.
+
 ## POST-EXPO / deferred polish — not blockers
 
 - Patient age appearance refinement.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { prepareV2_021LiveProof } from "../runtime/v2-021-live-proof.mjs";
+import { prepareV2_021LiveProof, createV2_021QuestionAdmission, V2_021_PROOF_QUESTION } from "../runtime/v2-021-live-proof.mjs";
 
 // Synthetic configuration and injected I/O only. Never consult process.env.
 const environment = {
@@ -16,6 +16,26 @@ const request = { model: "gpt-5.6-terra", instructions: "Synthetic instructions"
   max_output_tokens: 64, max_attempts: 2, timeout_ms: 1000, reasoning_effort: "low" };
 const tokenRequest = { capability: "TTS", session_id: "session.live-proof",
   locale: "ar-JO", voice_profile_id: "voice-profile.stemi-review" };
+
+test("review admission permits exact retry but rejects a new page's key without resetting its budget", () => {
+  const admit = createV2_021QuestionAdmission();
+  const body = { text: V2_021_PROOF_QUESTION, locale: "ar-JO" };
+  assert.equal(admit(body, "idempotency.first"), undefined);
+  assert.equal(admit(body, "idempotency.first"), undefined);
+  assert.equal(admit(body, "idempotency.reloaded"), "REVIEW_PROOF_ALREADY_CONSUMED");
+  assert.equal(admit(body, "idempotency.first"), undefined);
+  assert.equal(createV2_021QuestionAdmission()(body, "idempotency.new-boot"), undefined);
+});
+
+test("invalid review admission does not consume the one-question identity", () => {
+  const admit = createV2_021QuestionAdmission();
+  const body = { text: V2_021_PROOF_QUESTION, locale: "ar-JO" };
+  for (const [input, key] of [[null, "key"], [{ ...body, locale: "en-US" }, "key"],
+    [{ ...body, text: "not approved" }, "key"], [body, undefined], [body, ["key"]]]) {
+    assert.equal(admit(input, key), "REVIEW_PROOF_REQUEST_NOT_ALLOWED");
+  }
+  assert.equal(admit(body, "idempotency.valid"), undefined);
+});
 
 test("live proof reads no credentials and does no I/O without explicit opt-in", () => {
   const names = [];

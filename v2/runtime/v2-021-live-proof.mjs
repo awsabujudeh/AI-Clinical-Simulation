@@ -5,6 +5,19 @@ import { createElevenLabsTokenProvider } from "../packages/api-core/src/voice/el
 import { createMemorySpeechTokenBroker } from "../packages/api-core/src/voice/token-broker.ts";
 
 export const V2_021_PROOF_QUESTION = "متى بلش وجع صدرك؟";
+
+// DEV-only admission limit. Exact retries still reach authoritative API replay;
+// a new page must not obtain another provider invocation in the same host boot.
+export function createV2_021QuestionAdmission() {
+  let acceptedKey;
+  return (body, key) => {
+    if (body?.text !== V2_021_PROOF_QUESTION || body?.locale !== "ar-JO"
+      || typeof key !== "string" || !key) return "REVIEW_PROOF_REQUEST_NOT_ALLOWED";
+    if (acceptedKey && key !== acceptedKey) return "REVIEW_PROOF_ALREADY_CONSUMED";
+    acceptedKey = key;
+    return undefined;
+  };
+}
 /** Explicit, one-question loopback proof; never production configuration or auth. */
 export function prepareV2_021LiveProof({ getEnv, fetch, now = Date.now }) {
   try {

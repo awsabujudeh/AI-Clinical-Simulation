@@ -163,6 +163,16 @@ with explicit ar-JO bootstrap/request language independent of shell localization
 idempotency key can be replayed. It permits one Patient invocation with the
 existing policy's at-most-two transport attempts, and one TTD token mint attempt.
 Other mutations/actions and STT issuance are unavailable in this local proof.
+Each host boot creates a fresh review Session from a UUID-scoped start key.
+The bootstrap exposes a non-secret review namespace; request/utterance identities
+include both that namespace and a fresh page UUID, so reload counters cannot
+collide. Opening an old review URL selects the current boot's Session.
+A page reload does **not** reset the one-question/provider/token budgets. A new
+question key in a consumed boot returns DEV-only `REVIEW_PROOF_ALREADY_CONSUMED`
+(403); exact retries still pass through the unchanged authoritative API replay.
+For another owner proof, restart `npm run dev:v2-021` in the same trusted terminal
+and reload the page. This restores Patient availability for a genuinely fresh
+review Session, not by suppressing a security failure or altering production.
 Patient context selection, local answer validation and exact committed answer
 text → TTS remain the existing application path. `store:false` and no tools are
 preserved. Browser receives only the existing single-use TTD token, never a key.
