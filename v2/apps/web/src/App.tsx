@@ -22,6 +22,8 @@ import { ExpoLanding } from "./features/public/ExpoLanding";
 import { PublicLanding } from "./features/public/PublicLanding";
 import { SessionEntryPage } from "./features/simulation/SessionEntryPage";
 import { SessionPage } from "./features/simulation/SessionPage";
+import { FacultyPage } from "./features/faculty/FacultyPage";
+import type { FacultyDemoService } from "./features/faculty/faculty-service";
 
 const portabilityOutput = JSON.stringify(
   createPortabilitySmokeResult(PORTABILITY_SMOKE_FIXTURE)
@@ -36,13 +38,16 @@ function NotFoundPage() {
   );
 }
 
-export function StudentRoutes({ services }: { services: StudentUiServices }) {
+export function StudentRoutes({ services, faculty }: { services: StudentUiServices; faculty?: FacultyDemoService }) {
   return (
     <div data-portability-output={portabilityOutput}>
       <Routes>
         <Route path="/" element={<PublicLanding />} />
         <Route path="/login" element={<LoginPage services={services} />} />
-        <Route path="/expo" element={<ExpoLanding />} />
+        <Route path="/expo" element={<ExpoLanding facultyAvailable={faculty !== undefined} />} />
+        <Route path="/faculty" element={<FacultyPage service={faculty} />} />
+        <Route path="/faculty/new" element={<FacultyPage service={faculty} />} />
+        <Route path="/faculty/cases/:caseId" element={<FacultyPage service={faculty} />} />
         <Route
           path="/app"
           element={(
@@ -68,10 +73,12 @@ export function StudentRoutes({ services }: { services: StudentUiServices }) {
 
 export function App({
   services = createUnconfiguredStudentUiServices(),
-  initialEntries
+  initialEntries,
+  faculty
 }: {
   services?: StudentUiServices;
   initialEntries?: string[];
+  faculty?: FacultyDemoService;
 }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -82,7 +89,7 @@ export function App({
   const content = (
     <QueryClientProvider client={queryClient}>
       <LocalizationProvider>
-        <StudentRoutes services={services} />
+        <StudentRoutes services={services} faculty={faculty} />
       </LocalizationProvider>
     </QueryClientProvider>
   );

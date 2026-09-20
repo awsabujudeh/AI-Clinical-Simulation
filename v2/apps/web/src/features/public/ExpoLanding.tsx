@@ -4,7 +4,7 @@ import { useLocalization } from "../../app/localization";
 import { AppFrame } from "../../components/AppFrame";
 import { StatusBadge } from "../../components/ui";
 
-export function ExpoLanding() {
+export function ExpoLanding({ facultyAvailable = false }: { facultyAvailable?: boolean }) {
   const { t } = useLocalization();
   return (
     <AppFrame>
@@ -35,6 +35,7 @@ export function ExpoLanding() {
           </div>
         </div>
         <div className="expo-actions">
+          {facultyAvailable ? <Link className="button button--secondary" to="/faculty">Faculty demo — case management</Link> : null}
           <Link
             className="button button--primary"
             to="/login"

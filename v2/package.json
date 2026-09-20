@@ -18,6 +18,9 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:v2-025": "node scripts/v2-025-faculty-host.mjs",
+    "test:v2-025": "vitest run --config vitest.config.mjs tests/browser/faculty",
+    "test:v2-025:playwright": "playwright test --config playwright.v2-025.config.mjs",
     "dev:v2-024": "node scripts/v2-024-review-host.mjs",
     "test:v2-024": "npm run typecheck && vitest run --config vitest.config.mjs tests/browser/tutor tests/browser/api/learner-timeline-assessment.browser.test.ts tests/browser/knowledge && deno test tests/deno/tutor_test.ts && npm run test:portability-guard",
     "test:v2-024:playwright": "playwright test --config playwright.v2-024.config.mjs",
