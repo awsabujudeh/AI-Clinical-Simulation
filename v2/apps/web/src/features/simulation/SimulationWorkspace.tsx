@@ -11,6 +11,7 @@ import { AssessmentDebriefPanel } from "../assessment/AssessmentDebriefPanel";
 import { ClinicalMonitor } from "../monitor/ClinicalMonitor";
 import { LearnerTimeline } from "../timeline/LearnerTimeline";
 import { ConnectionBanner } from "./ConnectionBanner";
+import { InvestigationResults } from "../investigations/InvestigationResults";
 
 function PatientHeader({ state }: { state: SessionPresentationState }) {
   const { t } = useLocalization();
@@ -59,16 +60,6 @@ export function VisualPatientSlot() {
   );
 }
 
-function InvestigationSlot() {
-  const { t } = useLocalization();
-  return (
-    <Panel className="investigation-slot" aria-labelledby="investigation-title">
-      <SectionHeader id="investigation-title" title={t("investigationsTitle")} />
-      <EmptyState title={t("investigationsTitle")} body={t("investigationsBody")} />
-    </Panel>
-  );
-}
-
 export function SimulationWorkspace({
   services,
   auth,
@@ -105,7 +96,7 @@ export function SimulationWorkspace({
             onSpeaking={onSpeaking}
             onAuthoritativeRefresh={onAuthoritativeRefresh}
           />
-          <InvestigationSlot />
+          <InvestigationResults state={state} services={services} />
           <LearnerTimeline state={state} service={services.timeline} />
           <AssessmentDebriefPanel
             state={state}

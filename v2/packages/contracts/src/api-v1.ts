@@ -411,8 +411,11 @@ export const SafeInvestigationProjectionSchema = z.strictObject({
   structured_result: LearnerDiagnosticStructuredResultSchema.optional(),
   media_assets: z.array(DiagnosticAssetReferenceSchema).max(16).optional(),
   machine_interpretation_key: z.string().min(3).max(160).optional(),
-  formal_report_key: z.string().min(3).max(160).optional()
+  formal_report_key: z.string().min(3).max(160).optional(),
+  finding_texts: z.array(z.array(LearnerLocalizedTextSchema).max(2)).max(256).optional(),
+  formal_report_text: z.array(LearnerLocalizedTextSchema).max(2).optional()
 });
+export type SafeInvestigationProjection = z.infer<typeof SafeInvestigationProjectionSchema>;
 
 export const SafeFinalAssessmentProjectionSchema = z.strictObject({
   assessment_id: AssessmentIdSchema,

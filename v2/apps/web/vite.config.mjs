@@ -24,7 +24,10 @@ export default defineConfig(({ mode }) => ({
         cleanupOutdatedCaches: true,
         clientsClaim: false,
         skipWaiting: false,
-        globPatterns: ["**/*.{html,js,css,ico,png,svg,webmanifest}"],
+        // Preserve the original 4.09 MB review ECG; cache paired local reports,
+        // never authoritative API responses or runtime clinical state.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globPatterns: ["**/*.{html,js,css,ico,png,svg,webmanifest}", "media/stemi/1.0.0/*-report.txt"],
         navigateFallback: "index.html",
         navigateFallbackDenylist: [/^\/v1(?:\/|$)/u],
         runtimeCaching: []

@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "../../../apps/web/src/App.tsx";
 import type { StudentUiServices } from "../../../apps/web/src/app/types.ts";
 import { SafeSessionProjectionSchema, SafeLearnerTimelineProjectionSchema,
-  SafeAssessmentApiProjectionSchema, PatientConversationTranscriptSchema, SafePatientConversationTurnSchema } from "../../../packages/contracts/src/index.ts";
+  SafeAssessmentApiProjectionSchema, PatientConversationTranscriptSchema, SafePatientConversationTurnSchema, SafeInvestigationProjectionSchema } from "../../../packages/contracts/src/index.ts";
 import "../../../apps/web/src/styles.css";
 import { createElevenLabsStudentVoiceServices } from "../../../apps/web/src/features/voice/create-voice-services";
 import { createFetchSpeechTokenSource } from "../../../apps/web/src/features/voice/fetch-speech-token";
@@ -19,6 +19,12 @@ async function read(path: string, body?: unknown) {
   return await response.json();
 }
 const services: StudentUiServices = {
+  investigations: { async load(sessionId, resultId) {
+    const r = await read(`/v1/sessions/${encodeURIComponent(sessionId)}/investigations/${encodeURIComponent(resultId)}`);
+    const parsed = SafeInvestigationProjectionSchema.safeParse(r.data);
+    return parsed.success ? { kind: "AVAILABLE", projection: parsed.data }
+      : { kind: r.error?.code === "RESULT_PENDING" ? "PENDING" : "UNAVAILABLE" };
+  } },
   auth: { async resolve() { return { status: "AUTHENTICATED", principal_user_id: "10000000-0000-4000-8000-000000000003", display_name: "Local reviewer" }; } },
   sessions: { async load(id) { const r = await read(`/v1/sessions/${id}/state`); return r.data !== undefined ? { kind: "AUTHORITATIVE", connectivity: "ONLINE", projection: SafeSessionProjectionSchema.parse(r.data) } : { kind: "API_UNAVAILABLE" }; }, async start() { return { success: false, kind: "UNAUTHORIZED" }; } },
   actions: { async submit(intent) { const id = ++sequence; const r = await read(`/v1/sessions/${intent.session_id}/actions/propose`, {

@@ -1,0 +1,4 @@
+ECG Report
+
+Sinus rhythm at approximately 84 bpm. Acute ST-segment elevation in leads II, III and aVF, most pronounced in lead III. Reciprocal ST-segment depression in leads I and aVL. No bundle branch block.
+Impression: Acute inferior ST-elevation myocardial infarction (STEMI).

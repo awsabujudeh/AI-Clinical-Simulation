@@ -948,6 +948,10 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
         formal_report: formal
       },
       ...(structured === "AVAILABLE" ? { structured_result: learnerStructured } : {}),
+      ...(structured === "AVAILABLE" ? { finding_texts: result.finding_fact_ids.map(id => {
+        const fact = sourceCase(loaded.data.authorization).clinical_facts.facts.find(f => f.fact_id === id);
+        return fact ? localizedLabelsForKey(loaded.data.authorization, fact.content_key) : [];
+      }) } : {}),
       ...(media === "AVAILABLE" && "asset_references" in result
         ? { media_assets: result.asset_references }
         : {}),
@@ -957,9 +961,11 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
         : {}),
       ...(formal === "AVAILABLE"
         ? result.result_type === "TEXT_REPORT"
-          ? { formal_report_key: result.report_content_key }
+          ? { formal_report_key: result.report_content_key,
+              formal_report_text: localizedLabelsForKey(loaded.data.authorization, result.report_content_key) }
           : "formal_report_key" in result && result.formal_report_key !== undefined
-            ? { formal_report_key: result.formal_report_key }
+            ? { formal_report_key: result.formal_report_key,
+                formal_report_text: localizedLabelsForKey(loaded.data.authorization, result.formal_report_key) }
             : {}
         : {})
     });

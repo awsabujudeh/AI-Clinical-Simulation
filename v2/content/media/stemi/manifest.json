@@ -1,0 +1,207 @@
+{
+  "manifest_version": "1.0.0",
+  "status": "REVIEW_ONLY_IMPLEMENTATION",
+  "case_association": {
+    "case_package_id": "case-package.stemi.inferior-rv.002",
+    "case_version_id": "case-version.stemi.inferior-rv.002",
+    "case_version": "2.0.1",
+    "execution_authority": "REVIEW_ONLY",
+    "review_execution_hash": "90b8bfa625ff217edaefd2f235deacf396f9a9d8af86268c0acf411f939046f1"
+  },
+  "runtime_package": {
+    "presentation_asset_id": "stemi.physical-exam-v02",
+    "source": "planning_input/v2-021/V2-021_CLOSEOUT.md",
+    "expo_status": "APPROVED",
+    "files": [
+      {
+        "path": "/visual-patient/stemi/physical-exam-v02/visual_patient_stemi_physical_exam_runtime_v01.glb",
+        "sha256": "00563647261c8da8dd030f366aec6bdfdd2550bf667159eab9cf7c922beed4a1"
+      },
+      {
+        "path": "/visual-patient/stemi/physical-exam-v02/visual_patient_stemi_physical_exam_runtime_v01.json",
+        "sha256": "5eab5851925ed57367d274e79ee818ce393460a5604671255fc751ca1cbb366c"
+      }
+    ]
+  },
+  "patient_fallback": {
+    "definition": {
+      "media_asset_id": "asset.stemi.static-fallback-pending",
+      "media_kind": "STATIC_IMAGE",
+      "required": true,
+      "static_fallback": true
+    },
+    "asset_version": "1.0.0",
+    "purpose": "Failure-only static depiction of the approved active-pain patient; not a live examination finding or monitor.",
+    "provenance": "Existing project-rendered V04 pain stills, byte-for-byte copies; no new image generation.",
+    "rights_status": "DOCUMENTED_PROJECT_DERIVATIVE_CC0_BASE",
+    "rights_evidence": [
+      "visual-patient-lab/assets/patient/ASSET_PROVENANCE.md",
+      "visual-patient-lab/assets/patient/LICENSE.ASSETS.md",
+      "visual-patient-lab/assets/textures/phase2b/CLEAN_SKIN_PROVENANCE.json"
+    ],
+    "clinical_review_status": "PENDING_REVIEW",
+    "expo_status": "APPROVED_PARENT_VISUAL_REUSE",
+    "approval_evidence": "visual-patient-lab/APPROVED_VISUAL_FOUNDATION.md: frozen V04 and Clinical_Pain_Strong",
+    "variants": [
+      {
+        "position": "semi_fowler",
+        "face": "pain",
+        "path": "/media/stemi/1.0.0/patient-pain-semi-fowler.png",
+        "sha256": "10cf9269533cce54f1e6fe8731e33dfa3a6a151d810d102b273731c4e22c99f9",
+        "source": "visual-patient-lab/renders/stemi_runtime_v04/_check_semi_fowler_pain.png"
+      },
+      {
+        "position": "supine",
+        "face": "pain",
+        "path": "/media/stemi/1.0.0/patient-pain-supine.png",
+        "sha256": "6d5bd8c08458e9fb602c2c1c6519653cf3aeafadf66505d661419e3b848231cf",
+        "source": "visual-patient-lab/renders/stemi_runtime_v04/_check_supine_pain.png"
+      }
+    ],
+    "fallback_if_image_unavailable": "EXISTING_NEUTRAL_UNAVAILABLE_PANEL"
+  },
+  "diagnostics": [
+    {
+      "definition": {
+        "media_asset_id": "asset.stemi.ecg-standard-pending",
+        "media_kind": "STATIC_IMAGE",
+        "required": false,
+        "static_fallback": true
+      },
+      "action_id": "investigation.ecg-standard",
+      "modality": "ECG",
+      "asset_version": "1.0.0",
+      "source_file": "ECG's/ECG-002 — Acute Inferior STEMI.png",
+      "source_report_file": "ECG-002 — Acute Inferior STEMI Report.txt",
+      "source_status": "PROJECT_GENERATED",
+      "rights_status": "OWNER_ATTESTED_PROJECT_USE_FORMAL_DOCUMENTATION_PENDING",
+      "clinical_review_status": "PENDING_PHYSICIAN_REVIEW",
+      "expo_status": "REVIEW_ONLY",
+      "formal_report_key": "diagnostic.stemi.ecg-standard-report",
+      "fallback_fact_ids": [
+        "fact.stemi.ecg-inferior-findings"
+      ],
+      "diagnostic_result_id": "diagnostic-result.stemi.ecg-standard",
+      "labels": [
+        {
+          "locale": "en-US",
+          "text": "Standard 12-lead ECG"
+        },
+        {
+          "locale": "ar-JO",
+          "text": "تخطيط قلب 12 اشتقاقًا"
+        }
+      ],
+      "packaged": {
+        "image_path": "/media/stemi/1.0.0/ecg-002.png",
+        "image_sha256": "735f2fdc6d6e9555dbbfe91cbadfb4f8ddbf868dd1d3f121402c08c1426ac776",
+        "report_path": "/media/stemi/1.0.0/ecg-002-report.txt",
+        "report_sha256": "bba37c489632a59181632094172c9e7d9dca6d24367f8df6b86bc22cfc735cb4"
+      },
+      "review_note": "Reference asset report rate approximately 84 bpm differs from authored case approximately 112 bpm. Not the authoritative tracing; physician matching review required."
+    },
+    {
+      "definition": {
+        "media_asset_id": "asset.stemi.ecg-right-pending",
+        "media_kind": "STATIC_IMAGE",
+        "required": false,
+        "static_fallback": true
+      },
+      "action_id": "investigation.ecg-right-sided",
+      "modality": "ECG",
+      "asset_version": null,
+      "source_file": null,
+      "source_status": "SOURCE_UNKNOWN",
+      "rights_status": "RIGHTS_REVIEW_REQUIRED",
+      "clinical_review_status": "PENDING_PHYSICIAN_REVIEW",
+      "expo_status": "MEDIA_ASSET_PENDING",
+      "formal_report_key": "diagnostic.stemi.ecg-right-report",
+      "fallback_fact_ids": [
+        "fact.stemi.ecg-right-findings"
+      ],
+      "diagnostic_result_id": "diagnostic-result.stemi.ecg-right-sided",
+      "labels": [
+        {
+          "locale": "en-US",
+          "text": "Right-sided ECG"
+        },
+        {
+          "locale": "ar-JO",
+          "text": "تخطيط القلب الأيمن"
+        }
+      ],
+      "packaged": null
+    },
+    {
+      "definition": {
+        "media_asset_id": "asset.stemi.cxr-pending",
+        "media_kind": "STATIC_IMAGE",
+        "required": false,
+        "static_fallback": true
+      },
+      "action_id": "investigation.chest-xray",
+      "modality": "XRAY",
+      "asset_version": "1.0.0",
+      "source_file": "X-RAY/CXR's/CXR-001 — Normal Chest X-ray.png",
+      "source_report_file": "CXR-001 — Normal Chest X-ray Report.txt",
+      "source_status": "PROJECT_GENERATED",
+      "rights_status": "OWNER_ATTESTED_PROJECT_USE_FORMAL_DOCUMENTATION_PENDING",
+      "clinical_review_status": "PENDING_PHYSICIAN_REVIEW",
+      "expo_status": "REVIEW_ONLY",
+      "formal_report_key": "diagnostic.stemi.cxr-report",
+      "fallback_fact_ids": [
+        "fact.stemi.cxr-result"
+      ],
+      "diagnostic_result_id": "diagnostic-result.stemi.chest-xray",
+      "labels": [
+        {
+          "locale": "en-US",
+          "text": "Chest X-ray"
+        },
+        {
+          "locale": "ar-JO",
+          "text": "أشعة الصدر"
+        }
+      ],
+      "packaged": {
+        "image_path": "/media/stemi/1.0.0/cxr-001.png",
+        "image_sha256": "c03e089421638f658b2cae5bb356bd8d640cfda3c158c1161a2d0a364fd884ab",
+        "report_path": "/media/stemi/1.0.0/cxr-001-report.txt",
+        "report_sha256": "801e794c7e2f3475e8648dcbbb87c419afe8f5a38ec54ecf16ef52dc4c710194"
+      },
+      "review_note": "Reference image/report candidate; physician matching review required."
+    },
+    {
+      "definition": {
+        "media_asset_id": "asset.stemi.echo-pending",
+        "media_kind": "STATIC_IMAGE",
+        "required": false,
+        "static_fallback": true
+      },
+      "action_id": "investigation.focused-echo",
+      "modality": "ECHOCARDIOGRAPHY",
+      "asset_version": null,
+      "source_file": null,
+      "source_status": "SOURCE_UNKNOWN",
+      "rights_status": "RIGHTS_REVIEW_REQUIRED",
+      "clinical_review_status": "PENDING_PHYSICIAN_REVIEW",
+      "expo_status": "MEDIA_ASSET_PENDING",
+      "formal_report_key": "diagnostic.stemi.echo-report",
+      "fallback_fact_ids": [
+        "fact.stemi.echo-result"
+      ],
+      "diagnostic_result_id": "diagnostic-result.stemi.focused-echo",
+      "labels": [
+        {
+          "locale": "en-US",
+          "text": "Focused echo"
+        },
+        {
+          "locale": "ar-JO",
+          "text": "إيكو مركّز"
+        }
+      ],
+      "packaged": null
+    }
+  ]
+}

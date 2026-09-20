@@ -12,6 +12,7 @@ import {
   type PatientConversationTranscript,
   type SafePatientConversationTurn,
   type SafeSessionProjection,
+  type SafeInvestigationProjection,
   type SessionMode,
   type StartSessionRequest
 } from "@ai-clinical-simulation/contracts";
@@ -221,6 +222,8 @@ export interface StudentFinalizationService {
 }
 
 export type StudentUiServices = Readonly<{
+  investigations?: { load(sessionId: string, resultId: string): Promise<
+    { kind: "AVAILABLE"; projection: SafeInvestigationProjection } | { kind: "PENDING" | "UNAVAILABLE" }> };
   voice?: StudentVoiceServices;
   auth: StudentAuthService;
   sessions: StudentSessionService;

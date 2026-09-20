@@ -5,6 +5,7 @@ import { Panel, Button } from "../../components/ui";
 import { useLocalization } from "../../app/localization";
 import type { PatientRuntime, ExamRegion } from "./runtime/runtime.js";
 import "./visual-patient.css";
+import { resolvePatientStaticFallback } from "./static-fallback";
 
 // Read-only presentation diagnostics for local regression tooling, never clinical authority.
 const runtimes = new WeakMap<HTMLCanvasElement, PatientRuntime>();
@@ -24,6 +25,7 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
   const starter = useRef<(() => Promise<void>) | undefined>(undefined);
   const latest = useRef({ presentation, speaking, onExamRequest }); latest.current = { presentation, speaking, onExamRequest };
   const [status, setStatus] = useState<"IDLE" | "LOADING" | "READY" | "FAILED">("IDLE");
+  const [staticFailed, setStaticFailed] = useState(false);
   const [exam, setExam] = useState(false); const [region, setRegion] = useState<ExamRegion>("DEFAULT_COVERED");
   const [tool, setTool] = useState<VisualExamRequest["tool"]>("inspection");
   const supported = VisualPatientPresentationSchema.safeParse(presentation).success;
@@ -35,7 +37,7 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
       await Promise.resolve(); if (cancelled || !canvas.current || !viewport.current) return;
       if (started || !VisualPatientPresentationSchema.safeParse(latest.current.presentation).success) return;
       started = true;
-      setStatus("LOADING"); setExam(false); setRegion("DEFAULT_COVERED");
+      setStatus("LOADING"); setStaticFailed(false); setExam(false); setRegion("DEFAULT_COVERED");
       try {
         const { createPatientRuntime } = await import("./runtime/runtime.js");
         if (cancelled) return;
@@ -58,6 +60,7 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
   useEffect(() => { runtime.current?.setSpeaking(speaking); }, [speaking]);
   useEffect(() => { if (!enabled) { runtime.current?.exitExam(); setExam(false); } }, [enabled]);
   const ready = status === "READY" && supported;
+  const fallback = staticFailed ? undefined : resolvePatientStaticFallback(presentation, status);
   function selectRegion(value: ExamRegion) { if (runtime.current?.reveal(value)) { setRegion(value); if (tool === "penlight") setTool("inspection"); } }
   return <Panel className="visual-patient-native" aria-labelledby="visual-patient-title">
     <div className="visual-patient-native__header"><h2 id="visual-patient-title">{ar ? "المريض المرئي" : "Visual Patient"}</h2>
@@ -66,7 +69,9 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
     </div>
     <div className="visual-patient-native__viewport" ref={viewport} data-visual-status={ready ? "READY" : status}>
       {supported || status !== "IDLE" ? <canvas ref={canvas} aria-label={ar ? "المريض ثلاثي الأبعاد؛ اسحب لتحريك الكاميرا" : "3D patient; drag to adjust camera"} style={{ visibility: ready ? "visible" : "hidden" }} /> : null}
-      {!ready ? <div className="visual-patient-native__fallback" role="status"><strong>{status === "LOADING" && supported ? (ar ? "جارٍ تحميل المريض…" : "Loading patient…") : (ar ? "العرض المرئي غير متاح" : "Patient view unavailable")}</strong><p>{ar ? "تظل المراقبة والإجراءات السريرية متاحة." : "Monitoring and clinical actions remain available."}</p></div> : null}
+      {!ready ? <div className="visual-patient-native__fallback" role="status">
+        {fallback ? <img src={fallback.path} onError={() => setStaticFailed(true)} alt={ar ? "صورة ثابتة للمريض، وليست فحصًا حيًا" : "Static patient illustration, not a live examination"} style={{ maxWidth: "100%", maxHeight: "calc(100% - 5rem)", objectFit: "contain" }} /> : null}
+        <strong>{fallback ? (ar ? "صورة بديلة ثابتة — العرض ثلاثي الأبعاد غير متاح" : "Static fallback — 3D view unavailable") : status === "LOADING" && supported ? (ar ? "جارٍ تحميل المريض…" : "Loading patient…") : (ar ? "العرض المرئي غير متاح" : "Patient view unavailable")}</strong><p>{ar ? "تظل المراقبة والإجراءات السريرية متاحة." : "Monitoring and clinical actions remain available."}</p></div> : null}
     </div>
     <div className="visual-patient-native__controls">
       <Button disabled={!ready || !enabled} onClick={() => { if (exam) runtime.current?.exitExam(); else runtime.current?.enterExam(); setExam(!exam); setRegion("DEFAULT_COVERED"); setTool("inspection"); }}>{exam ? (ar ? "إنهاء الفحص" : "Exit examination") : (ar ? "بدء الفحص السريري" : "Enter physical examination")}</Button>
