@@ -68,7 +68,8 @@ export const fetchAiHttpTransport: AiHttpTransport = Object.freeze({
       method: request.method,
       headers: request.headers,
       body: request.body,
-      signal: request.signal
+      signal: request.signal,
+      redirect: "error"
     });
     return Object.freeze({ status: response.status, body: await response.text() });
   }

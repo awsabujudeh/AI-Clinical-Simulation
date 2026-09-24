@@ -6,6 +6,9 @@ import { prepareStemiConversationArtifact } from "../content/cases/stemi/v2-conv
 import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
 import { createStemiTutorRetrieval, createTutorGateway } from "../runtime/v2-024-tutor-composition.ts";
 import { tutorTestGateway } from "../tests/fixtures/tutor.ts";
+import { assertLocalReviewEnvironment, reviewApiRequestAllowed } from './local-review-security.mjs';
+
+assertLocalReviewEnvironment(process.env.NODE_ENV);
 
 // Local REVIEW_ONLY host. No credentials are read unless the owner explicitly opts
 // into a live Tutor. Default: deterministic fallback. Test double is clearly labeled.
@@ -39,6 +42,7 @@ const server = createServer(async (req, res) => {
       res.writeHead(r.success ? 200 : 409, { "Content-Type": "application/json" }); res.end(JSON.stringify({ success: r.success })); return;
     }
     if (url.pathname.startsWith("/v1/")) {
+      if (!reviewApiRequestAllowed(req.method, url.pathname, sessionId)) { res.writeHead(403).end(); return; }
       const chunks = []; let bytes = 0;
       for await (const c of req) { bytes += c.length; if (bytes > 16384) { res.writeHead(413).end(); return; } chunks.push(c); }
       const r = await h.app.request(url.pathname + url.search, { method: req.method, headers: apiHeaders({ token: "faculty", idempotency: req.headers["idempotency-key"] }), ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) });

@@ -5,13 +5,16 @@ import { createServer as createViteServer } from "vite";
 import { createDanaReviewSession } from "../runtime/v2-026-review-composition.ts";
 import { apiHeaders } from "../tests/fixtures/api/secure-api.ts";
 import { prepareDanaLiveProof, createDanaQuestionAdmission, DANA_PROOF_QUESTION } from '../runtime/v2-026-live-proof.mjs';
+import { assertLocalReviewEnvironment, reviewApiRequestAllowed } from './local-review-security.mjs';
+
+assertLocalReviewEnvironment(process.env.NODE_ENV);
 
 // Loopback-only review host; offline by default. Only the trusted opt-in
 // composition reads credentials. They are never logged or sent to Vite.
 const namespace=randomUUID();
 const live=process.env.V2_ALLOW_LIVE_V2_026_VOICE_PROOF==='1'?prepareDanaLiveProof({getEnv:name=>process.env[name],fetch:globalThis.fetch}):undefined;
 if(live&&!live.success){console.error(live.code);process.exit(1);}
-const review = await createDanaReviewSession({namespace,...(live?.success?{patient_provider:live.patient_provider,speech_token_broker:live.speech_token_broker}:{})});
+const review = await createDanaReviewSession({namespace,...(live?.success?{patient_provider:live.patient_provider,speech_token_broker:live.speech_token_broker,voice_profile_id:live.profile.profile_id}:{})});
 const admit=createDanaQuestionAdmission();
 // An isolated offline review can coexist with the owner's trusted live host.
 const portArg=process.argv.find(a=>a.startsWith('--port='));
@@ -31,6 +34,7 @@ const server = createServer(async (req, res) => {
       const r = await review.advance(180); res.writeHead(r.success ? 200 : 409, { "Content-Type": "application/json" }); res.end(JSON.stringify({success:r.success}));return;
     }
     if (url.pathname.startsWith("/v1/")) {
+      if (!reviewApiRequestAllowed(req.method, url.pathname, review.sessionId)) { res.writeHead(403).end(); return; }
       const chunks = []; let bytes = 0;
       for await (const c of req) { bytes += c.length; if (bytes > 16384) { res.writeHead(413).end(); return; } chunks.push(c); }
       if(live?.success&&req.method!=='GET'){

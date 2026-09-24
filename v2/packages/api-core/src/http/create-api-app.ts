@@ -21,6 +21,7 @@ import {
 
 import type { AuthenticationVerifier } from "../auth/verified-principal.ts";
 import type { SpeechTokenBroker } from "../voice/token-broker.ts";
+import type { InMemorySessionAggregate } from "../../../session-engine/src/index.ts";
 import {
   ERRORS,
   apiErrorResponse,
@@ -43,6 +44,9 @@ export type SecureApiAppDependencies = SecureApiDependencies & Readonly<{
   authentication_verifier: AuthenticationVerifier;
   allowed_origins: readonly string[];
   speech_token_broker?: SpeechTokenBroker;
+  /** Trusted presentation binding, evaluated only after Session/Case authorization.
+   * A profile being in the broker's catalogue does not authorize it for every Case. */
+  resolve_voice_profile?: (session: InMemorySessionAggregate) => string | undefined;
 }>;
 
 function requestIdentity(context: Context): { request_id: string; correlation_id: string } {
@@ -152,6 +156,10 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
   }));
 
   app.use("/v1/*", async (context, next) => {
+    // Session evidence, transcripts and credentials must not enter HTTP caches.
+    context.header("Cache-Control", "no-store");
+    context.header("Pragma", "no-cache");
+    context.header("X-Content-Type-Options", "nosniff");
     const authentication = await dependencies.authentication_verifier
       .verifyAuthorizationHeader(context.req.header("Authorization"));
     if (!authentication.success) return errorJson(context, ERRORS.authentication);
@@ -211,6 +219,10 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
     if (!loaded.success) return errorJson(context, loaded.error);
     if (loaded.data.session.status === "ENDED") return errorJson(context, ERRORS.ended);
     if (!dependencies.speech_token_broker) return errorJson(context, ERRORS.unavailable);
+    if (body.data.capability === "TTS"
+      && dependencies.resolve_voice_profile?.(loaded.data.session) !== body.data.voice_profile_id) {
+      return errorJson(context, ERRORS.forbidden);
+    }
     return respond(context, await dependencies.speech_token_broker.issue(
       authority.principal.user_id, body.data, authority.idempotency_key
     ));

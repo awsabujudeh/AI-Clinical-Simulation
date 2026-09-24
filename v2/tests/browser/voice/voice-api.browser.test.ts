@@ -7,9 +7,12 @@ async function setup() {
   let calls = 0; let now = 1000; let fail = false; const types: string[] = [];
   const broker = createMemorySpeechTokenBroker({ async issue(type) { types.push(type); calls++;
     if (fail) throw Error("private provider detail"); return { single_use_token: `synthetic-token-${calls}` }; } }, () => now, [SYNTHETIC_VOICE_PROFILE]);
-  const h = await createApiTestHarness({ include_stemi: false, speech_token_broker: broker });
+  let boundSessionId: string;
+  const h = await createApiTestHarness({ include_stemi: false, speech_token_broker: broker,
+    resolve_voice_profile: session => session.session_id === boundSessionId ? SYNTHETIC_VOICE_PROFILE.profile_id : undefined });
   const started = await h.app.request("/v1/sessions", { method: "POST", headers: apiHeaders({ idempotency: "start.voice" }), body: JSON.stringify(startBody(h.productionPackage.manifest.case_id)) });
   const session = (await started.json() as any).data.session;
+  boundSessionId = session.session_id;
   const req = { session_id: session.session_id, locale: "ar-JO", capability: "STT" };
   return { h, session, req, broker, types, calls: () => calls, now(v: number) { now = v; }, fail() { fail = true; },
     send(body: unknown = req, headers: Record<string, string> = apiHeaders({ idempotency: "issue.voice" })) {
@@ -47,7 +50,7 @@ describe("authorized single-use speech tokens", () => {
   });
   it("trusted TTS profile determines token type/model/voice; arbitrary profile fails", async () => {
     const t = await setup();
-    expect((await t.send({ ...t.req, capability: "TTS", voice_profile_id: "voice-profile.unknown" })).status).toBe(503);
+    expect((await t.send({ ...t.req, capability: "TTS", voice_profile_id: "voice-profile.unknown" })).status).toBe(403);
     expect(t.calls()).toBe(0);
     const response = await t.send({ ...t.req, capability: "TTS", voice_profile_id: SYNTHETIC_VOICE_PROFILE.profile_id });
     expect(response.status).toBe(200); expect(t.types).toEqual(["ttd_websocket"]);

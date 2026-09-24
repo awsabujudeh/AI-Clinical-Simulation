@@ -160,6 +160,7 @@ export async function createApiTestHarness(input?: {
   production_package?: CompiledCasePackage;
   enable_patient_conversation?: boolean;
   speech_token_broker?: SpeechTokenBroker;
+  resolve_voice_profile?: SecureApiAppDependencies["resolve_voice_profile"];
   enable_clinical_interpreter?: boolean;
   tutor?: SecureApiAppDependencies["tutor"];
 }) {
@@ -309,6 +310,7 @@ export async function createApiTestHarness(input?: {
   const dependencies: SecureApiAppDependencies = {
     ...(input?.tutor ? { tutor: input.tutor } : {}),
     speech_token_broker: input?.speech_token_broker,
+    resolve_voice_profile: input?.resolve_voice_profile,
     authentication_verifier: authentication,
     allowed_origins: ["http://localhost:5173"],
     authority_repository: authority,

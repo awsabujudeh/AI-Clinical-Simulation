@@ -317,3 +317,22 @@ Run `npm run test:v2-020c1` after a production build for focused checks; `npm ru
 The unchanged 52 synthetic definitions, hashes and semantic/safety thresholds are offline/integration regression evidence, not another provider-quality qualification. The product owner has approved Jordanian/Arabic quality and confirmed both required live browser integrations PASS, including exactly one corrected `ttd_websocket` TTS smoke. See the [final V2-020 closure report](../planning_input/v2-020/V2-020_FINAL_CLOSURE_REPORT.md) for the attributed single-sample timings and privacy caveat, and the migration document for the exact A–G criteria. V2-020 is CLOSED only after final verification, commit, normal push and exact-SHA CI PASS; provider-quality reevaluation is not required. No live provider request runs in tests or CI.
 
 Provider default retention may apply; Zero Retention is not claimed. Synthetic educational data only until institutional retention/BAA/privacy/residency review. That restriction on future sensitive data does not reopen the provider decision or add a synthetic quality gate.
+
+## V2-027 Security / Privacy / Budget Hardening — CLOSED
+
+The trusted local synthetic Expo scope is `EXPO_SAFE`; production hardening
+remains `PRODUCTION_PENDING` as classified in the handoff. Existing review hosts
+must be restarted in the owner's configured terminal to activate these guards.
+
+TTS issuance now requires a trusted Session-specific voice-profile resolver in
+addition to authorization and broker catalogue membership; absence fails closed.
+Private API responses are non-cacheable, OpenAI redirects are refused, Patient
+claims and Interpreter requests have bounded per-Session spend controls, and
+Interpreter repeats share results without new provider calls. Local review hosts
+cannot create additional Sessions or run in explicit production mode.
+
+Run `npm run test:v2-027` for the focused mocked security gate. See
+[security handoff](../planning_input/v2-027/V2-027_SECURITY_HANDOFF.md) for exact
+limits, two-case isolation evidence, secret-scan scope, and Expo versus production
+exceptions. Both cases remain REVIEW_ONLY; this is not medical approval or a
+production deployment/security certification.

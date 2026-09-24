@@ -7,6 +7,9 @@ import { prepareStemiConversationArtifact } from "../content/cases/stemi/v2-conv
 import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
 import { prepareV2_021LiveProof, V2_021_PROOF_QUESTION, createV2_021QuestionAdmission } from "../runtime/v2-021-live-proof.mjs";
 import { V2_021_PATIENT_LANGUAGE, createV2_021ReviewStartKey } from "../runtime/v2-021-review-bootstrap.ts";
+import { assertLocalReviewEnvironment, reviewApiRequestAllowed } from './local-review-security.mjs';
+
+assertLocalReviewEnvironment(process.env.NODE_ENV);
 
 // Explicit local review composition, never production auth or a deployed service.
 // Actual API/Session/Clinical/Assessment implementations; memory storage and the
@@ -17,7 +20,10 @@ const reviewNamespace = randomUUID();
 const liveRequested = process.env.V2_ALLOW_LIVE_V2_021_VOICE_PROOF === "1";
 const live = liveRequested ? prepareV2_021LiveProof({ getEnv: name => process.env[name], fetch: globalThis.fetch }) : undefined;
 if (live && !live.success) { console.error(live.code); process.exit(1); }
-const h = await createApiTestHarness({ enable_patient_conversation: true, ...(live?.success ? {
+let boundVoiceSessionId;
+const h = await createApiTestHarness({ enable_patient_conversation: true,
+  resolve_voice_profile: session => live?.success && session.session_id === boundVoiceSessionId ? live.profile.profile_id : undefined,
+  ...(live?.success ? {
   review_artifact: await prepareStemiConversationArtifact(PORTABLE_SHA256_ADAPTER),
   patient_provider: live.patient_provider, speech_token_broker: live.speech_token_broker
 } : {}) });
@@ -27,6 +33,7 @@ const start = await h.app.request("/v1/review-sessions", { method: "POST",
     mode: "PRACTICE_DEMO", patient_language: V2_021_PATIENT_LANGUAGE })) });
 const started = await start.json();
 if (start.status !== 201 || !started.data?.session?.visual_patient) throw Error("REVIEW_COMPOSITION_UNAVAILABLE");
+boundVoiceSessionId = started.data.session.session_id;
 const vite = await createViteServer({ root: fileURLToPath(new URL("../apps/web/", import.meta.url)),
   envDir: false, envPrefix: "__V2_021_NO_CLIENT_ENV__", server: { middlewareMode: true, host: "127.0.0.1", hmr: false }, appType: "custom" });
 const entry = fileURLToPath(new URL("../tests/browser/v2-021-e2e/app.tsx", import.meta.url)).replaceAll("\\", "/");
@@ -40,6 +47,7 @@ const server = createServer(async (request, response) => {
       patient_language: started.data.patient_language, review_namespace: reviewNamespace,
       ...(live?.success ? { voice_profile: live.profile, proof_question: V2_021_PROOF_QUESTION } : {}) })); return; }
     if (url.pathname.startsWith("/v1/")) {
+      if (!reviewApiRequestAllowed(request.method, url.pathname, started.data.session.session_id)) { response.writeHead(403).end(); return; }
       const chunks = []; let bytes = 0;
       for await (const chunk of request) { bytes += chunk.length; if (bytes > 65536) { response.writeHead(413).end(); return; } chunks.push(chunk); }
       if (live?.success && request.method !== "GET") {

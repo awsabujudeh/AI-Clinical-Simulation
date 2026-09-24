@@ -4,6 +4,9 @@ import { createServer as createViteServer } from "vite";
 import { prepareStemiConversationArtifact } from "../content/cases/stemi/v2-conversation/stemi-conversation-case.ts";
 import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
 import { createFacultyDemoStore, projectFacultyStemi } from "../runtime/v2-025-faculty-store.ts";
+import { assertLocalReviewEnvironment } from './local-review-security.mjs';
+
+assertLocalReviewEnvironment(process.env.NODE_ENV);
 
 // Same explicit loopback fixture-host boundary as V2-021/024. Never mounted in
 // production; no identity, role or institution is accepted from the browser.

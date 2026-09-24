@@ -7,17 +7,21 @@ export async function createDanaReviewSession(options?: {
   namespace?: string;
   patient_provider?: NonNullable<Parameters<typeof createApiTestHarness>[0]>['patient_provider'];
   speech_token_broker?: NonNullable<Parameters<typeof createApiTestHarness>[0]>['speech_token_broker'];
+  voice_profile_id?: string;
 }) {
   const prepared = await prepareDanaReview(PORTABLE_SHA256_ADAPTER);
   if (!prepared.success) throw Error(JSON.stringify(prepared.report));
   const artifact = prepared.artifact;
+  let boundSessionId: string | undefined;
   const h = await createApiTestHarness({ review_artifact: artifact,
+    resolve_voice_profile: session => session.session_id === boundSessionId ? options?.voice_profile_id : undefined,
     ...(options?.patient_provider ? {enable_patient_conversation:true,patient_provider:options.patient_provider,speech_token_broker:options.speech_token_broker} : {}) });
   const start = await h.app.request("/v1/review-sessions", { method: "POST",
     headers: apiHeaders({ token: "faculty", idempotency: `idempotency.dana.${options?.namespace??'start'}` }),
     body: JSON.stringify(startBody(artifact.source_case.manifest.case_id, { mode: "PRACTICE_DEMO", patient_language: "ar-JO" })) });
   if (start.status !== 201) throw Error("DANA_REVIEW_START_FAILED");
   const sessionId = (await start.json()).data.session.session_id as string;
+  boundSessionId = sessionId;
   let index = 0;
   async function state() {
     return (await (await h.app.request(`/v1/sessions/${sessionId}/state`, { headers: apiHeaders({ token: "faculty" }) })).json()).data;

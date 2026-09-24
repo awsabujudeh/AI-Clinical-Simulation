@@ -52,6 +52,7 @@ export const ERRORS = Object.freeze({
   clinicalInterpreterUnavailable: apiError({ code: "CLINICAL_INTERPRETER_UNAVAILABLE", http_status: 503, message_key: "api.error.clinical-interpreter-unavailable", retryable: true }),
   assessmentPending: apiError({ code: "ASSESSMENT_PENDING", http_status: 422, message_key: "api.error.assessment-pending", retryable: true }),
   unavailable: apiError({ code: "FEATURE_NOT_AVAILABLE", http_status: 503, message_key: "api.error.feature-not-available", retryable: false }),
+  providerBudget: apiError({ code: "AI_REQUEST_LIMIT_REACHED", http_status: 503, message_key: "api.error.ai-request-limit", retryable: false }),
   persistence: apiError({ code: "CORE_UNAVAILABLE", http_status: 503, message_key: "api.error.core-unavailable", retryable: true }),
   internal: apiError({ code: "INTERNAL_ERROR", http_status: 500, message_key: "api.error.internal", retryable: false })
 });

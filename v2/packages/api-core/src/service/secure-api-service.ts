@@ -37,6 +37,7 @@ import {
   type StartSessionRequest,
   type SubmitClinicalActionRequest,
   type SubmitClinicalInterpretationRequest,
+  type SubmitClinicalInterpretationResponseData,
   type SubmitQuestionRequest
 } from "../../../contracts/src/index.ts";
 import { canonicalSerialize } from "../../../case-schema/src/index.ts";
@@ -636,6 +637,13 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
   const debriefs = new Map<string, Promise<TutorDebrief>>();
   const tutorAttempts = new Map<string, number>();
   const tutorKeys = new Map<string, { locale: string; result: Promise<ApiServiceResult<TutorDebrief>> }>();
+  // Non-authoritative Interpreter results only. Failures remain tombstones too;
+  // repeated UI submissions never turn provider failure into an automatic retry.
+  // Bounded process-local Expo protection; shared durable quota is deployment work.
+  const interpretations = new Map<string, {
+    owner: string; fingerprint: string; state_version: number;
+    result: Promise<ApiServiceResult<SubmitClinicalInterpretationResponseData>>;
+  }>();
   async function authorizeAndLoad(
     authority: ApiRequestAuthority,
     sessionId: string
@@ -880,6 +888,20 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     if (!context.success) {
       return { success: false, error: ERRORS.domainRejected } as const;
     }
+    const owner = canonicalSerialize([input.authority.principal.user_id, input.session_id]);
+    const key = canonicalSerialize([owner, input.request.utterance_id]);
+    const fingerprint = canonicalSerialize(input.request);
+    const version = loaded.data.session.patient_state.state_version;
+    const previous = interpretations.get(key);
+    if (previous) {
+      if (previous.fingerprint !== fingerprint) return { success: false, error: ERRORS.idempotency } as const;
+      if (previous.state_version !== version) return { success: false, error: ERRORS.stale } as const;
+      return previous.result;
+    }
+    if (interpretations.size >= 512 || [...interpretations.values()].filter(record => record.owner === owner).length >= 64) {
+      return { success: false, error: ERRORS.providerBudget } as const;
+    }
+    const compute = async (): Promise<ApiServiceResult<SubmitClinicalInterpretationResponseData>> => {
     const workflow = await executeClinicalInterpreter({
       gateway: capability.gateway,
       request_id: input.authority.request_id,
@@ -904,6 +926,10 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     return response.success
       ? { success: true, data: response.data } as const
       : { success: false, error: ERRORS.internal } as const;
+    };
+    const result = compute().catch(() => ({ success: false as const, error: ERRORS.internal }));
+    interpretations.set(key, { owner, fingerprint, state_version: version, result });
+    return result;
   }
 
   async function getInvestigationResult(
@@ -1252,6 +1278,12 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
         && event.event_type === "QUESTION_ASKED"
         && event.idempotency_key === idempotencyKey.data
     );
+    // Committed claims count even when the provider failed. Exact durable replay
+    // still works at the limit and never incurs another provider invocation.
+    if (existingQuestionEvent === undefined
+      && initial.data.session.committed_events.filter(event => event.event_type === "QUESTION_ASKED").length >= 64) {
+      return { success: false, error: ERRORS.providerBudget } as const;
+    }
     const claimedQuestion = existingQuestionEvent === undefined
       ? appendConversationEvent({
           session: initial.data.session,
