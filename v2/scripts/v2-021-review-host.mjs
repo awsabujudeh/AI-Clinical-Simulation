@@ -8,6 +8,7 @@ import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
 import { prepareV2_021LiveProof, V2_021_PROOF_QUESTION, createV2_021QuestionAdmission } from "../runtime/v2-021-live-proof.mjs";
 import { V2_021_PATIENT_LANGUAGE, createV2_021ReviewStartKey } from "../runtime/v2-021-review-bootstrap.ts";
 import { assertLocalReviewEnvironment, reviewApiRequestAllowed } from './local-review-security.mjs';
+import { createReviewReadiness, serveReviewReadiness } from './review-readiness.mjs';
 
 assertLocalReviewEnvironment(process.env.NODE_ENV);
 
@@ -20,6 +21,7 @@ const reviewNamespace = randomUUID();
 const liveRequested = process.env.V2_ALLOW_LIVE_V2_021_VOICE_PROOF === "1";
 const live = liveRequested ? prepareV2_021LiveProof({ getEnv: name => process.env[name], fetch: globalThis.fetch }) : undefined;
 if (live && !live.success) { console.error(live.code); process.exit(1); }
+const readiness = await createReviewReadiness('stemi', { patient: live?.success, voice: live?.success });
 let boundVoiceSessionId;
 const h = await createApiTestHarness({ enable_patient_conversation: true,
   resolve_voice_profile: session => live?.success && session.session_id === boundVoiceSessionId ? live.profile.profile_id : undefined,
@@ -43,6 +45,7 @@ const server = createServer(async (request, response) => {
     if (request.headers.host !== "127.0.0.1:4186" || (request.headers.origin && request.headers.origin !== origin)
       || request.headers["sec-fetch-site"] === "cross-site") { response.writeHead(403).end(); return; }
     const url = new URL(request.url, origin);
+    if (serveReviewReadiness(request, response, url.pathname, readiness)) return;
     if (url.pathname === "/__review/session") { response.setHeader("Content-Type", "application/json"); response.setHeader("Cache-Control", "no-store"); response.end(JSON.stringify({ session_id: started.data.session.session_id,
       patient_language: started.data.patient_language, review_namespace: reviewNamespace,
       ...(live?.success ? { voice_profile: live.profile, proof_question: V2_021_PROOF_QUESTION } : {}) })); return; }

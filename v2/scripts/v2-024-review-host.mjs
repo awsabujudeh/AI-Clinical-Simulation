@@ -7,6 +7,7 @@ import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
 import { createStemiTutorRetrieval, createTutorGateway } from "../runtime/v2-024-tutor-composition.ts";
 import { tutorTestGateway } from "../tests/fixtures/tutor.ts";
 import { assertLocalReviewEnvironment, reviewApiRequestAllowed } from './local-review-security.mjs';
+import { createReviewReadiness, serveReviewReadiness } from './review-readiness.mjs';
 
 assertLocalReviewEnvironment(process.env.NODE_ENV);
 
@@ -25,6 +26,7 @@ const start = await h.app.request("/v1/review-sessions", { method: "POST", heade
   body: JSON.stringify(startBody(artifact.source_case.manifest.case_id, { mode: "PRACTICE_DEMO", patient_language: "ar-JO" })) });
 if (start.status !== 201) throw Error("REVIEW_START_FAILED");
 const sessionId = (await start.json()).data.session.session_id;
+const readiness = await createReviewReadiness('tutor', { tutor: live && Boolean(process.env.OPENAI_API_KEY?.trim()) });
 const origin = "http://127.0.0.1:4192";
 const vite = await createViteServer({ root: fileURLToPath(new URL("../apps/web/", import.meta.url)), envDir: false,
   envPrefix: "__V2_024_NO_CLIENT_ENV__", server: { middlewareMode: true, hmr: false }, appType: "custom" });
@@ -33,6 +35,7 @@ const server = createServer(async (req, res) => {
   try {
     if (req.headers.host !== "127.0.0.1:4192" || (req.headers.origin && req.headers.origin !== origin) || req.headers["sec-fetch-site"] === "cross-site") { res.writeHead(403).end(); return; }
     const url = new URL(req.url, origin);
+    if (serveReviewReadiness(req, res, url.pathname, readiness)) return;
     if (url.pathname === "/__review/session") { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify({ session_id: sessionId, patient_language: "ar-JO", review_namespace: "tutor-review", tutor_enabled: true, tutor_provider_mode: test ? "TEST_DOUBLE" : live ? "LIVE" : "UNAVAILABLE" })); return; }
     // Deterministic offline proof control: normal coordinator, no state/rubric edits.
     if (!live && url.pathname === "/__review/advance" && req.method === "POST") {

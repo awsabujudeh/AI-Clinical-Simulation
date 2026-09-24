@@ -5,6 +5,7 @@ import { prepareStemiConversationArtifact } from "../content/cases/stemi/v2-conv
 import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
 import { createFacultyDemoStore, projectFacultyStemi } from "../runtime/v2-025-faculty-store.ts";
 import { assertLocalReviewEnvironment } from './local-review-security.mjs';
+import { createReviewReadiness, serveReviewReadiness } from './review-readiness.mjs';
 
 assertLocalReviewEnvironment(process.env.NODE_ENV);
 
@@ -14,6 +15,7 @@ const origin = "http://127.0.0.1:4193";
 const member = Object.freeze({ membership_id: "membership.faculty-demo", institution_id: "institution.faculty-demo", role: "FACULTY" });
 const artifact = await prepareStemiConversationArtifact(PORTABLE_SHA256_ADAPTER);
 const store = createFacultyDemoStore(projectFacultyStemi(artifact), member.institution_id);
+const readiness = await createReviewReadiness('faculty');
 const vite = await createViteServer({ root: fileURLToPath(new URL("../apps/web/", import.meta.url)),
   envDir: false, envPrefix: "__V2_025_NO_CLIENT_ENV__", server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" });
 const entry = fileURLToPath(new URL("../tests/browser/v2-025-e2e/app.tsx", import.meta.url)).replaceAll("\\", "/");
@@ -22,6 +24,7 @@ const server = createServer(async (req, res) => {
   try {
     if (req.headers.host !== "127.0.0.1:4193" || (req.headers.origin && req.headers.origin !== origin) || req.headers["sec-fetch-site"] === "cross-site") { json(403, { code: "FORBIDDEN" }); return; }
     const url = new URL(req.url, origin);
+    if (serveReviewReadiness(req, res, url.pathname, readiness)) return;
     if (url.pathname.startsWith("/__faculty/")) {
       let result;
       if (req.method === "GET" && url.pathname === "/__faculty/cases") result = store.list(member);

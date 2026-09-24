@@ -6,6 +6,7 @@ import { createDanaReviewSession } from "../runtime/v2-026-review-composition.ts
 import { apiHeaders } from "../tests/fixtures/api/secure-api.ts";
 import { prepareDanaLiveProof, createDanaQuestionAdmission, DANA_PROOF_QUESTION } from '../runtime/v2-026-live-proof.mjs';
 import { assertLocalReviewEnvironment, reviewApiRequestAllowed } from './local-review-security.mjs';
+import { createReviewReadiness, serveReviewReadiness } from './review-readiness.mjs';
 
 assertLocalReviewEnvironment(process.env.NODE_ENV);
 
@@ -16,6 +17,7 @@ const live=process.env.V2_ALLOW_LIVE_V2_026_VOICE_PROOF==='1'?prepareDanaLivePro
 if(live&&!live.success){console.error(live.code);process.exit(1);}
 const review = await createDanaReviewSession({namespace,...(live?.success?{patient_provider:live.patient_provider,speech_token_broker:live.speech_token_broker,voice_profile_id:live.profile.profile_id}:{})});
 const admit=createDanaQuestionAdmission();
+const readiness = await createReviewReadiness('dana', { patient: live?.success, voice: live?.success });
 // An isolated offline review can coexist with the owner's trusted live host.
 const portArg=process.argv.find(a=>a.startsWith('--port='));
 const port=portArg?Number(portArg.slice(7)):4194;
@@ -28,6 +30,7 @@ const server = createServer(async (req, res) => {
   try {
     if (req.headers.host !== `127.0.0.1:${port}` || (req.headers.origin && req.headers.origin !== origin) || req.headers["sec-fetch-site"] === "cross-site") { res.writeHead(403).end(); return; }
     const url = new URL(req.url, origin);
+    if (serveReviewReadiness(req, res, url.pathname, readiness)) return;
     if (url.pathname === "/__review/session") { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify({ session_id: review.sessionId, patient_language: "ar-JO", review_namespace: namespace,...(live?.success?{voice_profile:live.profile,proof_question:DANA_PROOF_QUESTION,voice_selection:'OWNER_AUTHORIZED_FEMALE_REVIEW_ONLY'}:{}) })); return; }
     if (url.pathname === "/__review/advance" && req.method === "POST") {
       if(live){res.writeHead(403).end();return;}

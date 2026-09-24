@@ -1,5 +1,14 @@
 # AI Clinical Simulation Platform V2
 
+V2-028 operator readiness is **CLOSED — trusted-local Expo scope**.
+From `v2`, run `npm run dev:v2-028` and open
+`http://127.0.0.1:4200/expo/preflight`. This dedicated loopback page is not Student
+navigation or production authentication. Default/recheck performs local checks
+only, with no external provider call or demo Session mutation. Restart existing
+review hosts in their original trusted terminals to expose current hardened boot
+identity. See the [V2-028 operator handoff](../planning_input/v2-028/V2-028_OPERATOR_HANDOFF.md)
+for safe degradation, source/review gates and exact commands.
+
 V2-026 Dana/Anaphylaxis is **CLOSED — technical implementation and owner visual approval**.
 Physician review remains pending for Dana and STEMI; both remain REVIEW_ONLY.
 Run

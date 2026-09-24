@@ -1,0 +1,7 @@
+.operator-preflight{max-width:1240px;margin:0 auto;padding:28px;color:#142a39;background:#f4f7fa;font:16px/1.5 system-ui,sans-serif}
+.operator-preflight h1{font-size:32px;margin:8px 0}.operator-preflight h2{font-size:19px;margin:0 0 8px}
+.operator-preflight section{padding:18px;margin:16px 0;background:white;border:1px solid #d0dae1;border-radius:8px}
+.operator-preflight button{padding:10px 18px;background:#143d56;color:white;border:0;border-radius:5px;cursor:pointer}.operator-preflight button:disabled{opacity:.65;cursor:wait}
+.preflight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}.operator-preflight .preflight-check{margin:0}
+.operator-preflight .READY{border-left:5px solid #15815b}.operator-preflight .DEGRADED{border-left:5px solid #b17604}.operator-preflight .BLOCKED{border-left:5px solid #b62932}
+.operator-preflight code{font-size:13px;overflow-wrap:anywhere}.operator-preflight li{margin-bottom:9px}.operator-preflight a{color:#135680}
