@@ -32,7 +32,7 @@ const services: StudentUiServices = {
   actions: { async submit(intent) { const id = ++sequence; const r = await read(`/v1/sessions/${intent.session_id}/actions/propose`, {
     command_id: requestId("command", id), action_request_id: requestId("action-request", id), action_id: intent.action.action_id,
     expected_state_version: intent.expected_state_version, parameters: intent.parameters, source: "UI" });
-    return r.data !== undefined ? { kind: "COMMITTED", replayed: r.data.replayed, idempotency_key: requestId("idempotency", sequence), committed_event_ids: r.data.committed_event_ids, projection: SafeSessionProjectionSchema.parse(r.data.session) } : { kind: "REJECTED", requires_authoritative_sync: true }; } },
+    return r.data !== undefined ? { kind: "COMMITTED", replayed: r.data.replayed, idempotency_key: requestId("idempotency", sequence), committed_event_ids: r.data.committed_event_ids, projection: SafeSessionProjectionSchema.parse(r.data.session) } : { kind: r.error?.code === "SESSION_VERSION_CONFLICT" ? "STALE" : "REJECTED", requires_authoritative_sync: true }; } },
   timeline: { async load(id) { const r = await read(`/v1/sessions/${id}/timeline`); return r.data !== undefined ? { kind: "AVAILABLE", projection: SafeLearnerTimelineProjectionSchema.parse(r.data) } : { kind: "UNAVAILABLE" }; } },
   assessment: { async load(id) { const r = await read(`/v1/sessions/${id}/assessment`); return r.data !== undefined ? { kind: "AVAILABLE", projection: SafeAssessmentApiProjectionSchema.parse(r.data) } : { kind: "PENDING" }; } },
   finalization: { async end() { return { kind: "UNAVAILABLE", requires_authoritative_sync: false }; } },
@@ -47,4 +47,12 @@ const voice = current.voice_profile === undefined ? undefined : createElevenLabs
 });
 // A bookmarked previous boot's URL must not select its expired in-memory Session.
 if (location.pathname !== `/sessions/${current.session_id}`) history.replaceState(null, "", `/sessions/${current.session_id}`);
-createRoot(document.getElementById("root")!).render(<App services={{ ...services, ...(voice === undefined ? {} : { voice }) }} />);
+// Only the offline Playwright bootstrap supplies this marker. This file is a
+// test/review entry, not the production app entry. No review host emits it;
+// a configured real voice profile also prevents this offline substitution.
+const localPlayback = current.local_visual_playback_fixture === 'DANA_VISUAL_ONLY' && current.voice_profile === undefined
+  ? (await import('../v2-026-e2e/local-speaking-fixture.ts')).localSpeakingFixture(current.session_id) : undefined;
+createRoot(document.getElementById("root")!).render(<>
+  {localPlayback ? <p role="note">LOCAL VISUAL PLAYBACK FIXTURE — synthetic tone, no provider request or generated conversation</p> : null}
+  <App services={{ ...services, ...(voice === undefined ? {} : { voice }), ...localPlayback }} />
+</>);

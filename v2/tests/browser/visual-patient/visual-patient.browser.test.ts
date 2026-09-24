@@ -21,7 +21,8 @@ describe("case-bound downstream Visual Patient", () => {
     expect(projection.visual_patient).toEqual(projectVisualPatient(session));
     expect(projection.visual_patient).toMatchObject({ face: "pain", position: "semi_fowler", hand: true });
     expect(JSON.stringify(session)).toBe(before);
-    expect(Object.keys(projection.visual_patient).sort()).toEqual(["asset_id","blink","body","breathing","face","hand","living","position","presentation_schema_version"]);
+    expect(Object.keys(projection.visual_patient).sort()).toEqual(["asset_id","blink","body","breathing","equipment","face","hand","living","position","presentation_schema_version"]);
+    expect(projection.visual_patient.equipment).toEqual({bp_cuff:false,iv_access:false,iv_tubing:false});
   });
   it("does not invent relief from modest support or from displayed vitals", async () => {
     const { session } = await review(); session.patient_state.hemodynamic_state = "hemodynamics.stemi-modestly-supported" as never;

@@ -45,7 +45,7 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
           onReady() { if (cancelled) return; const p = VisualPatientPresentationSchema.safeParse(latest.current.presentation); if (p.success) instance.setPresentation(p.data); instance.setSpeaking(latest.current.speaking); setStatus("READY"); },
           onError() { if (!cancelled) setStatus("FAILED"); },
           onExamRequest(value) { const parsed = VisualExamRequestSchema.safeParse(value); if (parsed.success) latest.current.onExamRequest(parsed.data); }
-        });
+        }, latest.current.presentation?.asset_id);
         runtime.current = instance; runtimes.set(canvas.current, instance);
       } catch { if (!cancelled) setStatus("FAILED"); }
     };
@@ -64,6 +64,7 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
   function selectRegion(value: ExamRegion) { if (runtime.current?.reveal(value)) { setRegion(value); if (tool === "penlight") setTool("inspection"); } }
   return <Panel className="visual-patient-native" aria-labelledby="visual-patient-title">
     <div className="visual-patient-native__header"><h2 id="visual-patient-title">{ar ? "المريض المرئي" : "Visual Patient"}</h2>
+      {presentation?.asset_id === "dana.review-v01" ? <span>{ar ? "دانا — عرض قيد المراجعة" : "Dana — review visual"}</span> : null}
       <span>{exam ? (ar ? "الفحص السريري" : "Physical examination") : (ar ? "التواصل مع المريض" : "Patient interaction")}</span>
       {speaking && ready ? <span role="status">{ar ? "يتحدث" : "Speaking"}</span> : null}
     </div>
@@ -71,13 +72,16 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
       {supported || status !== "IDLE" ? <canvas ref={canvas} aria-label={ar ? "المريض ثلاثي الأبعاد؛ اسحب لتحريك الكاميرا" : "3D patient; drag to adjust camera"} style={{ visibility: ready ? "visible" : "hidden" }} /> : null}
       {!ready ? <div className="visual-patient-native__fallback" role="status">
         {fallback ? <img src={fallback.path} onError={() => setStaticFailed(true)} alt={ar ? "صورة ثابتة للمريض، وليست فحصًا حيًا" : "Static patient illustration, not a live examination"} style={{ maxWidth: "100%", maxHeight: "calc(100% - 5rem)", objectFit: "contain" }} /> : null}
+        {fallback && presentation?.asset_id === "dana.review-v01" ? <span>{ar ? "صورة مرجعية للحالة الأولية؛ القيم السريرية الحالية معروضة على المراقبة." : "Initial-presentation reference still; current clinical values remain on the monitor."}</span> : null}
         <strong>{fallback ? (ar ? "صورة بديلة ثابتة — العرض ثلاثي الأبعاد غير متاح" : "Static fallback — 3D view unavailable") : status === "LOADING" && supported ? (ar ? "جارٍ تحميل المريض…" : "Loading patient…") : (ar ? "العرض المرئي غير متاح" : "Patient view unavailable")}</strong><p>{ar ? "تظل المراقبة والإجراءات السريرية متاحة." : "Monitoring and clinical actions remain available."}</p></div> : null}
     </div>
     <div className="visual-patient-native__controls">
       <Button disabled={!ready || !enabled} onClick={() => { if (exam) runtime.current?.exitExam(); else runtime.current?.enterExam(); setExam(!exam); setRegion("DEFAULT_COVERED"); setTool("inspection"); }}>{exam ? (ar ? "إنهاء الفحص" : "Exit examination") : (ar ? "بدء الفحص السريري" : "Enter physical examination")}</Button>
       <Button disabled={!ready} onClick={() => runtime.current?.focus()}>{ar ? "إعادة توسيط الكاميرا" : "Reset camera"}</Button>
       {exam ? <>
-        <div role="group" aria-label="Examination region">{regions.map(([id, en, arabic]) => <button key={id} type="button" aria-pressed={region === id} onClick={() => selectRegion(id)}>{ar ? arabic : en}</button>)}</div>
+        <div role="group" aria-label="Examination region">{(presentation?.asset_id === "dana.review-v01"
+          ? [...regions.filter(([id]) => !["ABDOMEN", "LOWER_LEGS"].includes(id)), ["FACE", "Face / lips", "الوجه / الشفتان"], ["NECK", "Neck", "الرقبة"]] as readonly [ExamRegion, string, string][]
+          : regions).map(([id, en, arabic]) => <button key={id} type="button" aria-pressed={region === id} onClick={() => selectRegion(id)}>{ar ? arabic : en}</button>)}</div>
         <div role="group" aria-label="Examination tool">{([ ["inspection", "Inspection / pointer", "المعاينة"], ["stethoscope", "Stethoscope", "السماعة"], ["penlight", "Penlight", "المصباح"] ] as const).map(([id,en,arabic]) => <button key={id} type="button" aria-pressed={tool === id} onClick={() => { if (runtime.current?.tool(id)) { setTool(id); if (id === "penlight") setRegion("DEFAULT_COVERED"); } }}>{ar ? arabic : en}</button>)}</div>
         <p>{ar ? "اختر منطقة ثم انقر على المريض لطلب الفحص. تأكيد الإجراء يتم من قائمة الإجراءات؛ لا تُستنتج النتائج من الصورة." : "Select a region, then point to the patient to request examination. Confirm clinical actions in the action panel; appearance is not an examination result."}</p>
       </> : null}

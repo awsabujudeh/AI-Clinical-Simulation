@@ -1,0 +1,12 @@
+import {readFile} from 'node:fs/promises';
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {DanaRig} from '../apps/web/src/features/visual-patient/runtime/dana-rig.js';
+const loader=new GLTFLoader();loader.register(()=>({name:'LOCAL_TEXTURE_TEST',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
+const b=await readFile(new URL('../apps/web/public/visual-patient/dana/review-v01/dana-review.glb',import.meta.url));
+const asset=await loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
+const rig=new DanaRig({asset,camera:new THREE.PerspectiveCamera(),orbit:{target:new THREE.Vector3(),update(){},addEventListener(){}},canvas:{addEventListener(){}},state:{mode:'conversation',body:'itch_body',hand:true,face:'anxious',living:true,breathing:true,blink:true},onRequest(){}});
+rig.pose(17.2,0);
+const upper=rig.point('LeftForeArm').sub(rig.point('LeftArm')).normalize(),lower=rig.point('LeftHand').sub(rig.point('LeftForeArm')).normalize();
+const hinge=new THREE.Vector3().crossVectors(upper,lower).normalize();
+console.log(JSON.stringify({roll:rig.neckForearmRoll,bend:upper.angleTo(lower),hinge:hinge.toArray(),bones:Object.fromEntries(['LeftArm','LeftForeArm','LeftHand'].map(n=>[n,{p:rig.point(n).toArray(),axes:[[1,0,0],[0,1,0],[0,0,1]].map(a=>new THREE.Vector3(...a).applyQuaternion(rig.bones[n].getWorldQuaternion(new THREE.Quaternion())).toArray())}]))},null,2));

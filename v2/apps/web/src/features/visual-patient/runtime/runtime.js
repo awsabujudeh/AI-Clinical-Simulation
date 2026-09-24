@@ -5,8 +5,12 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {LivingBehavior} from './living.js';
 import {PhysicalExamController} from './exam.js';
 import {ExaminationCameraNavigation} from './camera-navigation.js';
+import {DanaRig} from './dana-rig.js';
+import {PatientEquipment} from './equipment.js';
+import danaAsset from '../../../../../../content/media/dana/manifest.json';
 /** Port of approved Physical Exam V02. Animation math remains presentation-only. */
-export function createPatientRuntime(canvas, view, callbacks) {
+export function createPatientRuntime(canvas, view, callbacks, assetId='stemi.physical-exam-v02') {
+const isDana=assetId===danaAsset.presentation_asset_id;
 let disposed=false, frame=0, loadPromise; const abort=new AbortController();
 const ui=()=>{};
 const scene=new THREE.Scene();scene.background=new THREE.Color('#bdc9c8');
@@ -18,9 +22,9 @@ const env=new RoomEnvironment(),pmrem=new THREE.PMREMGenerator(renderer),environ
 scene.add(new THREE.HemisphereLight(0xf4f7ff,0xa3abb0,.45));
 const key=new THREE.DirectionalLight(0xfff9f3,2.3);key.position.set(-2.3,4.8,.4);key.target.position.set(0,.7,0);key.castShadow=true;key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-2.6,right:2.6,top:2.8,bottom:-2.8,near:.1,far:12});key.shadow.normalBias=.0015;key.shadow.bias=-.00015;scene.add(key,key.target);
 const fill=new THREE.DirectionalLight(0xe4eeff,.8);fill.position.set(1.5,2.8,-.5);scene.add(fill);
-const state={mode:'conversation',position:'semi_fowler',face:'pain',body:'pain_body',breathing:true,speaking:false,blink:true,hand:true};
+const state={mode:'conversation',position:'semi_fowler',face:isDana?'anxious':'pain',body:isDana?'itch_body':'pain_body',breathing:true,speaking:false,blink:true,hand:true};
 let manifest,asset,clips={},nodes={},morphMeshes=[],elapsed=0,ready=false,last=performance.now(),loadMs=0;
-let living,exam,navigation;
+let living,exam,navigation,dana,equipment;
 let positionFrom=0,positionTo=0,positionStarted=-10,contactStarted=0,contactActive=true,entryCount=1;
 const smooth=x=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*x*(10+x*(-15+6*x));};
 function positionMix(t=elapsed){return THREE.MathUtils.lerp(positionFrom,positionTo,smooth((t-positionStarted)/2.5));}
@@ -30,10 +34,11 @@ function setSpeaking(v){const old={...state};state.speaking=v;living?.stateChang
 const q=new THREE.Quaternion(),painUniform={value:1},positionV=new THREE.Vector3(),directionV=new THREE.Vector3();
 function resize(){renderer.setSize(view.clientWidth,view.clientHeight,false);camera.aspect=view.clientWidth/view.clientHeight;camera.updateProjectionMatrix();}
 const observer=new ResizeObserver(resize);observer.observe(view);
-function applyView(name='Camera_Student_Primary'){navigation?.go(name,!ready);}
+function applyView(name='Camera_Student_Primary'){if(dana)dana.focus(!ready);else navigation?.go(name,!ready);}
 function setPresentation(p){
- const old={...state}; if(state.mode==='conversation')setPosition(p.position);else if(exam)exam.previousPosition=p.position;
- for(const k of ['face','body','breathing','blink','hand'])state[k]=p[k];
+ equipment?.setPresentation(p);
+ const old={...state}; if(state.mode==='conversation')setPosition(p.position);else if(dana)dana.previousPosition=p.position;else if(exam)exam.previousPosition=p.position;
+ for(const k of ['face','body','breathing','blink','hand','living'])state[k]=p[k];
  syncContact(); if(living)living.enabled=p.living; living?.stateChanged(old);
 }
 function morph(name,value,mesh=null){for(const m of mesh?[mesh]:morphMeshes){const i=m.morphTargetDictionary[name];if(i!==undefined)m.morphTargetInfluences[i]=value;}}
@@ -61,6 +66,7 @@ function applyContact(w,t){
  if(w)for(const tr of clips[manifest.contact.entry_supine].tracks)tr.node.quaternion.slerp(q.fromArray(tr.interpolant.evaluate(Math.max(0,t))),w);
 }
 function pose(t){
+ if(dana){dana.pose(t,positionMix(t));return;}
  for(const m of morphMeshes)m.morphTargetInfluences.fill(0);
  const w=positionMix(t),contactTime=Math.max(0,t-contactStarted);
  applyPosition(w);
@@ -92,13 +98,25 @@ vec3 clinicalNormal(vec3 p,vec3 n,float h){vec3 sx=dFdx(p),sy=dFdy(p);vec3 r1=cr
 `).replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\nnormal=clinicalNormal(-vViewPosition,normal,ch(vClinicalBind)*.00055*.55*clinicalPain);');
  };mat.customProgramCacheKey=()=> 'approved-clinical-pain-creases-v01';
 }
-async function load(){const start=performance.now();const root='/visual-patient/stemi/physical-exam-v02/';
+async function load(){const start=performance.now();const root=isDana?danaAsset.root:'/visual-patient/stemi/physical-exam-v02/';
  const checked=async(name,hash)=>{
   const response=await fetch(root+name,{signal:abort.signal});if(!response.ok)throw Error('ASSET_UNAVAILABLE');
   const bytes=await response.arrayBuffer();
   const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
   if(digest!==hash)throw Error('ASSET_INTEGRITY');return bytes;
  };
+ if(isDana){
+  const glb=await checked(danaAsset.file,danaAsset.sha256);if(disposed)return;
+  asset=await new GLTFLoader().parseAsync(glb,root);scene.add(asset.scene);
+  asset.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
+  dana=new DanaRig({asset,camera,orbit,canvas,state,onRequest:callbacks.onExamRequest});
+  equipment=new PatientEquipment(asset,scene,supply=>{
+   const side=supply?.x<0?'Right':'Left';
+   return {shoulder:dana.point(side+'Arm'),elbow:dana.point(side+'ForeArm'),wrist:dana.point(side+'Hand'),armRadius:.043,forearmRadius:.028};
+  });
+  pose(0);resize();await renderer.compileAsync(scene,camera);if(disposed)return;
+  renderer.render(scene,camera);loadMs=performance.now()-start;ready=true;callbacks.onReady();return;
+ }
  const [json,glb]=await Promise.all([
   checked('visual_patient_stemi_physical_exam_runtime_v01.json','5eab5851925ed57367d274e79ee818ce393460a5604671255fc751ca1cbb366c'),
   checked('visual_patient_stemi_physical_exam_runtime_v01.glb','00563647261c8da8dd030f366aec6bdfdd2550bf667159eab9cf7c922beed4a1')
@@ -111,16 +129,22 @@ async function load(){const start=performance.now();const root='/visual-patient/
  living=new LivingBehavior({manifest,clips,nodes,state,scene,applyClip,now:()=>elapsed});
  exam=new PhysicalExamController({manifest,nodes,state,scene,living,morph,canvas,camera,setPosition,positionMix,setCamera:applyView,onRequest:callbacks.onExamRequest,now:()=>elapsed});
  navigation=new ExaminationCameraNavigation({camera,orbit,nodes,exam,positionMix});
+ const point=name=>nodes[name]?.getWorldPosition(new THREE.Vector3());
+ equipment=new PatientEquipment(asset,scene,supply=>{
+  const side=supply?.x<0?'R':'L';
+  const shoulder=point('upperarm01.'+side),elbow=point('lowerarm01.'+side),wrist=point('wrist.'+side);
+  return shoulder&&elbow&&wrist?{shoulder,elbow,wrist,armRadius:.052,forearmRadius:.036}:undefined;
+ });
  pose(0);resize();applyView();await renderer.compileAsync(scene,camera);
  if(disposed)return;renderer.render(scene,camera);loadMs=performance.now()-start;ready=true;callbacks.onReady();
 }
 function stats(){return {ready,loadMs,elapsed,positionMix:positionMix(),entryCount,
  modelUUID:asset?.scene.uuid,modelLoads:asset?1:0,
- breathing:exam?.bodyMesh?.morphTargetInfluences[exam.bodyMesh.morphTargetDictionary.Breathing_ThoracicExpansion]??0,
- camera:navigation?.stats(),exam:exam?.stats(),state:{...state}};}
+ breathing:dana?.breathing??exam?.bodyMesh?.morphTargetInfluences[exam.bodyMesh.morphTargetDictionary.Breathing_ThoracicExpansion]??0,
+ camera:navigation?.stats(),equipment:equipment?.stats(),exam:dana?.stats()??exam?.stats(),state:{...state}};}
 function animate(now){
  if(disposed)return;frame=requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.25);last=now;
- if(!ready)return;elapsed+=dt;pose(elapsed);navigation.update(now);renderer.render(scene,camera);
+ if(!ready)return;elapsed+=dt;pose(elapsed);equipment?.update();if(dana)dana.update();else navigation.update(now);renderer.render(scene,camera);
 }
 function release(){
  const materials=new Set(),geometries=new Set(),textures=new Set();
@@ -135,11 +159,11 @@ frame=requestAnimationFrame(animate);
 loadPromise=load().catch(()=>{if(!disposed)callbacks.onError();});
 return {
  setPresentation,setSpeaking,
- enterExam:()=>{if(ready)exam.enter();},exitExam:()=>{if(ready)exam.exit();},
- reveal:region=>ready&&exam.selectRegion(region),tool:tool=>ready&&exam.setTool(tool),
- focus:()=>applyView(state.mode==='physical_exam'?navigation.regionView(exam.region):'Camera_Student_Primary'),
+ enterExam:()=>{if(ready){if(dana){dana.enter();setPosition('supine');}else exam.enter();}},exitExam:()=>{if(ready){if(dana){dana.exit();setPosition(state.position);}else exam.exit();}},
+ reveal:region=>ready&&(dana??exam).selectRegion(region),tool:tool=>ready&&(dana??exam).setTool(tool),
+ focus:()=>dana?dana.focus():applyView(state.mode==='physical_exam'?navigation.regionView(exam.region):'Camera_Student_Primary'),
  stats,
- dispose(){if(disposed)return;disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();exam?.dispose();orbit.dispose();
+ dispose(){if(disposed)return;disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();exam?.dispose();dana?.dispose();orbit.dispose();
 canvas.removeEventListener('webglcontextlost',contextLost);void loadPromise.finally(release);}
 };
 }

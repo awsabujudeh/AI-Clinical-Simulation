@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "presentation_asset_id": "dana.review-v01",
+  "case_package_id": "case-package.anaphylaxis.dana.001",
+  "case_version_id": "case-version.anaphylaxis.dana.001",
+  "review_execution_hash": "caab9211b2277341226e652e69b78a2fe2b6f7d11e8237ed5645f5e34ba90b8c",
+  "root": "/visual-patient/dana/review-v01/",
+  "file": "dana-review.glb",
+  "sha256": "17f578e1813b4d96a365c50c498ad8251fcb39b805119ce7c030611c96e7bc65",
+  "source": "visual-patient-lab/assets/characters/Dana.fbx",
+  "source_owner_selection": "APPROVED_PRIMARY_CHARACTER",
+  "rights_status": "RIGHTS_REVIEW_REQUIRED",
+  "clinical_review": "PENDING_PHYSICIAN_REVIEW",
+  "visual_review": "OWNER_APPROVED_EXPO",
+  "patient_fallback": {
+    "media_id": "media.dana.static-initial-v01",
+    "version": "1.0.0",
+    "path": "/visual-patient/dana/review-v01/dana-static-anxious.png",
+    "sha256": "f90e26c649476d67d4ec31c33b21c4178198a0f557468b0fe17993b32214a5cb",
+    "source": "patient_anaphylaxis_dana_v05.blend / Dana_Review_Camera",
+    "purpose": "Initial-presentation reference still after 3D failure, not a live examination or current clinical state",
+    "rights_status": "RIGHTS_REVIEW_REQUIRED",
+    "visual_review": "OWNER_APPROVED_EXPO"
+  },
+  "diagnostic_media": "MEDIA_ASSET_PENDING_TEXT_ONLY",
+  "diagnostics": [
+    {"action_id":"investigation.dana.ecg","diagnostic_result_id":"diagnostic-result.dana.ecg","labels":[{"locale":"en-US","text":"ECG"},{"locale":"ar-JO","text":"تخطيط القلب"}]},
+    {"action_id":"investigation.dana.cxr","diagnostic_result_id":"diagnostic-result.dana.cxr","labels":[{"locale":"en-US","text":"Chest X-ray"},{"locale":"ar-JO","text":"صورة الصدر"}]},
+    {"action_id":"investigation.dana.vbg","diagnostic_result_id":"diagnostic-result.dana.vbg","labels":[{"locale":"en-US","text":"Venous blood gas"},{"locale":"ar-JO","text":"غاز الدم الوريدي"}]},
+    {"action_id":"investigation.dana.labs","diagnostic_result_id":"diagnostic-result.dana.labs","labels":[{"locale":"en-US","text":"Basic ED labs"},{"locale":"ar-JO","text":"تحاليل الطوارئ الأساسية"}]},
+    {"action_id":"investigation.dana.tryptase","diagnostic_result_id":"diagnostic-result.dana.tryptase","labels":[{"locale":"en-US","text":"Serum tryptase sample"},{"locale":"ar-JO","text":"عينة التريبتاز"}]}
+  ],
+  "notes": "Owner-supplied Mixamo character; same-Dana body-complete modeling explicitly authorized. Owner-approved Expo authoring baseline: patient_anaphylaxis_dana_v25.blend. Gentle treated mouth-corner/cheek relief cue; accepted thoracic breathing, anxiety, lip/blink/speech shapes, chest contour, shallow navel, fitted shared pillow and aligned white-mattress supports preserved. Original identity meshes preserved; rejected shirt-derived torso excluded. Exact STEMI Cotton/Blanket materials reused. No substitution or external media. Distribution-license and physician approval have not been fabricated. Owner visual approval is recorded in planning_input/v2-026/V2-026_CLOSEOUT.md."
+}

@@ -18,6 +18,9 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:v2-026": "node scripts/v2-026-review-host.mjs",
+    "test:v2-026": "vitest run --config vitest.config.mjs tests/browser/v2-026 && node scripts/v2-026-asset-check.mjs && node scripts/v2-026-live-proof-test.mjs",
+    "test:v2-026:playwright": "playwright test --config playwright.v2-026.config.mjs",
     "dev:v2-025": "node scripts/v2-025-faculty-host.mjs",
     "test:v2-025": "vitest run --config vitest.config.mjs tests/browser/faculty",
     "test:v2-025:playwright": "playwright test --config playwright.v2-025.config.mjs",

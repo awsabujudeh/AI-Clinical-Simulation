@@ -1,5 +1,20 @@
 # AI Clinical Simulation Platform V2
 
+V2-026 Dana/Anaphylaxis is **CLOSED — technical implementation and owner visual approval**.
+Physician review remains pending for Dana and STEMI; both remain REVIEW_ONLY.
+Run
+`npm run dev:v2-026` for the local REVIEW_ONLY second-case composition (port 4194).
+It reuses the Session/Clinical/Assessment engines and Visual Patient renderer.
+Dana now has minimal blink/mouth/anxious/calm shapes, localized rash, intermittent
+scratching, exam adaptation and a local static fallback. The host is offline by
+default; its explicitly enabled, one-question live composition requires an
+owner-authorized female review voice. The prior real Dana Conversation/ElevenLabs
+proof passed and was not repeated for closeout. Treatment-linked visual relief
+is downstream of authoritative Clinical Engine state, never AI or renderer time.
+See the [V2-026 closeout](../planning_input/v2-026/V2-026_CLOSEOUT.md).
+See the [V2-026 handoff](../planning_input/v2-026/V2-026_DANA_HANDOFF.md) and
+[visual review index](../planning_input/v2-026/V2-026_VISUAL_REVIEW.md).
+
 V2-021 Visual Patient Engine is **CLOSED for Expo scope** after human approval.
 The [closeout record](../planning_input/v2-021/V2-021_CLOSEOUT.md) records final
 live playback evidence and non-blocking POST-EXPO polish.
