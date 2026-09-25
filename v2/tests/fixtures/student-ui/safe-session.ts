@@ -18,24 +18,15 @@ export const SYNTHETIC_SAFE_SESSION = SafeSessionProjectionSchema.parse({
   event_sequence_through: 7,
   clock_status: "RUNNING",
   observations: {
-    observation_schema_version: "1.0",
-    projection_definition_id: "observation.synthetic-ui",
+    observation_schema_version: "2.0",
     session_id: "session.ui-neutral",
-    case_version: "1.0.0",
-    state_version: 3,
     clinical_time: 125,
-    heart_rate_bpm: 72,
-    systolic_bp_mm_hg: 112,
-    diastolic_bp_mm_hg: 68,
-    respiratory_rate_per_minute: 16,
-    spo2_percent: 98,
-    temperature_celsius: 36.7,
-    consciousness_display_code: "consciousness.synthetic-alert",
-    rhythm: {
-      cardiac_rhythm: "rhythm.synthetic-regular",
-      display_code: "rhythm-display.synthetic-regular",
-      waveform_descriptor: "waveform.synthetic-regular"
-    }
+    // Explicit synthetic handoff, never implicit exposure of PatientState.
+    acquired: [
+      {channel:"HR",value:72,unit:"bpm"}, {channel:"BP",systolic:112,diastolic:68,unit:"mmHg"},
+      {channel:"RR",value:16,unit:"/min"}, {channel:"SPO2",value:98,unit:"%"}, {channel:"TEMPERATURE",value:36.7,unit:"C"},
+      {channel:"CONSCIOUSNESS",value:"consciousness.synthetic-alert",unit:"code"}, {channel:"RHYTHM",value:"rhythm.synthetic-regular",unit:"code"}
+    ].map(measurement=>({measurement,status:"PRE_OBSERVED",acquired_at:0,sampled_at:0}))
   },
   learner_action_catalogue: {
     catalogue_schema_version: "1.0",

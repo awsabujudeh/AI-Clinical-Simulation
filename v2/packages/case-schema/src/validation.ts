@@ -1592,6 +1592,13 @@ function validateParsedCase(
 
   for (const action of casePackage.action_catalogue.actions) {
     addDanglingIssues(issues, action.prerequisite_action_ids, actions, "DANGLING_ACTION_REFERENCE", "action_catalogue", "$.action_catalogue.actions", "Action ID");
+    const acquisition=action.observation_acquisition;
+    if(acquisition && (!["EXAMINATION","PROCEDURE"].includes(action.action_type)
+      || [...acquisition.channels,...(acquisition.sample_channels??[])].includes("TEMPERATURE")
+        && !casePackage.initial_state.observation_projection?.temperature_mappings)) {
+      issues.push(issue({code:"SCHEMA_INVALID",severity:"ERROR",module:"action_catalogue",path:"$.action_catalogue.actions.observation_acquisition",
+        relatedIds:[action.action_id],message:"Acquisition requires an examination/procedure and supported physiology mappings."}));
+    }
     addDanglingIssues(issues, action.source_ids, sources, "DANGLING_SOURCE_REFERENCE", "action_catalogue", "$.action_catalogue.actions", "Source ID");
 
     for (const parameter of action.parameter_definitions) {

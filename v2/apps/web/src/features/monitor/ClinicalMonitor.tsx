@@ -2,11 +2,22 @@ import { useLocalization } from "../../app/localization";
 import type { SessionPresentationState } from "../../app/types";
 import { Panel, SectionHeader, StatusBadge } from "../../components/ui";
 import { observationDescriptorLabel } from "./monitor-model";
+import { formatClinicalTime } from "../../app/session-presentation";
+import type { ObservationChannel } from "@ai-clinical-simulation/contracts";
 
 export function ClinicalMonitor({ state }: { state: SessionPresentationState }) {
   const { locale, t } = useLocalization();
   const observation = state.projection.observations;
   const stale = state.mutation_authority === "NONE";
+  const acquired = (ch:ObservationChannel) => observation.acquired.find(a=>a.measurement.channel===ch);
+  const value = (ch:ObservationChannel) => {
+    const m=acquired(ch)?.measurement;
+    return !m ? "—" : m.channel==="BP" ? `${m.systolic}/${m.diastolic}` : m.value;
+  };
+  const stamp = (ch:ObservationChannel) => {
+    const a=acquired(ch);
+    return a ? `${a.status} · ${formatClinicalTime(a.sampled_at)}` : (locale==="ar-JO"?"لم تُقَس":"Not measured");
+  };
   return (
     <Panel className={`monitor-slot${stale ? " monitor-slot--stale" : ""}`} aria-labelledby="monitor-title">
       <SectionHeader
@@ -20,22 +31,17 @@ export function ClinicalMonitor({ state }: { state: SessionPresentationState }) 
         )}
       />
       <div className="monitor-grid" aria-label={t("monitorVitals")}>
-        <div><span>{t("heartRate")}</span><strong>{observation.heart_rate_bpm}</strong><small dir="ltr">bpm</small></div>
-        <div><span>{t("bloodPressure")}</span><strong dir="ltr">{observation.systolic_bp_mm_hg}/{observation.diastolic_bp_mm_hg}</strong><small dir="ltr">mmHg</small></div>
-        <div><span>{t("respiratoryRate")}</span><strong>{observation.respiratory_rate_per_minute}</strong><small dir="ltr">/min</small></div>
-        <div><span>{t("oxygenSaturation")}</span><strong>{observation.spo2_percent}</strong><small dir="ltr">%</small></div>
-        {observation.temperature_celsius === undefined ? null : (
-          <div><span>{t("temperature")}</span><strong>{observation.temperature_celsius}</strong><small dir="ltr">°C</small></div>
-        )}
+        {([ ["HR","heartRate","bpm"],["BP","bloodPressure","mmHg"],["RR","respiratoryRate","/min"],["SPO2","oxygenSaturation","%"],["TEMPERATURE","temperature","°C"] ] as const).map(([ch,label,unit])=>
+          <div key={ch} data-observation={ch}><span>{t(label)}</span><strong dir="ltr">{value(ch)}</strong><small dir="ltr">{unit}</small><small>{stamp(ch)}</small></div>)}
       </div>
       <dl className="monitor-context">
         <div>
           <dt>{t("rhythm")}</dt>
-          <dd>{observationDescriptorLabel("rhythm", observation.rhythm.cardiac_rhythm, locale)}</dd>
+          <dd>{acquired("RHYTHM") ? observationDescriptorLabel("rhythm",String(value("RHYTHM")),locale) : "—"}</dd>
         </div>
         <div>
           <dt>{t("consciousness")}</dt>
-          <dd>{observationDescriptorLabel("consciousness", observation.consciousness_display_code, locale)}</dd>
+          <dd>{acquired("CONSCIOUSNESS") ? observationDescriptorLabel("consciousness",String(value("CONSCIOUSNESS")),locale) : "—"}</dd>
         </div>
       </dl>
       <p className="monitor-disclaimer" role="status">

@@ -14,6 +14,7 @@ export * from "./knowledge.ts";
 export * from "./lifecycle.ts";
 export * from "./locales.ts";
 export * from "./observations.ts";
+export * from "./acquired-observations.ts";
 export * from "./patient-state.ts";
 export * from "./patient-conversation.ts";
 export * from "./recovery.ts";

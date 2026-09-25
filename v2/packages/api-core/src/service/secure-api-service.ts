@@ -46,7 +46,6 @@ import {
   evaluateReviewAssessment,
   projectAssessmentDisclosure
 } from "../../../assessment-engine/src/index.ts";
-import { projectObservations } from "../../../clinical-engine/src/index.ts";
 import {
   EXTERNAL_LEARNER_COMMAND_SCHEMA_VERSION,
   InMemorySessionAggregateSchema,
@@ -56,6 +55,7 @@ import {
   initializeInMemorySession,
   initializeReviewInMemorySession,
   projectAssessmentEvidenceFromSession,
+  projectAcquiredObservations,
   type InMemorySessionAggregate,
   type SessionCommitAdapter,
   type SessionCoordinator
@@ -396,11 +396,9 @@ function safeSessionProjection(
   authorization: AuthorizedSession,
   assessmentId: string
 ): ApiServiceResult<SafeSessionProjection> {
-  const observations = projectObservations(
-    session.patient_state,
-    session.pinned_case.clinical_policy.observation_projection
-  );
-  if (!observations.success) return { success: false, error: ERRORS.internal };
+  let observations;
+  try { observations = projectAcquiredObservations(session); }
+  catch { return { success: false, error: ERRORS.internal }; }
   const learnerActionCatalogue = safeLearnerActionCatalogue(session, authorization);
   if (!learnerActionCatalogue.success) {
     return learnerActionCatalogue;
@@ -419,7 +417,7 @@ function safeSessionProjection(
     clinical_time: session.patient_state.clinical_time,
     event_sequence_through: session.next_sequence_no - 1,
     clock_status: session.clinical_clock.status,
-    observations: observations.observations,
+    observations,
     visual_patient: projectVisualPatient(session),
     learner_action_catalogue: learnerActionCatalogue.data,
     ...(session.status === "ACTIVE"
@@ -777,8 +775,20 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
   async function getPatientState(authority: ApiRequestAuthority, sessionId: string) {
     const loaded = await authorizeAndLoad(authority, sessionId);
     if (!loaded.success) return loaded;
+    // Authenticated delivery is also the trusted missed-tick catch-up boundary.
+    // No client time/elapsed/observation field is accepted. Ended sessions stay fixed.
+    let session = loaded.data.session;
+    if (session.status === "ACTIVE") {
+      const synchronized = await dependencies.session_coordinator.syncRunningSession({
+        coordinator_schema_version: SESSION_COORDINATOR_SCHEMA_VERSION, session_id:sessionId,
+        trusted_real_time_utc: dependencies.trusted_time_utc(), request_id:authority.request_id,
+        correlation_id:authority.correlation_id, idempotency_key:authority.request_id
+      });
+      if (!synchronized.success) return sessionFailure(synchronized.issues);
+      session=synchronized.authoritative_session;
+    }
     return safeSessionProjection(
-      loaded.data.session,
+      session,
       loaded.data.authorization,
       String(dependencies.id_factories.createAssessmentId({ session_id: sessionId }))
     );
@@ -798,6 +808,11 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       return { success: false, error: ERRORS.ended } as const;
     }
     const pinned = loaded.data.session.pinned_case;
+    const prior=loaded.data.session.idempotency_records.find(r=>r.idempotency_key===input.authority.idempotency_key);
+    const priorEvent=prior && loaded.data.session.committed_events.find(e=>e.event_id===prior.command_event_id);
+    const priorPayload=priorEvent?.payload;
+    const originalIntake=priorPayload && typeof priorPayload==="object" && !Array.isArray(priorPayload)
+      && typeof priorPayload.intake_clinical_time==="number" ? priorPayload.intake_clinical_time : undefined;
     const expectedCase = pinned.execution_authority === "PUBLISHED_PRODUCTION"
       ? {
           execution_authority: "PUBLISHED_PRODUCTION" as const,
@@ -834,7 +849,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
           action_id: input.request.action_id,
           request_schema_version: "1.0",
           expected_state_version: input.request.expected_state_version,
-          requested_at_clinical_time: loaded.data.session.patient_state.clinical_time,
+          requested_at_clinical_time: originalIntake ?? loaded.data.session.patient_state.clinical_time,
           parameters: input.request.parameters,
           source: input.request.source,
           idempotency_key: input.authority.idempotency_key

@@ -23,6 +23,7 @@ import {
   LocalizationKeySchema,
   MediaAssetIdSchema,
   ObservationProjectionDefinitionSchema,
+  ObservationAcquisitionPolicySchema,
   PatientManifestationIdSchema,
   PatientLanguageSchema,
   PatientStateSchema,
@@ -289,6 +290,7 @@ export const CaseActionDefinitionSchema = z.strictObject({
   ]),
   repeat_policy: z.enum(["NOT_REPEATABLE", "REPEATABLE", "CASE_DEFINED"]),
   source_ids: z.array(SourceIdSchema).max(16),
+  observation_acquisition: ObservationAcquisitionPolicySchema.optional(),
   investigation: InvestigationDefinitionSchema.optional()
 });
 

@@ -7,6 +7,7 @@ import {
   StateVersionSchema
 } from "./ids.ts";
 import { CaseControlledValueSchema } from "./patient-state.ts";
+import { ObservationValueSchema } from "./acquired-observations.ts";
 
 export const OBSERVATION_PROJECTION_SCHEMA_VERSION = "1.0" as const;
 export const OBSERVATION_OUTPUT_SCHEMA_VERSION = "1.0" as const;
@@ -80,6 +81,7 @@ export type ConsciousnessObservationDefinition = z.infer<
 export const ObservationProjectionDefinitionSchema = z.strictObject({
   projection_schema_version: z.literal(OBSERVATION_PROJECTION_SCHEMA_VERSION),
   projection_definition_id: CaseControlledValueSchema,
+  pre_observed: z.array(ObservationValueSchema).max(7).refine(v => new Set(v.map(x=>x.channel)).size===v.length, "Duplicate pre-observed channel").optional(),
   hemodynamic_mappings: z.record(
     CaseControlledValueSchema,
     HemodynamicObservationDefinitionSchema

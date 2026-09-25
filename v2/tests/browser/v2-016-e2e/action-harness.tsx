@@ -68,9 +68,8 @@ const services: StudentUiServices = {
         event_sequence_through: projection.event_sequence_through + 1,
         observations: {
           ...projection.observations,
-          state_version: projection.state_version + 1,
           clinical_time: projection.clinical_time + 5,
-          heart_rate_bpm: 80
+          acquired: projection.observations.acquired.map(a=>a.measurement.channel==="HR"?{...a,measurement:{...a.measurement,value:80},sampled_at:projection.clinical_time+5}:a)
         }
       });
       return {

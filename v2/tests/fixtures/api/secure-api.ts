@@ -154,6 +154,7 @@ export class ApiTestSessionStore implements SessionCommitAdapter, SessionStartRe
 export type ApiTestHarness = Awaited<ReturnType<typeof createApiTestHarness>>;
 
 export async function createApiTestHarness(input?: {
+  trusted_time_utc?: () => unknown;
   include_stemi?: boolean;
   review_artifact?: Awaited<ReturnType<typeof prepareStemiReviewArtifact>>;
   patient_provider?: AiProvider;
@@ -326,7 +327,7 @@ export async function createApiTestHarness(input?: {
         return `assessment.api.${session_id}`;
       }
     },
-    trusted_time_utc: () => trustedTime,
+    trusted_time_utc: input?.trusted_time_utc ?? (() => trustedTime),
     ...(input?.enable_patient_conversation
       ? {
           patient_conversation: {

@@ -16,12 +16,16 @@ const text = (items: readonly {locale: string; text: string}[] | undefined, loca
 
 export function matchingStemiMedia(state: SessionPresentationState) {
   const p = state.projection.pinned_case;
-  return p.execution_authority === "REVIEW_ONLY" && p.case_version_id === manifest.case_association.case_version_id
-    && p.case_version === manifest.case_association.case_version && p.case_package_id === manifest.case_association.case_package_id;
+  return p.execution_authority === "REVIEW_ONLY" && ((p.case_version_id === manifest.case_association.case_version_id
+    && p.case_version === manifest.case_association.case_version && p.case_package_id === manifest.case_association.case_package_id)
+    || (p.case_version_id==="case-version.stemi.inferior-rv.003" && p.case_package_id==="case-package.stemi.inferior-rv.003" && p.case_version==="2.1.0"));
 }
 export function matchingCaseDiagnostics(state: SessionPresentationState): readonly Entry[] | undefined {
   if (matchingStemiMedia(state)) return manifest.diagnostics;
   const p=state.projection.pinned_case;
+  // WP1 successor inherits the exact diagnostic definitions and pending media review.
+  if(p.execution_authority==="REVIEW_ONLY" && p.case_package_id==="case-package.anaphylaxis.dana.002"
+    && p.case_version_id==="case-version.anaphylaxis.dana.002" && p.case_version==="1.1.0") return danaManifest.diagnostics;
   if(p.execution_authority==="REVIEW_ONLY" && p.case_package_id===danaManifest.case_package_id
     && p.case_version_id===danaManifest.case_version_id && p.case_version==="1.0.0") return danaManifest.diagnostics;
   return undefined;

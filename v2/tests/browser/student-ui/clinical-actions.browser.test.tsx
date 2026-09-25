@@ -286,9 +286,8 @@ describe("V2-016 generic action presentation and validation", () => {
       event_sequence_through: 8,
       observations: {
         ...SYNTHETIC_SAFE_SESSION.observations,
-        state_version: 4,
         clinical_time: 130,
-        heart_rate_bpm: 80
+        acquired: SYNTHETIC_SAFE_SESSION.observations.acquired.map(a=>a.measurement.channel==="HR"?{...a,measurement:{...a.measurement,value:80},sampled_at:130}:a)
       }
     });
     await render(authenticatedServices({

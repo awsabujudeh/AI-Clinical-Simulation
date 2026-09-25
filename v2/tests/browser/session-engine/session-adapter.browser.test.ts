@@ -50,7 +50,8 @@ describe("storage-neutral in-memory Session commit adapter", () => {
     expect(stored.session).toEqual(committed.session);
     expect(stored.session.committed_events[0]!.payload).toEqual({
       catalogue_membership: "VERIFIED",
-      execution_status: "EXECUTED"
+      execution_status: "EXECUTED",
+      intake_clinical_time: 45
     });
     committed.session.patient_state.pain_state.severity_0_10 = 8;
     expect(requireSuccess(await adapter.load(initial.session_id)).session.patient_state

@@ -77,6 +77,25 @@ export function formatClinicalTime(seconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
+/** Delivery guard, not a clock: retain only an already received server snapshot.
+ * An out-of-order response disables mutation until authoritative resynchronization.
+ * Authentication failures are never masked by a previous successful response. */
+export function preserveSessionProgress(
+  previous: SessionLoadResult | undefined,
+  incoming: SessionLoadResult
+): SessionLoadResult {
+  const before = previous && presentSessionLoad(previous);
+  const next = presentSessionLoad(incoming);
+  if (!before || !next || before.projection.session_id !== next.projection.session_id) return incoming;
+  const a = before.projection, b = next.projection;
+  const regressed = b.clinical_time < a.clinical_time || b.state_version < a.state_version
+    || b.event_sequence_through < a.event_sequence_through || (a.status === "ENDED" && b.status !== "ENDED");
+  if (!regressed) return incoming;
+  if (incoming.kind === "STALE") return { ...incoming, cached: { ...incoming.cached, projection: a } };
+  if (incoming.kind === "AUTHORITATIVE") return { ...incoming, projection: a, connectivity: "SYNC_REQUIRED" };
+  return incoming;
+}
+
 export function isSessionMutationEntryEnabled(
   state: SessionPresentationState
 ): boolean {

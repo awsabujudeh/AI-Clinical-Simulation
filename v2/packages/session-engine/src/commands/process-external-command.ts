@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { captureActionObservations } from "../observations/acquisition.ts";
 
 import {
   CanonicalEventEnvelopeSchema,
@@ -12,6 +13,7 @@ import {
 import {
   ClinicalTransitionIssueSchema,
   evaluatePinnedClinicalPolicy,
+  projectObservations,
   type ClinicalTransitionFailure
 } from "../../../clinical-engine/src/index.ts";
 
@@ -34,6 +36,7 @@ import {
 } from "../session/in-memory-session.ts";
 import {
   drainDueWorkBeforeExternalCommand,
+  advanceClinicalTime,
   type ClinicalTimeAdvancementSuccess
 } from "../time/advance-clinical-time.ts";
 import {
@@ -631,7 +634,7 @@ export async function processExternalLearnerCommand(
   }
 
   const priorFacts = eventFactsFromCommittedSession(session);
-  const due = settleDueClosure({
+  let due = settleDueClosure({
     clock: session.clinical_clock,
     state: session.patient_state,
     scheduler_state: session.scheduler_state,
@@ -662,6 +665,22 @@ export async function processExternalLearnerCommand(
     prior_event_facts: due.prior_event_facts
   });
   if (actionIssues.length > 0) return failure(actionIssues);
+
+  // Explicit Case-owned compressed duration, never a browser elapsed-time input.
+  // Due work is settled chronologically; interruption commits no measurement/action.
+  if(parsedAction.observation_acquisition) {
+    const advanced=advanceClinicalTime({advancement_schema_version:"1.0",source:"CASE_OWNED_DURATION",
+      clock:due.next_clock,policy:session.pinned_case.clinical_policy,state:due.next_state,scheduler_state:due.next_scheduler_state,
+      prior_event_facts:due.prior_event_facts,requested_target_clinical_time:due.next_state.clinical_time+parsedAction.observation_acquisition.duration_seconds});
+    if(!advanced.success) return failure([createSessionCommandIssue({code:"DUE_WORK_FAILED",path:"$.action.observation_acquisition",message:"Acquisition duration failed closed."})]);
+    due={success:true,status:advanced.status,next_clock:advanced.next_clock,next_state:advanced.next_state,next_scheduler_state:advanced.next_scheduler_state,
+      event_proposals:[...due.event_proposals,...advanced.event_proposals],interrupting_event_proposals:[...due.interrupting_event_proposals,...advanced.interrupting_event_proposals],
+      prior_event_facts:[...due.prior_event_facts,...eventFactsFromProposals(advanced.event_proposals)]};
+    if (due.event_proposals.length > MAX_COMMAND_EVENT_PROPOSALS || due.prior_event_facts.length > MAX_PRIOR_EVENT_FACTS) {
+      return failure([createSessionCommandIssue({code:"COMMAND_WORK_BUDGET_EXCEEDED",path:"$.action.observation_acquisition",message:"Acquisition exceeded the existing Session work budget."})]);
+    }
+    if(due.status==="INTERRUPTED") return commitInterruptedDueSettlement({session,command,due,dependencies});
+  }
 
   const clinical = evaluatePinnedClinicalPolicy({
     operation: "EVALUATE_TRIGGER",
@@ -712,6 +731,18 @@ export async function processExternalLearnerCommand(
   const finalState = postDue.next_state;
   const finalScheduler = postDue.next_scheduler_state;
   const finalClock = postDue.next_clock;
+  let observationSamples;
+  if (parsedAction.observation_acquisition) {
+    // Capture settled completion truth, including deterministic same-time cascades.
+    // An invalid/missing mapping rolls back the entire tentative transaction.
+    const projected = projectObservations(finalState, session.pinned_case.clinical_policy.observation_projection);
+    try {
+      if (!projected.success) throw Error("OBSERVATION_PROJECTION_FAILED");
+      observationSamples = captureActionObservations(projected.observations, parsedAction);
+    } catch {
+      return failure([createSessionCommandIssue({code:"CLINICAL_ENGINE_FAILURE",path:"$.action.observation_acquisition",message:"Acquisition could not produce a valid authoritative sample."})]);
+    }
+  }
   const pending: PendingSessionEvent[] = due.event_proposals.map((proposal) =>
     proposalToPendingEvent({
       proposal,
@@ -735,7 +766,9 @@ export async function processExternalLearnerCommand(
     parameters: command.action_request.parameters,
     payload: {
       catalogue_membership: "VERIFIED",
-      execution_status: "EXECUTED"
+      execution_status: "EXECUTED",
+      intake_clinical_time: command.action_request.requested_at_clinical_time,
+      ...(observationSamples ? { observation_samples:observationSamples } : {})
     },
     clinical_effect_ids: [],
     state_version_before: due.next_state.state_version,

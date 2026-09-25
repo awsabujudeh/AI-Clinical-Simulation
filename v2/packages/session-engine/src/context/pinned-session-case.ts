@@ -30,6 +30,7 @@ const PinnedActionBaseSchema = CaseActionDefinitionSchema.pick({
   prerequisite_action_ids: true,
   confirmation_policy: true,
   repeat_policy: true,
+  observation_acquisition: true,
   investigation: true
 });
 
@@ -227,6 +228,7 @@ export function createPinnedSessionCaseContext(
         prerequisite_action_ids: action.prerequisite_action_ids,
         confirmation_policy: action.confirmation_policy,
         repeat_policy: action.repeat_policy,
+        ...(action.observation_acquisition === undefined ? {} : { observation_acquisition: action.observation_acquisition }),
         ...(action.investigation === undefined
           ? {}
           : { investigation: action.investigation }),
@@ -294,6 +296,7 @@ export function createPinnedReviewSessionCaseContext(
         confirmation_policy: action.confirmation_policy,
         repeat_policy: action.repeat_policy,
         ...(action.investigation === undefined ? {} : { investigation: action.investigation }),
+        ...(action.observation_acquisition === undefined ? {} : { observation_acquisition: action.observation_acquisition }),
         execution_event_type: executionEventTypeForActionType(action.action_type)
       }))
     });

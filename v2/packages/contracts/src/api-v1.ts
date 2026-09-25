@@ -28,7 +28,7 @@ import {
 import { JsonObjectSchema } from "./json.ts";
 import { SessionLifecycleStatusSchema, SessionModeSchema } from "./lifecycle.ts";
 import { PatientLanguageSchema } from "./locales.ts";
-import { ObservationProjectionSchema } from "./observations.ts";
+import { LearnerObservationsSchema } from "./acquired-observations.ts";
 import { CaseControlledValueSchema } from "./patient-state.ts";
 import {
   DiagnosticAbnormalFlagSchema,
@@ -252,10 +252,13 @@ export const SafeSessionProjectionSchema = z.strictObject({
   clinical_time: ClinicalTimeSchema,
   event_sequence_through: z.number().int().nonnegative(),
   clock_status: z.enum(["RUNNING", "PAUSED"]),
-  observations: ObservationProjectionSchema,
+  observations: LearnerObservationsSchema,
   learner_action_catalogue: SafeLearnerActionCatalogueSchema,
   assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional(),
   visual_patient: VisualPatientPresentationSchema.optional()
+}).superRefine((v,c)=>{
+  if(v.observations.session_id!==v.session_id || v.observations.clinical_time!==v.clinical_time)
+    c.addIssue({code:"custom",path:["observations"],message:"Observation authority must match Session/time"});
 });
 export type SafeSessionProjection = z.infer<typeof SafeSessionProjectionSchema>;
 

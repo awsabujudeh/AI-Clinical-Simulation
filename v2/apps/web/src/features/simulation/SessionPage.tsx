@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { useLocalization } from "../../app/localization";
-import { presentSessionLoad } from "../../app/session-presentation";
-import type { AuthSnapshot, StudentUiServices } from "../../app/types";
+import { presentSessionLoad, preserveSessionProgress } from "../../app/session-presentation";
+import type { AuthSnapshot, SessionLoadResult, StudentUiServices } from "../../app/types";
 import { AppFrame } from "../../components/AppFrame";
 import { ErrorState, LoadingState } from "../../components/ui";
 import { SimulationWorkspace } from "./SimulationWorkspace";
@@ -24,7 +24,12 @@ export function SessionPage({
     queryFn: () => services.sessions.load(parsedSessionId.success ? parsedSessionId.data : "invalid"),
     enabled: parsedSessionId.success,
     retry: false,
-    refetchOnWindowFocus: false
+    structuralSharing: (previous, incoming) => preserveSessionProgress(
+      previous as SessionLoadResult | undefined, incoming as SessionLoadResult
+    ),
+    refetchOnWindowFocus: true,
+    // Delivery only: server coordinator owns all elapsed time and due work.
+    refetchInterval: query => query.state.data?.kind === "AUTHORITATIVE" && query.state.data.projection.status === "ACTIVE" ? 2000 : false
   });
   const back = <Link className="button button--secondary" to="/app">{t("backHome")}</Link>;
   if (!parsedSessionId.success) {

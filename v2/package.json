@@ -18,6 +18,8 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:wp1": "node scripts/wp1-review-host.mjs",
+    "test:wp1": "vitest run --config vitest.config.mjs tests/browser/wp1",
     "dev:v2-028": "node scripts/v2-028-preflight-host.mjs",
     "test:v2-028:browser": "vitest run --config vitest.config.mjs tests/browser/preflight tests/browser/security",
     "test:v2-028:node": "node --test scripts/v2-028-preflight-test.mjs scripts/v2-027-review-security-test.mjs",
