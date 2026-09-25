@@ -17,7 +17,7 @@ function equipment(session: InMemorySessionAggregate, bindings: { bp: readonly s
     return p&&[...p.channels,...(p.sample_channels??[])].some(c=>c===channel);
   });
   return { bp_cuff: acquired("BP") || executed.some(e => bindings.bp.includes(e.action_id ?? "")), iv_access: !!access,
-    ...(session.pinned_case.action_catalogue.some(a=>a.observation_acquisition) ? {pulse_ox:acquired("SPO2")?"APPLIED_VISUAL_PENDING":"ABSENT"} : {}),
+    ...(session.pinned_case.action_catalogue.some(a=>a.observation_acquisition) ? {pulse_ox:acquired("SPO2")?(session.pinned_case.execution_authority==="APPROVED_EXPO"?"APPLIED":"APPLIED_VISUAL_PENDING"):"ABSENT"} : {}),
     iv_tubing: !!access && executed.some(e => e.sequence_no > access.sequence_no && bindings.infusion.includes(e.action_id ?? "")) };
 }
 
@@ -48,7 +48,7 @@ export function projectVisualPatient(session: InMemorySessionAggregate): VisualP
     return VisualPatientPresentationSchema.parse({ presentation_schema_version: "1.0", asset_id: "dana.review-v01",
       position: "semi_fowler", face: improved ? "relieved" : "anxious", body: improved ? "calm_body" : "itch_body",
       breathing: true, blink: true, hand: !improved, living: true,
-      equipment: equipment(session, {bp:["procedure.dana.monitor"],iv:["procedure.dana.iv-access"],infusion:["procedure.dana.crystalloid-500", "procedure.expo.normal-saline-250"]}) });
+      equipment: equipment(session, {bp:["procedure.dana.monitor"],iv:["procedure.dana.iv-access"],infusion:["procedure.dana.crystalloid-500", "procedure.expo.normal-saline-250", "medication.expo.ufh-70-units-kg"]}) });
   }
   const approvedBindings = [
     ["case-package.stemi.inferior-rv.006", "case-version.stemi.inferior-rv.006", "2.4.0", "e212c36090b59a4d324348c85fd1f5f7a0dbff02b1710a4e360a135e060760d7"],

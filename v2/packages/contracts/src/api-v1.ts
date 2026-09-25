@@ -269,6 +269,7 @@ export const SafeSessionProjectionSchema = z.strictObject({
   clock_status: z.enum(["RUNNING", "PAUSED"]),
   observations: LearnerObservationsSchema,
   learner_action_catalogue: SafeLearnerActionCatalogueSchema,
+  examinations: SafeExaminationProjectionSchema.optional(),
   search_only_actions: z.array(SafeLearnerActionSchema).max(16).optional(),
   investigations: z.array(SafeInvestigationStatusSchema).max(256).optional(),
   assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional(),
@@ -525,3 +526,4 @@ export const InvestigationPathParametersSchema = SessionPathParametersSchema.ext
 });
 
 export const ApiIdempotencyHeaderSchema = IdempotencyKeySchema;
+import { SafeExaminationProjectionSchema } from "./examination.ts";

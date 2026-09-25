@@ -10,6 +10,9 @@ export class PatientEquipment {
   asset.scene.traverse(o=>{if(connected.test(name(o))){o.visible=false;this.hidden.push(o);}});
   this.root=new THREE.Group();this.root.name='Session_Equipment';scene.add(this.root);
   const material=(color)=>new THREE.MeshStandardMaterial({color,roughness:.75});
+  this.ox=new THREE.Group();this.ox.name='Committed_Pulse_Oximeter';this.root.add(this.ox);
+  for(const y of [-.009,.009]){const shell=new THREE.Mesh(new THREE.BoxGeometry(.019,.004,.026),material(0xe9edf0));shell.position.y=y;this.ox.add(shell);}
+  const hinge=new THREE.Mesh(new THREE.BoxGeometry(.019,.018,.003),material(0x396379));hinge.position.z=-.014;this.ox.add(hinge);
   this.cuff=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,24,1,true),material(0x263b50));
   this.cuff.name='Committed_BP_Cuff';this.root.add(this.cuff);
   this.access=new THREE.Group();this.access.name='Committed_IV_Access';this.root.add(this.access);
@@ -27,6 +30,14 @@ export class PatientEquipment {
   // Other presentation layers may change visibility, never re-enable donor lines.
   for(const o of this.hidden)o.visible=false;
   const a=this.anchors(this.supply);
+  this.ox.visible=!!a?.finger&&!!a?.fingerBase&&this.value.pulse_ox==='APPLIED';
+  if(this.ox.visible){
+   const axis=a.finger.clone().sub(a.fingerBase).normalize();
+   const normal=new THREE.Vector3(0,1,0).addScaledVector(axis,-axis.y).normalize();
+   const side=new THREE.Vector3().crossVectors(normal,axis).normalize();
+   this.ox.position.copy(a.finger).addScaledVector(axis,.005);
+   this.ox.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side,normal,axis));
+  }
   this.cuff.visible=!!a&&this.value.bp_cuff===true;
   this.access.visible=!!a&&this.value.iv_access===true;
   this.tube.visible=this.access.visible&&this.value.iv_tubing===true&&!!this.supply;
@@ -51,5 +62,5 @@ export class PatientEquipment {
    this.tube.geometry.dispose();this.tube.geometry=new THREE.TubeGeometry(curve,24,.002,6,false);
   }
  }
- stats(){return {bp_cuff:this.cuff.visible,iv_access:this.access.visible,iv_tubing:this.tube.visible};}
+ stats(){return {bp_cuff:this.cuff.visible,iv_access:this.access.visible,iv_tubing:this.tube.visible,...(this.value.pulse_ox==='APPLIED'?{pulse_ox:this.ox.visible}: {})};}
 }

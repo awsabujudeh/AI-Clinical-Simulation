@@ -37,8 +37,8 @@ export class DanaRig {
    const rect=canvas.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2),camera);
    const hits=ray.intersectObjects(this.meshes.filter(m=>this.visiblePatientMesh(m)),false);
    if(!hits.length)return;
-   const anchor={FACE:'Head',NECK:'Neck',CHEST:'Spine2',LEFT_ARM:'LeftForeArm',RIGHT_ARM:'RightForeArm'}[this.region];
-   if(!anchor||hits[0].point.distanceTo(this.point(anchor))>({FACE:.23,NECK:.15,CHEST:.3,LEFT_ARM:.25,RIGHT_ARM:.25}[this.region]))return;
+   const anchor={FACE:'Head',NECK:'Neck',CHEST:'Spine2',ABDOMEN:'Spine',LEFT_ARM:'LeftForeArm',RIGHT_ARM:'RightForeArm'}[this.region];
+   if(!anchor||hits[0].point.distanceTo(this.point(anchor))>({FACE:.23,NECK:.15,CHEST:.3,ABDOMEN:.28,LEFT_ARM:.25,RIGHT_ARM:.25}[this.region]))return;
    this.requestCount++;onRequest({type:'visual_exam_request',tool:this.toolName,exam_mode:this.toolName==='stethoscope'?'AUSCULTATION':'INSPECTION',region_id:this.region,anchor_id:'Dana_'+this.region,patient_position:'supine'});
   };
   canvas.addEventListener('pointerdown',this.down);canvas.addEventListener('pointerup',this.up);
@@ -247,7 +247,7 @@ export class DanaRig {
   this.asset.scene.updateMatrixWorld(true);
  }
  focus(immediate=false){
-  const bone={FACE:'Head',NECK:'Neck',CHEST:'Spine2',LEFT_ARM:'LeftForeArm',RIGHT_ARM:'RightForeArm'}[this.region];
+  const bone={FACE:'Head',NECK:'Neck',CHEST:'Spine2',ABDOMEN:'Spine',LEFT_ARM:'LeftForeArm',RIGHT_ARM:'RightForeArm'}[this.region];
   const target=bone?this.point(bone):new THREE.Vector3(0,1.1,0);
   if(this.region.endsWith('_ARM'))target.lerp(this.point(this.region==='LEFT_ARM'?'LeftHand':'RightHand'),.5);
   if(this.region==='FACE')target.add(new THREE.Vector3(0,.06,-.075));
@@ -264,7 +264,7 @@ export class DanaRig {
   this.shirt.visible=!exam;this.top.visible=exam;if(this.examSkin)this.examSkin.visible=exam;
   if(this.bodyMesh)this.bodyMesh.visible=!exam;if(this.seam)this.seam.value=exam?1:0;
  }
- selectRegion(r){if(!['DEFAULT_COVERED','FACE','NECK','CHEST','LEFT_ARM','RIGHT_ARM'].includes(r))return false;this.region=r;this.cover();this.focus();return true;}
+ selectRegion(r){if(!['DEFAULT_COVERED','FACE','NECK','CHEST','ABDOMEN','LEFT_ARM','RIGHT_ARM'].includes(r))return false;this.region=r;this.cover();this.focus();return true;}
  setTool(t){if(!['inspection','stethoscope','penlight'].includes(t))return false;this.toolName=t;return true;}
  stats(){return{region:this.region,tool:this.toolName,requestCount:this.requestCount,visibleGarments:[this.shirt,this.top].filter(m=>m.visible).map(m=>m.name),scratch:this.scratch,scratchContact:this.scratchContact,scratchRegion:this.scratchRegion,neckForearmRoll:this.neckForearmRoll,thoracic:this.thoracic,articulation:this.articulation,blink:this.blink,face:{...this.faceMix},swelling:this.swelling,rash:this.rash.value};}
  dispose(){this.orbit.removeEventListener('start',this.cancelFocus);this.canvas.removeEventListener('pointerdown',this.down);this.canvas.removeEventListener('pointerup',this.up);}

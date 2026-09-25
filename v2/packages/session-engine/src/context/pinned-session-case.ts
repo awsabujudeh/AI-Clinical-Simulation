@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { PinnedExamSchema } from "../../../contracts/src/examination.ts";
+import { deriveExamActions } from "../../../case-schema/src/examination-runtime.ts";
 
 import {
   EventTypeSchema,
@@ -37,6 +39,7 @@ const PinnedActionBaseSchema = CaseActionDefinitionSchema.pick({
 });
 
 export const PinnedSessionActionDefinitionSchema = PinnedActionBaseSchema.extend({
+  examination: PinnedExamSchema.optional(),
   execution_event_type: EventTypeSchema
 }).superRefine((action, context) => {
   if (action.action_type === "INVESTIGATION" && action.investigation === undefined) {
@@ -296,7 +299,7 @@ export function createPinnedReviewSessionCaseContext(
       review_subject_hash: artifact.data.review_subject_hash,
       clinical_policy: clinicalPolicy,
       ...(casePackage.action_catalogue.shared ? { shared_catalogue: casePackage.action_catalogue.shared } : {}),
-      action_catalogue: casePackage.action_catalogue.actions.map((action) => ({
+      action_catalogue: [...casePackage.action_catalogue.actions.map((action) => ({
         action_id: action.action_id,
         action_type: action.action_type,
         parameter_definitions: action.parameter_definitions,
@@ -307,7 +310,7 @@ export function createPinnedReviewSessionCaseContext(
         ...(action.investigation === undefined ? {} : { investigation: action.investigation }),
         ...(action.observation_acquisition === undefined ? {} : { observation_acquisition: action.observation_acquisition }),
         execution_event_type: executionEventTypeForActionType(action.action_type)
-      }))
+      })), ...deriveExamActions(artifact.data)]
     });
     return context.success
       ? { success: true, issues: [], context: context.data }

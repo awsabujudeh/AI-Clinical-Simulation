@@ -1,5 +1,7 @@
 import { projectVisualPatient } from "./visual-patient-projection.ts";
 import { investigationStatuses } from "./investigation-status.ts";
+import { examinationProjection } from "./examination-projection.ts";
+import { EXAM_OPTIONS } from "../../../case-schema/src/examination-runtime.ts";
 import {
   ASSESSMENT_DISCLOSURE_SCHEMA_VERSION,
   ASSESSMENT_FINALIZATION_BOUNDARY_SCHEMA_VERSION,
@@ -140,6 +142,8 @@ function localizedLabelsForKey(
 }
 
 function actionLabels(authorization: AuthorizedSession, actionId: string) {
+  const exam=EXAM_OPTIONS.find(o=>o.action_id===actionId);
+  if(exam)return exam.labels.map(l=>({...l,locale:PatientLanguageSchema.parse(l.locale)}));
   const shared = sourceCase(authorization).action_catalogue.shared;
   const binding = [...(shared?.bindings??[]),...(shared?.search_only?.bindings??[])].find(b => b.case_action_id === actionId);
   const concept = [...(shared?.catalogue.actions??[]),...(shared?.search_only?.actions??[])].find(a => a.action_id === binding?.concept_id);
@@ -429,6 +433,7 @@ function safeSessionProjection(
     observations,
     visual_patient: projectVisualPatient(session),
     learner_action_catalogue: learnerActionCatalogue.data,
+    ...(examinationProjection(session) ? {examinations:examinationProjection(session)} : {}),
     ...(session.pinned_case.shared_catalogue?.search_only ? {search_only_actions:session.pinned_case.shared_catalogue.search_only.actions} : {}),
     ...(investigationStatuses(session) ? { investigations: investigationStatuses(session) } : {}),
     ...(session.status === "ACTIVE"
@@ -842,7 +847,8 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     const pinned = loaded.data.session.pinned_case;
     // Public concept identities never give the client control of the Case binding.
     const sharedBinding = [...(pinned.shared_catalogue?.bindings??[]),...(pinned.shared_catalogue?.search_only?.bindings??[])].find(b => b.concept_id === input.request.action_id);
-    if (pinned.shared_catalogue && !sharedBinding) return { success: false, error: ERRORS.domainRejected } as const;
+    const exam=pinned.action_catalogue.find(a=>a.action_id===input.request.action_id && a.examination);
+    if (pinned.shared_catalogue && !sharedBinding && !exam) return { success: false, error: ERRORS.domainRejected } as const;
     const prior=loaded.data.session.idempotency_records.find(r=>r.idempotency_key===input.authority.idempotency_key);
     const priorEvent=prior && loaded.data.session.committed_events.find(e=>e.event_id===prior.command_event_id);
     const priorPayload=priorEvent?.payload;

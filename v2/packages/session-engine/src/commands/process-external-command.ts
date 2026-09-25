@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { captureActionObservations } from "../observations/acquisition.ts";
+import { examStateSignature } from "../../../case-schema/src/examination-runtime.ts";
 
 import {
   CanonicalEventEnvelopeSchema,
@@ -668,7 +669,7 @@ export async function processExternalLearnerCommand(
 
   // Explicit Case-owned compressed duration, never a browser elapsed-time input.
   // Due work is settled chronologically; interruption commits no measurement/action.
-  const actionDuration = parsedAction.observation_acquisition?.duration_seconds ?? parsedAction.outcome_policy?.duration_seconds;
+  const actionDuration = parsedAction.observation_acquisition?.duration_seconds ?? parsedAction.outcome_policy?.duration_seconds ?? parsedAction.examination?.option.duration_seconds;
   if(actionDuration !== undefined) {
     const advanced=advanceClinicalTime({advancement_schema_version:"1.0",source:"CASE_OWNED_DURATION",
       clock:due.next_clock,policy:session.pinned_case.clinical_policy,state:due.next_state,scheduler_state:due.next_scheduler_state,
@@ -773,7 +774,14 @@ export async function processExternalLearnerCommand(
         case_outcome_behavior: parsedAction.outcome_policy.behavior,
         outcome_policy_version: parsedAction.outcome_policy.policy_version,
         action_duration_seconds: actionDuration } : {}),
-      ...(observationSamples ? { observation_samples:observationSamples } : {})
+      ...(observationSamples ? { observation_samples:observationSamples } : {}),
+      ...(parsedAction.examination ? { examination: {
+        region:parsedAction.examination.option.region, tool:parsedAction.examination.option.tool,
+        duration_seconds:actionDuration,
+        status:examStateSignature(finalState)===parsedAction.examination.baseline_state_signature ? "AVAILABLE" : "CURRENT_STATE_NOT_AUTHORED",
+        findings:examStateSignature(finalState)===parsedAction.examination.baseline_state_signature ? parsedAction.examination.findings : [],
+        contract_version:"1.0.0",
+      }} : {})
     },
     clinical_effect_ids: [],
     state_version_before: due.next_state.state_version,

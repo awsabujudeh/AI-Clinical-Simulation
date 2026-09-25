@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { bindVisualExamRequest, type VisualExamSelection } from "../visual-patient/exam-intent";
 import { VisualPatient } from "../visual-patient/VisualPatient";
+import { ExaminationPanel } from "../visual-patient/ExaminationPanel";
+import type { ExamOption } from "@ai-clinical-simulation/contracts";
 import { useLocalization } from "../../app/localization";
 import { formatClinicalTime, isSessionMutationEntryEnabled } from "../../app/session-presentation";
 import type { AuthSnapshot, SessionPresentationState, StudentUiServices } from "../../app/types";
@@ -74,6 +76,7 @@ export function SimulationWorkspace({
   const enabled = isSessionMutationEntryEnabled(state);
   const [speakers, setSpeakers] = useState<ReadonlySet<string>>(new Set());
   const [examRequest, setExamRequest] = useState<VisualExamSelection>();
+  const [examFocus,setExamFocus]=useState<ExamOption>();
   const onSpeaking = useCallback((id: string, active: boolean) => {
     setSpeakers(previous => { const next = new Set(previous); if (active) next.add(id); else next.delete(id); return next; });
   }, []);
@@ -85,8 +88,10 @@ export function SimulationWorkspace({
         <div className="workspace-grid">
           <ClinicalMonitor state={state} />
           <VisualPatient key={state.projection.session_id} sessionId={state.projection.session_id}
+            clinicalExam={examFocus} supportedExam={!!state.projection.examinations}
             presentation={state.projection.visual_patient} speaking={speakers.size > 0}
             enabled={enabled} onExamRequest={request => setExamRequest(bindVisualExamRequest(request, state.projection))} />
+          <ExaminationPanel services={services} auth={auth} state={state} intent={examRequest} onFocus={o=>setExamFocus({...o})} onAuthoritativeRefresh={onAuthoritativeRefresh}/>
           <ClinicalActionsPanel
             services={services}
             auth={auth}

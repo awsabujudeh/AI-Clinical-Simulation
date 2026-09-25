@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { VisualExamRequestSchema, VisualPatientPresentationSchema,
-  type VisualExamRequest, type VisualPatientPresentation } from "@ai-clinical-simulation/contracts";
+  type ExamOption, type VisualExamRequest, type VisualPatientPresentation } from "@ai-clinical-simulation/contracts";
 import { Panel, Button } from "../../components/ui";
 import { useLocalization } from "../../app/localization";
 import type { PatientRuntime, ExamRegion } from "./runtime/runtime.js";
@@ -15,7 +15,8 @@ const regions: readonly [ExamRegion, string, string][] = [
   ["ABDOMEN", "Abdomen", "البطن"], ["LEFT_ARM", "Left arm", "الذراع اليسرى"],
   ["RIGHT_ARM", "Right arm", "الذراع اليمنى"], ["LOWER_LEGS", "Lower legs", "الساقان"]
 ];
-export function VisualPatient({ sessionId, presentation, speaking, enabled, onExamRequest }: {
+export function VisualPatient({ sessionId, presentation, speaking, enabled, onExamRequest, clinicalExam, supportedExam }: {
+  clinicalExam?:ExamOption; supportedExam?:boolean;
   sessionId: string; presentation?: VisualPatientPresentation; speaking: boolean;
   enabled: boolean; onExamRequest(request: VisualExamRequest): void;
 }) {
@@ -59,9 +60,17 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
   }, [presentation]);
   useEffect(() => { runtime.current?.setSpeaking(speaking); }, [speaking]);
   useEffect(() => { if (!enabled) { runtime.current?.exitExam(); setExam(false); } }, [enabled]);
+  useEffect(()=>{
+    if(!clinicalExam || !enabled || status!=="READY")return;
+    if(!exam)runtime.current?.enterExam();setExam(true);
+    const target:ExamRegion=clinicalExam.region==="CHEST"?"CHEST":clinicalExam.region==="ABDOMEN"?"ABDOMEN":clinicalExam.region==="SKIN"?"LEFT_ARM":clinicalExam.region==="EXTREMITIES"?"RIGHT_ARM":presentation?.asset_id==="dana.review-v01"&&["AIRWAY","NEUROLOGICAL"].includes(clinicalExam.region)?"FACE":"DEFAULT_COVERED";
+    runtime.current?.reveal(target);setRegion(target);
+    const instrument=clinicalExam.tool==="stethoscope"?"stethoscope":"inspection";
+    runtime.current?.tool(instrument);setTool(instrument);
+  },[clinicalExam]);
   const ready = status === "READY" && supported;
   const fallback = staticFailed ? undefined : resolvePatientStaticFallback(presentation, status);
-  function selectRegion(value: ExamRegion) { if (runtime.current?.reveal(value)) { setRegion(value); if (tool === "penlight") setTool("inspection"); } }
+  function selectRegion(value: ExamRegion) { if (runtime.current?.reveal(value)) { setRegion(value); if (tool === "penlight" || (supportedExam && value!=="CHEST")) {setTool("inspection");runtime.current?.tool("inspection");} } }
   return <Panel className="visual-patient-native" aria-labelledby="visual-patient-title">
     <div className="visual-patient-native__header"><h2 id="visual-patient-title">{ar ? "المريض المرئي" : "Visual Patient"}</h2>
       {presentation?.asset_id === "dana.review-v01" ? <span>{ar ? "دانا — عرض قيد المراجعة" : "Dana — review visual"}</span> : null}
@@ -80,9 +89,9 @@ export function VisualPatient({ sessionId, presentation, speaking, enabled, onEx
       <Button disabled={!ready} onClick={() => runtime.current?.focus()}>{ar ? "إعادة توسيط الكاميرا" : "Reset camera"}</Button>
       {exam ? <>
         <div role="group" aria-label="Examination region">{(presentation?.asset_id === "dana.review-v01"
-          ? [...regions.filter(([id]) => !["ABDOMEN", "LOWER_LEGS"].includes(id)), ["FACE", "Face / lips", "الوجه / الشفتان"], ["NECK", "Neck", "الرقبة"]] as readonly [ExamRegion, string, string][]
+          ? [...regions.filter(([id]) => !["LOWER_LEGS"].includes(id)), ["FACE", "Face / lips", "الوجه / الشفتان"], ["NECK", "Neck", "الرقبة"]] as readonly [ExamRegion, string, string][]
           : regions).map(([id, en, arabic]) => <button key={id} type="button" aria-pressed={region === id} onClick={() => selectRegion(id)}>{ar ? arabic : en}</button>)}</div>
-        <div role="group" aria-label="Examination tool">{([ ["inspection", "Inspection / pointer", "المعاينة"], ["stethoscope", "Stethoscope", "السماعة"], ["penlight", "Penlight", "المصباح"] ] as const).map(([id,en,arabic]) => <button key={id} type="button" aria-pressed={tool === id} onClick={() => { if (runtime.current?.tool(id)) { setTool(id); if (id === "penlight") setRegion("DEFAULT_COVERED"); } }}>{ar ? arabic : en}</button>)}</div>
+        <div role="group" aria-label="Examination tool">{([ ["inspection", "Inspection / pointer", "المعاينة"], ["stethoscope", "Stethoscope", "السماعة"], ["penlight", "Penlight", "المصباح"] ] as const).filter(([id])=>!supportedExam||(id!=="penlight"&&(id!=="stethoscope"||region==="CHEST"))).map(([id,en,arabic]) => <button key={id} type="button" aria-pressed={tool === id} onClick={() => { if (runtime.current?.tool(id)) { setTool(id); if (id === "penlight") setRegion("DEFAULT_COVERED"); } }}>{ar ? arabic : en}</button>)}</div>
         <p>{ar ? "اختر منطقة ثم انقر على المريض لطلب الفحص. تأكيد الإجراء يتم من قائمة الإجراءات؛ لا تُستنتج النتائج من الصورة." : "Select a region, then point to the patient to request examination. Confirm clinical actions in the action panel; appearance is not an examination result."}</p>
       </> : null}
     </div>

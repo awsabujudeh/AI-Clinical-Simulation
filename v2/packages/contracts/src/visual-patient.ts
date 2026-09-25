@@ -12,7 +12,7 @@ export const VisualPatientPresentationSchema = z.strictObject({
   hand: z.boolean(),
   living: z.boolean(),
   // Downstream display only. Absence means no attached equipment.
-  equipment: z.strictObject({ bp_cuff: z.boolean(), iv_access: z.boolean(), iv_tubing: z.boolean(), pulse_ox: z.enum(["ABSENT","APPLIED_VISUAL_PENDING"]).optional() })
+  equipment: z.strictObject({ bp_cuff: z.boolean(), iv_access: z.boolean(), iv_tubing: z.boolean(), pulse_ox: z.enum(["ABSENT","APPLIED_VISUAL_PENDING","APPLIED"]).optional() })
     .refine(v => !v.iv_tubing || v.iv_access, "IV tubing requires established access.").optional()
 }).superRefine((value, context) => {
   if ((value.asset_id === "stemi.physical-exam-v02" && value.body === "itch_body")
