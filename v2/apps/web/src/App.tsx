@@ -81,6 +81,7 @@ export function StudentRoutes({ services, faculty }: { services: StudentUiServic
           )}
         />
         <Route path="/sessions" element={<Navigate to="/app" replace />} />
+        <Route path="/sessions/:sessionId/debrief" element={<AuthBoundary services={services}>{auth=><SessionPage services={services} auth={auth} debrief/>}</AuthBoundary>}/>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>

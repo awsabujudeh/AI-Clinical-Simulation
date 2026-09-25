@@ -9,6 +9,7 @@ import { createFetchSpeechTokenSource } from "../../../apps/web/src/features/voi
 import { PatientVoiceProfileSchema } from "../../../packages/contracts/src/index.ts";
 import { createV2_021QuestionBody, createV2_021RequestIdentity } from "../../../runtime/v2-021-review-bootstrap.ts";
 import { createStudentTutorService } from "../../../apps/web/src/features/assessment/tutor-service.ts";
+import {QuickOrderPlanSchema} from '../../../packages/contracts/src/index.ts';
 
 // Review-only transport composition. Domain code stays server-side. No clinical fixtures in the browser.
 const current = await (await fetch("/__review/session")).json();
@@ -20,6 +21,10 @@ async function read(path: string, body?: unknown) {
   return await response.json();
 }
 const services: StudentUiServices = {
+  ...(current.functional_expo ? {
+    encounter_entry:{async list(){return (await read('/__expo/cases')).entries;},async begin(entry_id:string,mode:import('../../../packages/contracts/src/index.ts').SessionMode){const r=await read('/__expo/begin',{entry_id,mode});return r.data?{success:true as const,projection:SafeSessionProjectionSchema.parse(r.data.session),patient_language:'ar-JO' as never,replayed:r.data.replayed}:{success:false as const,kind:'API_UNAVAILABLE' as const};}},
+    quick_orders:{async plan(sessionId:string,text:string,locale:import('../../../packages/contracts/src/index.ts').PatientLanguage){const r=await read(`/v1/sessions/${sessionId}/quick-orders`,{text,locale,utterance_id:requestId('utterance',++sequence)});return r.data?QuickOrderPlanSchema.parse(r.data):undefined;},async confirm(sessionId:string,plan_id:string,selected_indexes:number[]){const r=await read(`/v1/sessions/${sessionId}/quick-orders/confirm`,{plan_id,selected_indexes,confirmed:true});return r.data;}}
+  }:{}),
   ...(current.tutor_enabled ? { tutor: createStudentTutorService(read) } : {}),
   investigations: { async load(sessionId, resultId) {
     const r = await read(`/v1/sessions/${encodeURIComponent(sessionId)}/investigations/${encodeURIComponent(resultId)}`);
@@ -55,7 +60,7 @@ const voice = current.voice_profile === undefined ? undefined : createElevenLabs
   token_source: createFetchSpeechTokenSource({ fetch: globalThis.fetch.bind(globalThis), headers: async () => ({}) })
 });
 // A bookmarked previous boot's URL must not select its expired in-memory Session.
-if (location.pathname !== `/sessions/${current.session_id}`) history.replaceState(null, "", `/sessions/${current.session_id}`);
+if (!current.functional_expo && location.pathname !== `/sessions/${current.session_id}`) history.replaceState(null, "", `/sessions/${current.session_id}`);
 // Only the offline Playwright bootstrap supplies this marker. This file is a
 // test/review entry, not the production app entry. No review host emits it;
 // a configured real voice profile also prevents this offline substitution.

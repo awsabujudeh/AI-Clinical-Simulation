@@ -31,7 +31,7 @@ export function ExaminationPanel({services,auth,state,onAuthoritativeRefresh,onF
   try {
    const action=SafeLearnerActionSchema.parse({action_id:option.action_id,action_type:"EXAMINATION",labels:option.labels.map(l=>({locale:l.locale,label:l.text})),aliases:option.labels.map(l=>({locale:l.locale,phrases:[l.text]})),parameter_definitions:[],confirmation_policy:"NONE",repeat_policy:"REPEATABLE"});
    const result=await services.actions.submit({principal_user_id:auth.principal_user_id,session_id:state.projection.session_id,expected_state_version:state.projection.state_version,action,parameters:{},connectivity_state:"ONLINE"});
-   await onAuthoritativeRefresh();setMessage(result.kind==="COMMITTED"?(ar?"تم تسجيل الفحص":"Examination recorded"):result.kind);
+   await onAuthoritativeRefresh();setMessage(result.kind==="COMMITTED"?(ar?"تم تسجيل الفحص":"Examination recorded"):(ar?"تعذر إكمال الفحص. راجع حالة الجلسة قبل المحاولة.":"The examination could not be completed. Review the Session state before retrying."));
   }finally{pending.current=false;setBusy(false);}
  }
  return <Panel aria-label="Physical examination findings">
@@ -43,7 +43,7 @@ export function ExaminationPanel({services,auth,state,onAuthoritativeRefresh,onF
   <p role="status">{message}</p>
   <ol aria-label="Acquired examination findings">{data.receipts.map(r=><li key={r.event_id}>
    <strong>{data.options.find(o=>o.action_id===r.action_id)?.labels.find(l=>l.locale===locale)?.text}</strong> — {r.clinical_time}s
-   {r.status==="AVAILABLE"?r.findings.map(f=><p key={f.fact_id}>{f.text.find(t=>t.locale===locale)?.text}</p>):<p>{ar?"لا توجد نتيجة فحص مؤلفة للحالة السريرية الحالية؛ لم تُفترض نتيجة طبيعية.":"No examination finding is authored for the current clinical state; no normal result was inferred."}</p>}
+   {r.status==="AVAILABLE"?r.findings.map(f=><p key={f.fact_id}>{f.text.find(t=>t.locale===locale)?.text}</p>):<p>{ar?"نتيجة الفحص غير متاحة للحالة الحالية. النتيجة السابقة، إن وجدت، تبقى ملاحظة تاريخية.":"A finding is not available for the current state. Any earlier finding remains a historical observation."}</p>}
   </li>)}</ol>
  </Panel>;
 }

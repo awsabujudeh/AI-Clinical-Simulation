@@ -5,6 +5,7 @@ import { formatClinicalTime } from "../../app/session-presentation";
 import type { SessionPresentationState, StudentTimelineService } from "../../app/types";
 import { Panel, SectionHeader, StatusBadge } from "../../components/ui";
 import { learnerLocalizedText } from "./timeline-model";
+import {assessmentFindingLabel} from '../assessment/assessment-model';
 
 export function LearnerTimeline({
   state,
@@ -46,6 +47,7 @@ export function LearnerTimeline({
             </div>
             <div>
               <strong>{learnerLocalizedText(item.labels, locale) ?? t("timelineCommittedActivity")}</strong>
+              {item.educational_feedback?.map(category=><span key={category}>{assessmentFindingLabel(category,locale)}</span>)}
               <span>{t("clinicalTimeShort")} <b dir="ltr">{formatClinicalTime(item.clinical_time)}</b></span>
             </div>
             <StatusBadge tone="neutral">{t("timelineCommitted")}</StatusBadge>

@@ -1,6 +1,9 @@
 import { SessionIdSchema } from "@ai-clinical-simulation/contracts";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
+import {AssessmentDebriefPanel} from '../assessment/AssessmentDebriefPanel';
+import {LearnerTimeline} from '../timeline/LearnerTimeline';
+import {ClinicalMonitor} from '../monitor/ClinicalMonitor';
 
 import { useLocalization } from "../../app/localization";
 import { presentSessionLoad, preserveSessionProgress } from "../../app/session-presentation";
@@ -11,10 +14,11 @@ import { SimulationWorkspace } from "./SimulationWorkspace";
 
 export function SessionPage({
   services,
-  auth
+  auth, debrief=false
 }: {
   services: StudentUiServices;
   auth: Extract<AuthSnapshot, { status: "AUTHENTICATED" }>;
+  debrief?:boolean;
 }) {
   const { t } = useLocalization();
   const params = useParams();
@@ -82,6 +86,9 @@ export function SessionPage({
       </AppFrame>
     );
   }
+  if(state.kind==='ENDED'&&!debrief)return <Navigate to={`/sessions/${state.projection.session_id}/debrief`} replace/>;
+  if(debrief&&state.kind!=='ENDED')return <Navigate to={`/sessions/${state.projection.session_id}`} replace/>;
+  if(debrief)return <AppFrame auth={auth}><h1>{t('debriefTitle')}</h1><AssessmentDebriefPanel state={state} auth={auth} assessmentService={services.assessment} finalizationService={services.finalization} tutorService={services.tutor} onAuthoritativeRefresh={()=>session.refetch()}/><ClinicalMonitor state={state}/><LearnerTimeline state={state} service={services.timeline}/>{back}</AppFrame>;
   return (
     <SimulationWorkspace
       services={services}

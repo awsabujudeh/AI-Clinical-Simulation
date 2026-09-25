@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
+import {QuickOrderRequestSchema,QuickOrderConfirmSchema} from '../../../contracts/src/quick-orders.ts';
 
 import {
   API_V1_SCHEMA_VERSION,
@@ -288,6 +289,17 @@ export function createSecureApiApp(dependencies: SecureApiAppDependencies) {
       session_id: path.data.session_id,
       request: body.data
     }));
+  });
+
+  app.post('/v1/sessions/:session_id/quick-orders',async context=>{
+    const path=SessionPathParametersSchema.safeParse(context.req.param());if(!path.success)return errorJson(context,ERRORS.malformed);
+    const body=await parseJsonBody(context,QuickOrderRequestSchema);if(!body.success)return errorJson(context,body.error);
+    return respond(context,await service.planQuickOrder({authority:context.get('authority'),session_id:path.data.session_id,request:body.data}));
+  });
+  app.post('/v1/sessions/:session_id/quick-orders/confirm',async context=>{
+    const path=SessionPathParametersSchema.safeParse(context.req.param());if(!path.success)return errorJson(context,ERRORS.malformed);
+    const body=await parseJsonBody(context,QuickOrderConfirmSchema);if(!body.success)return errorJson(context,body.error);
+    return respond(context,await service.confirmQuickOrder({authority:context.get('authority'),session_id:path.data.session_id,request:body.data}));
   });
 
   app.get("/v1/sessions/:session_id/investigations/:result_id", async (context) => {

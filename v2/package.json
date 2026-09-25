@@ -18,6 +18,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:expo-functional": "node scripts/expo-functional-host.mjs",
     "dev:wp2": "node scripts/wp1-review-host.mjs --catalogue=wp2",
     "test:wp2": "vitest run --config vitest.config.mjs tests/browser/wp2",
     "dev:wp1": "node scripts/wp1-review-host.mjs",

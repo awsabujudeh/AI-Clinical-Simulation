@@ -12,7 +12,7 @@ export const ExamReceiptSchema = z.strictObject({
   session_id:SessionIdSchema, case_version_id:CaseVersionIdSchema, case_version:SemanticVersionSchema,
   event_id:EventIdSchema, sequence_no:z.number().int().positive(), clinical_time:ClinicalTimeSchema,
   action_id:ActionIdSchema, region:ExamOptionSchema.shape.region, tool:ExamOptionSchema.shape.tool,
-  status:z.enum(["AVAILABLE","CURRENT_STATE_NOT_AUTHORED"]),
+  status:z.enum(["AVAILABLE","FINDING_NOT_AVAILABLE_FOR_CURRENT_STATE"]),
   findings:z.array(z.strictObject({fact_id:z.string().min(1).max(160),text:z.array(Text).length(2)})).max(8),
 }).superRefine((r,c)=>{if((r.status==="AVAILABLE")!==(r.findings.length>0))c.addIssue({code:"custom",message:"Only an available examination may carry findings."});});
 export const SafeExaminationProjectionSchema=z.strictObject({

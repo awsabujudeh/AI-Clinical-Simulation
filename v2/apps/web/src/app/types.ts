@@ -222,6 +222,11 @@ export interface StudentFinalizationService {
 }
 
 export type StudentUiServices = Readonly<{
+  encounter_entry?: { list():Promise<readonly LearnerCaseEntry[]>; begin(entryId:string,mode:SessionMode):Promise<StartSessionResult> };
+  quick_orders?: {
+    plan(sessionId:string,text:string,locale:PatientLanguage):Promise<import('@ai-clinical-simulation/contracts').QuickOrderPlan|undefined>;
+    confirm(sessionId:string,planId:string,indexes:number[]):Promise<{outcomes:{index:number;status:'COMMITTED'|'NOT_COMPLETED'}[];stopped:boolean}|undefined>;
+  };
   tutor?: StudentTutorService;
   investigations?: { load(sessionId: string, resultId: string): Promise<
     { kind: "AVAILABLE"; projection: SafeInvestigationProjection } | { kind: "PENDING" | "UNAVAILABLE" }> };
@@ -235,6 +240,7 @@ export type StudentUiServices = Readonly<{
   patient_conversation?: StudentPatientConversationService;
   finalization: StudentFinalizationService;
 }>;
+export interface LearnerCaseEntry { entry_id:string;name:string;demographics:string;setting:string;complaint:string;role:string; }
 
 export type StudentShellLocale = PatientLanguage;
 

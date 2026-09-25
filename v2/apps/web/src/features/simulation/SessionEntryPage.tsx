@@ -16,6 +16,7 @@ import type {
 } from "../../app/types";
 import { AppFrame } from "../../components/AppFrame";
 import { Button, Panel, StatusBadge } from "../../components/ui";
+import {EncounterEntry} from './EncounterEntry';
 
 const DEFAULTS: SessionEntryDefaults = {
   mode: "PRACTICE_DEMO",
@@ -86,6 +87,7 @@ export function SessionEntryPage({
   }
   return (
     <AppFrame auth={auth} onSignOut={services.auth.signOut === undefined ? undefined : () => void services.auth.signOut?.()}>
+      {services.encounter_entry?<EncounterEntry service={services.encounter_entry}/>:<>
       <div className="entry-page">
         <header className="entry-header">
           <div>
@@ -179,6 +181,7 @@ export function SessionEntryPage({
         </div>
         {formIssue === undefined ? null : <p className="form-issue" role="alert">{formIssue}</p>}
       </div>
+      </>}
     </AppFrame>
   );
 }

@@ -21,6 +21,7 @@ import {
 } from "./action-model";
 import { PatientConversationPanel } from "../conversation/PatientConversationPanel";
 import { ClinicalInterpreterPanel } from "./ClinicalInterpreterPanel";
+import {QuickOrderPanel} from './QuickOrderPanel';
 
 const domainMessageKeys: Record<ActionDomain, MessageKey> = {
   HISTORY: "navHistory",
@@ -184,7 +185,7 @@ export function ClinicalActionsPanel({
   const submitting = useRef(false);
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const actions = state.projection.learner_action_catalogue.actions;
+  const actions = [...state.projection.learner_action_catalogue.actions,...(state.projection.encounter_decisions??[])];
   const searchableActions=state.projection.search_only_actions??[];
   const visibleActions = useMemo(
     () => actionsForDomain(search.trim().length>=3?[...actions,...searchableActions]:actions, domain, locale, search),
@@ -331,7 +332,7 @@ export function ClinicalActionsPanel({
           />
         ) : (
           <>
-            <ClinicalInterpreterPanel
+            {services.quick_orders ? <QuickOrderPanel service={services.quick_orders} sessionId={state.projection.session_id} locale={locale} actions={state.projection.learner_action_catalogue.actions} enabled={enabled&&!locked} refresh={onAuthoritativeRefresh} onChoose={useInterpretedAction}/> : <ClinicalInterpreterPanel
               voice={services.voice}
               service={services.clinical_interpreter}
               sessionId={state.projection.session_id}
@@ -340,7 +341,7 @@ export function ClinicalActionsPanel({
               actions={actions}
               enabled={enabled && state.kind !== "ENDED"}
               onRecognized={useInterpretedAction}
-            />
+            />}
             <label className="action-search">
               <span>{t("actionSearch")}</span>
               <input

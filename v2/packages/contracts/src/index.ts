@@ -26,3 +26,4 @@ export * from "./voice.ts";
 export * from "./visual-patient.ts";
 export * from "./tutor.ts";
 export * from "./examination.ts";
+export * from './quick-orders.ts';

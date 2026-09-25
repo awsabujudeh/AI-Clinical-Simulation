@@ -222,7 +222,7 @@ describe("V2-017 assessment disclosure and finalization", () => {
     expect(load).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps ended sessions read-only while retaining final monitor and history", async () => {
+  it("routes ended sessions to read-only debrief while retaining final monitor and history", async () => {
     await render(services({
       sessions: {
         async load() { return { kind: "AUTHORITATIVE", connectivity: "ONLINE", projection: SYNTHETIC_ENDED_ASSESSMENT_SESSION } as const; },
@@ -235,7 +235,7 @@ describe("V2-017 assessment disclosure and finalization", () => {
     const examination = [...host.querySelectorAll<HTMLButtonElement>('.clinical-tabs button')]
       .find((button) => button.textContent === "Examination");
     await act(async () => examination?.click());
-    expect(host.querySelector<HTMLInputElement>('.action-search input')?.disabled).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('.action-search input')).toBeNull();
     expect([...host.querySelectorAll<HTMLButtonElement>(".action-catalogue button")]
       .every((button) => button.disabled)).toBe(true);
     expect(text()).not.toContain("End simulation");

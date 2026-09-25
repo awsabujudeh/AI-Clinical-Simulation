@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PinnedExamSchema } from "../../../contracts/src/examination.ts";
 import { deriveExamActions } from "../../../case-schema/src/examination-runtime.ts";
+import {deriveDecisionActions} from '../../../case-schema/src/encounter-decisions.ts';
 
 import {
   EventTypeSchema,
@@ -310,7 +311,7 @@ export function createPinnedReviewSessionCaseContext(
         ...(action.investigation === undefined ? {} : { investigation: action.investigation }),
         ...(action.observation_acquisition === undefined ? {} : { observation_acquisition: action.observation_acquisition }),
         execution_event_type: executionEventTypeForActionType(action.action_type)
-      })), ...deriveExamActions(artifact.data)]
+      })), ...deriveExamActions(artifact.data), ...deriveDecisionActions(artifact.data)]
     });
     return context.success
       ? { success: true, issues: [], context: context.data }

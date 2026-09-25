@@ -57,7 +57,7 @@ it('state-changing treatment never makes baseline text a new current finding; pr
  f.elapsed(200);await f.state();expect(f.raw().patient_state.hemodynamic_state).toBe('hemodynamics.dana.improved');
  const r=await f.action('examination.expo.skin');expect(r.response.status).toBe(200);
  const receipts=(await f.state()).examinations!.receipts;
- expect(receipts[0]!.status).toBe('AVAILABLE');expect(receipts[1]!.status).toBe('CURRENT_STATE_NOT_AUTHORED');expect(receipts[1]!.findings).toEqual([]);
+ expect(receipts[0]!.status).toBe('AVAILABLE');expect(receipts[1]!.status).toBe('FINDING_NOT_AVAILABLE_FOR_CURRENT_STATE');expect(receipts[1]!.findings).toEqual([]);
 });
 it('inspection does not leak auscultation and neurological exam does not leak abdomen/chest findings',async()=>{
  for(const p of ['dana','khalid'] as const){const f=await wp1Fixture(p,'wp2-approved');await f.action('examination.expo.respiratory');await f.action('examination.expo.neurological');

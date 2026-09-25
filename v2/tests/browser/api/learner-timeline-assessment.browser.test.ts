@@ -72,7 +72,7 @@ describe("V2-017 learner-safe timeline API", () => {
       "timeline_schema_version"
     ]);
     expect(Object.keys(projection.items[0]).sort()).toEqual([
-      "action_id", "clinical_time", "event_id", "item_type", "labels", "sequence_no"
+      "action_id", "clinical_time", "educational_feedback", "event_id", "item_type", "labels", "sequence_no"
     ]);
     expect(JSON.stringify(projection)).not.toMatch(
       /payload|rule_id|scheduler|effect|patient_state|diagnosis|rubric|score|package_hash|review|approval|future/iu

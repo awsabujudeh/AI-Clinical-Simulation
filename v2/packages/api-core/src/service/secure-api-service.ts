@@ -2,6 +2,9 @@ import { projectVisualPatient } from "./visual-patient-projection.ts";
 import { investigationStatuses } from "./investigation-status.ts";
 import { examinationProjection } from "./examination-projection.ts";
 import { EXAM_OPTIONS } from "../../../case-schema/src/examination-runtime.ts";
+import {ENCOUNTER_DECISIONS,decisionBinding} from '../../../case-schema/src/encounter-decisions.ts';
+import {splitClinicalOrder,controlledInterpretation} from '../../../clinical-interpreter/src/compound.ts';
+import {QuickOrderPlanSchema,type QuickOrderPlan,type QuickOrderConfirm} from '../../../contracts/src/quick-orders.ts';
 import {
   ASSESSMENT_DISCLOSURE_SCHEMA_VERSION,
   ASSESSMENT_FINALIZATION_BOUNDARY_SCHEMA_VERSION,
@@ -142,6 +145,8 @@ function localizedLabelsForKey(
 }
 
 function actionLabels(authorization: AuthorizedSession, actionId: string) {
+  const decision=ENCOUNTER_DECISIONS.find(o=>o.action_id===actionId||decisionBinding(o.action_id,[actionId]));
+  if(decision)return decision.labels.map(l=>({locale:l.locale,text:l.label}));
   const exam=EXAM_OPTIONS.find(o=>o.action_id===actionId);
   if(exam)return exam.labels.map(l=>({...l,locale:PatientLanguageSchema.parse(l.locale)}));
   const shared = sourceCase(authorization).action_catalogue.shared;
@@ -433,6 +438,7 @@ function safeSessionProjection(
     observations,
     visual_patient: projectVisualPatient(session),
     learner_action_catalogue: learnerActionCatalogue.data,
+    ...(session.pinned_case.action_catalogue.some(a=>a.action_id==='decision.expo.undetermined')?{encounter_decisions:ENCOUNTER_DECISIONS}:{}),
     ...(examinationProjection(session) ? {examinations:examinationProjection(session)} : {}),
     ...(session.pinned_case.shared_catalogue?.search_only ? {search_only_actions:session.pinned_case.shared_catalogue.search_only.actions} : {}),
     ...(investigationStatuses(session) ? { investigations: investigationStatuses(session) } : {}),
@@ -447,14 +453,18 @@ function safeSessionProjection(
 
 function safeLearnerTimelineProjection(
   session: InMemorySessionAggregate,
-  authorization: AuthorizedSession
+  authorization: AuthorizedSession,
+  assessmentId:string
 ): ApiServiceResult<SafeLearnerTimelineProjection> {
+  const feedback=session.status==='ACTIVE'&&session.mode==='PRACTICE_DEMO'?activeAssessmentProjection(session,authorization,assessmentId):undefined;
   const allSafeItems = session.committed_events.flatMap((event) => {
     if (event.status !== "COMMITTED" || event.clinical_time > session.patient_state.clinical_time) {
       return [];
     }
     const item = safeTimelineItem(event, authorization, session.status === "ENDED");
-    return item === undefined ? [] : [item];
+    if(!item)return [];
+    const categories=feedback?.projection_type==='ACTIVE_PRACTICE_FEEDBACK'?[...new Set(feedback.resolved_findings.filter(f=>f.evidence.some(e=>e.event_id===event.event_id)).map(f=>f.category))]:[];
+    return [{...item,...(categories.length?{educational_feedback:categories}:{})}];
   });
   const firstIncludedIndex = Math.max(0, allSafeItems.length - 256);
   const items = allSafeItems.slice(firstIncludedIndex);
@@ -647,6 +657,85 @@ function safePatientConversationTurn(input: unknown) {
 }
 
 export function createSecureApiService(dependencies: SecureApiDependencies) {
+  const quickPlans=new Map<string,{owner:string;fingerprint:string;plan:Promise<ApiServiceResult<QuickOrderPlan>>;confirmation?:string;execution?:Promise<ApiServiceResult<unknown>>}>();
+  async function planQuickOrder(input:{authority:ApiRequestAuthority;session_id:string;request:SubmitClinicalInterpretationRequest}):Promise<ApiServiceResult<QuickOrderPlan>>{
+    const loaded=await authorizeAndLoad(input.authority,input.session_id);if(!loaded.success)return loaded;
+    if(loaded.data.session.status==='ENDED')return {success:false,error:ERRORS.ended};
+    const catalogue=safeLearnerActionCatalogue(loaded.data.session,loaded.data.authorization);if(!catalogue.success)return catalogue;
+    if(catalogue.data.identity?.catalogue_id!=='catalogue.balsim.expo-clinical')return {success:false,error:ERRORS.domainRejected};
+    const owner=canonicalSerialize([input.authority.principal.user_id,input.session_id]);
+    const id=await hashCanonical(dependencies.hash_adapter,[owner,input.request.utterance_id]);if(!id)return {success:false,error:ERRORS.internal};
+    const fingerprint=canonicalSerialize(input.request),prior=quickPlans.get(id);
+    if(prior)return prior.owner===owner&&prior.fingerprint===fingerprint?prior.plan:{success:false,error:ERRORS.idempotency};
+    if(quickPlans.size>=512||[...quickPlans.values()].filter(x=>x.owner===owner).length>=64)return {success:false,error:ERRORS.providerBudget};
+    const fragments=splitClinicalOrder(input.request.text);if(!fragments.length||fragments.length>8)return {success:false,error:ERRORS.malformed};
+    const compute=async():Promise<ApiServiceResult<QuickOrderPlan>>=>{
+      const output:QuickOrderPlan['fragments']=[];
+      for(const [index,text] of fragments.entries()){
+        let interpretation=controlledInterpretation(text,catalogue.data);
+        if(!interpretation&&dependencies.clinical_interpreter){
+          const r=await interpretClinicalAction({...input,request:{...input.request,text,utterance_id:`quick.${id.slice(0,48)}.${index}`}});
+          if(r.success)interpretation=r.data.interpretation;
+        }
+        if(interpretation?.status==='MATCH'){
+          const matched=catalogue.data.actions.find(a=>interpretation?.status==='MATCH'&&a.action_id===interpretation.candidate.action_id);
+          if(matched?.category==='MEDICATIONS'||matched?.subcategory==='Fluids'){
+            const label=matched.labels.map(l=>l.label.toLowerCase()).join(' ');const numbers:string[]=text.match(/\d+(?:\.\d+)?/g)??[],allowed:string[]=label.match(/\d+(?:\.\d+)?/g)??[];
+            const route=/\b(iv|im|oral)\b/i.exec(text)?.[1]?.toLowerCase()??(/وريدي/.test(text)?'iv':/عضلي/.test(text)?'im':/فموي/.test(text)?'oral':undefined);
+            const units=[...text.toLowerCase().matchAll(/(\d+(?:\.\d+)?)\s*(mg|mcg|g|ml|units?|ملغ|مل|غرام|وحدة)\b/gu)].map(m=>`${m[1]} ${m[2]}`);
+            if(numbers.some(n=>!allowed.includes(n))||units.some(u=>!label.includes(u))||(route&&!new RegExp(`\\b${route}\\b`,'i').test(label)))interpretation=undefined;
+          }
+        }
+        // Missing providers/unsupported language never becomes hidden execution.
+        output.push({text,interpretation:interpretation??{interpretation_schema_version:'1.0',authority:'NON_AUTHORITATIVE',status:'NO_MATCH',no_match_reason:'UNAVAILABLE_ACTION'}});
+      }
+      return {success:true,data:QuickOrderPlanSchema.parse({plan_id:id,session_id:input.session_id,grounded_state_version:loaded.data.session.patient_state.state_version,fragments:output,execution_policy:'CONFIRMED_SEQUENTIAL_STOP_ON_FAILURE'})};
+    };
+    const plan=compute().catch(()=>({success:false as const,error:ERRORS.internal}));quickPlans.set(id,{owner,fingerprint,plan});return plan;
+  }
+  async function confirmQuickOrder(input:{authority:ApiRequestAuthority;session_id:string;request:QuickOrderConfirm}):Promise<ApiServiceResult<unknown>>{
+    const loaded=await authorizeAndLoad(input.authority,input.session_id);if(!loaded.success)return loaded;
+    const record=quickPlans.get(input.request.plan_id),owner=canonicalSerialize([input.authority.principal.user_id,input.session_id]);
+    if(!record||record.owner!==owner)return {success:false,error:ERRORS.notFound};
+    const signature=canonicalSerialize(input.request);
+    if(record.execution)return record.confirmation===signature?record.execution:{success:false,error:ERRORS.idempotency};
+    if(loaded.data.session.status==='ENDED')return {success:false,error:ERRORS.ended};
+    const plan=await record.plan;if(!plan.success)return plan;
+    const indexes=input.request.selected_indexes;
+    if(new Set(indexes).size!==indexes.length)return {success:false,error:ERRORS.malformed};
+    const candidates=indexes.map(i=>({index:i,fragment:plan.data.fragments[i]}));
+    if(candidates.some(c=>c.fragment?.interpretation.status!=='MATCH'||c.fragment.interpretation.candidate.unresolved_required_parameters.length))return {success:false,error:ERRORS.domainRejected};
+    const catalogue=loaded.data.session.pinned_case.shared_catalogue!.catalogue;
+    const ordered:typeof candidates=[];const remaining=[...candidates].sort((a,b)=>a.index-b.index);
+    while(remaining.length){
+      const next=remaining.findIndex(c=>{const i=c.fragment!.interpretation;if(i.status!=='MATCH')return false;
+        const prereqs=catalogue.actions.find(a=>a.action_id===i.candidate.action_id)?.prerequisite_concept_ids??[];
+        return !remaining.some(other=>other!==c&&other.fragment!.interpretation.status==='MATCH'&&prereqs.includes(other.fragment!.interpretation.candidate.action_id));});
+      if(next<0)return {success:false,error:ERRORS.domainRejected};ordered.push(remaining.splice(next,1)[0]!);
+    }
+    const execute=async():Promise<ApiServiceResult<unknown>>=>{
+      const outcomes:{index:number;status:'COMMITTED'|'NOT_COMPLETED'}[]=[];
+      for(const c of ordered){
+        const candidate=c.fragment!.interpretation;if(candidate.status!=='MATCH')break;
+        const key=`quick.${input.request.plan_id.slice(0,48)}.${c.index}`;
+        let result:Awaited<ReturnType<typeof submitClinicalAction>>|undefined;
+        for(let attempt=0;attempt<3;attempt++){
+          const current=await authorizeAndLoad(input.authority,input.session_id);if(!current.success)return current;
+          result=await submitClinicalAction({authority:{...input.authority,idempotency_key:IdempotencyKeySchema.parse(key)},session_id:input.session_id,
+          request:{action_id:candidate.candidate.action_id,parameters:candidate.candidate.parameters,expected_state_version:current.data.session.patient_state.state_version,command_id:`command.${key}` as never,action_request_id:`action-request.${key}` as never,source:'NATURAL_LANGUAGE'}});
+          // Only an explicit non-committed optimistic-version rejection is retried.
+          // Same identity; never retry unknown outcomes, domain or provider failure.
+          if(result.success||result.error.code!==ERRORS.stale.code)break;
+        }
+        outcomes.push({index:c.index,status:result?.success?'COMMITTED':'NOT_COMPLETED'});
+        if(!result?.success)break; // No later dependent or independent action runs after failure.
+      }
+      return {success:true,data:{plan_id:plan.data.plan_id,outcomes,stopped:outcomes.some(o=>o.status==='NOT_COMPLETED')}};
+    };
+    // Reserve before awaiting execution: concurrent confirmations share one promise.
+    if(record.execution)return record.confirmation===signature?record.execution:{success:false,error:ERRORS.idempotency};
+    record.confirmation=signature;record.execution=execute().catch(()=>({success:false as const,error:ERRORS.internal}));return record.execution;
+  }
   // Trusted immutable content only. Compare complete canonical bytes on every use;
   // a mutation invalidates the cached proof. Do not redo reachability/hash work on
   // each browser poll, or delay intake enough to race the authoritative clock.
@@ -681,7 +770,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       session_id: sessionId
     });
     if (!authorized.success) {
-      return {
+  return {
         success: false,
         error: authorized.code === "AUTHORITY_UNAVAILABLE"
           ? ERRORS.persistence
@@ -848,7 +937,8 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     // Public concept identities never give the client control of the Case binding.
     const sharedBinding = [...(pinned.shared_catalogue?.bindings??[]),...(pinned.shared_catalogue?.search_only?.bindings??[])].find(b => b.concept_id === input.request.action_id);
     const exam=pinned.action_catalogue.find(a=>a.action_id===input.request.action_id && a.examination);
-    if (pinned.shared_catalogue && !sharedBinding && !exam) return { success: false, error: ERRORS.domainRejected } as const;
+    const decision=ENCOUNTER_DECISIONS.find(o=>o.action_id===input.request.action_id&&pinned.action_catalogue.some(a=>a.action_id===o.action_id));
+    if (pinned.shared_catalogue && !sharedBinding && !exam && !decision) return { success: false, error: ERRORS.domainRejected } as const;
     const prior=loaded.data.session.idempotency_records.find(r=>r.idempotency_key===input.authority.idempotency_key);
     const priorEvent=prior && loaded.data.session.committed_events.find(e=>e.event_id===prior.command_event_id);
     const priorPayload=priorEvent?.payload;
@@ -887,7 +977,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
           catalogue_membership: "UNVERIFIED",
           command_id: input.request.command_id,
           session_id: input.session_id,
-          action_id: sharedBinding?.case_action_id ?? input.request.action_id,
+          action_id: sharedBinding?.case_action_id ?? (decision?decisionBinding(decision.action_id,pinned.action_catalogue.map(a=>a.action_id)):undefined) ?? input.request.action_id,
           request_schema_version: "1.0",
           expected_state_version: input.request.expected_state_version,
           requested_at_clinical_time: originalIntake ?? loaded.data.session.patient_state.clinical_time,
@@ -1279,7 +1369,8 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     if (!loaded.success) return loaded;
     return safeLearnerTimelineProjection(
       loaded.data.session,
-      loaded.data.authorization
+      loaded.data.authorization,
+      String(dependencies.id_factories.createAssessmentId({session_id:sessionId}))
     );
   }
 
@@ -1537,6 +1628,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
   }
 
   return Object.freeze({
+    planQuickOrder,confirmQuickOrder,
     startSession,
     getPatientState,
     submitClinicalAction,

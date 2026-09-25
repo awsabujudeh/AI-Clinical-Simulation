@@ -270,6 +270,7 @@ export const SafeSessionProjectionSchema = z.strictObject({
   observations: LearnerObservationsSchema,
   learner_action_catalogue: SafeLearnerActionCatalogueSchema,
   examinations: SafeExaminationProjectionSchema.optional(),
+  encounter_decisions: z.array(SafeLearnerActionSchema).max(16).optional(),
   search_only_actions: z.array(SafeLearnerActionSchema).max(16).optional(),
   investigations: z.array(SafeInvestigationStatusSchema).max(256).optional(),
   assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional(),
@@ -293,6 +294,7 @@ export const LearnerTimelineItemTypeSchema = z.enum([
 export type LearnerTimelineItemType = z.infer<typeof LearnerTimelineItemTypeSchema>;
 
 export const SafeLearnerTimelineItemSchema = z.strictObject({
+  educational_feedback:z.array(z.enum(['CORRECT_ACTION','UNSAFE_ACTION','IMPORTANT_DELAY','MISSED_OPPORTUNITY'])).max(4).optional(),
   event_id: EventIdSchema,
   sequence_no: SequenceNumberSchema,
   clinical_time: ClinicalTimeSchema,
