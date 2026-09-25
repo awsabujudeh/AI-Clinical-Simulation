@@ -233,7 +233,7 @@ describe("V2-016 generic action presentation and validation", () => {
   it("renders interactive domains with a safe unavailable Patient Conversation boundary", async () => {
     await render();
     expect(text()).toContain("Talk with the patient");
-    expect(text()).toContain("Reconnect to ask a new question");
+    expect(text()).toContain("Conversation unavailable");
     expect(host.querySelector("textarea")?.disabled).toBe(true);
     await click("Examination");
     expect(text()).toContain("Perform synthetic examination");

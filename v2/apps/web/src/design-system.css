@@ -1,0 +1,24 @@
+/* Salvaged appearance preference only. V2-028 owns layout and typography. */
+.brand-lockup { display: inline-flex; align-items: center; gap: .5rem; }
+.brand-lockup > img { width: 2.25rem; height: 2.5rem; object-fit: contain; }
+.brand-lockup small { display: block; }
+.brand-art { max-width: 100%; height: auto; }
+.theme-control { color: inherit; background: transparent; border: 1px solid currentColor; cursor: pointer; }
+.theme-control svg { width: 1.25rem; height: 1.25rem; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e7edf5; background: #101a28;
+  --ink: #e7edf5; --muted: #b2c0cf; --line: #42566d; --soft-line: #35485e;
+  --surface: #192b3e; --surface-muted: #21364a;
+}
+html[data-theme="dark"] body { color: var(--ink); background: #101a28; }
+/* Color substitutions only: no new grids, spacing, breakpoints or visual hierarchy. */
+[data-theme="dark"] :is(.site-footer, .public-principles article, .auth-card,
+  .button--secondary, .action-catalogue button, .action-form,
+  .domain-score-grid article, .patient-conversation__turn, .timeline-list li) {
+  color: var(--ink); background-color: var(--surface);
+}
+[data-theme="dark"] :is(.public-hero h1, .auth-card h1) { color: var(--ink); }
+[data-theme="dark"] :is(input, textarea, select, dialog) {
+  color: var(--ink); background-color: var(--surface); border-color: var(--line);
+}

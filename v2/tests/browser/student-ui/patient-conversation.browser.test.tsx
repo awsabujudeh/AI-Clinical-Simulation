@@ -129,6 +129,6 @@ describe("Patient Conversation learner UI", () => {
     };
     await act(async () => render(service));
     await settle(() => host.querySelector("textarea")?.disabled === true);
-    expect(host.textContent).toContain("Reconnect to ask a new question");
+    expect(host.textContent).toContain("Conversation unavailable");
   });
 });

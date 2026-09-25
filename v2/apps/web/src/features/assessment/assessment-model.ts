@@ -6,6 +6,23 @@ export function formatBasisPoints(basisPoints: number): string {
   return `${whole}.${fraction}%`;
 }
 
+const genericDomainLabels = {
+  "domain.history": { generic: "history", "en-US": "History", "ar-JO": "القصة المرضية" },
+  "domain.examination": { generic: "examination", "en-US": "Examination", "ar-JO": "الفحص" },
+  "domain.diagnostics": { generic: "diagnostics", "en-US": "Diagnostics", "ar-JO": "الاستقصاءات" },
+  "domain.management": { generic: "management", "en-US": "Management", "ar-JO": "التدبير" },
+  "domain.clinical-reasoning": { generic: "clinical-reasoning", "en-US": "Clinical reasoning", "ar-JO": "الاستدلال السريري" },
+  "domain.reperfusion-disposition": { generic: "reperfusion-disposition", "en-US": "Reperfusion and disposition", "ar-JO": "إعادة التروية والتصرف" }
+} as const;
+
+/** Display-only fallback for exact generic codes; authored case labels retain authority. */
+export function assessmentDomainLabel(domainId: string, label: string | undefined, locale: PatientLanguage): string | undefined {
+  const generic = Object.hasOwn(genericDomainLabels, domainId)
+    ? genericDomainLabels[domainId as keyof typeof genericDomainLabels]
+    : undefined;
+  return generic && label === generic.generic ? generic[locale === "ar-JO" ? "ar-JO" : "en-US"] : label;
+}
+
 export function assessmentFindingLabel(
   category: "CORRECT_ACTION" | "UNSAFE_ACTION" | "IMPORTANT_DELAY" | "MISSED_OPPORTUNITY",
   locale: PatientLanguage

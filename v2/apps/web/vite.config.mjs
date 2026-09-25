@@ -11,13 +11,13 @@ export default defineConfig(({ mode }) => ({
       registerType: "prompt",
       injectRegister: "auto",
       manifest: {
-        name: "AI Clinical Simulation Platform V2",
-        short_name: "Clinical Simulation",
-        description: "Server-authoritative clinical simulation application shell",
+        name: "BALSIM Clinical Simulation",
+        short_name: "BALSIM",
+        description: "Clinical simulation and structured learning",
         start_url: "/",
         display: "standalone",
-        background_color: "#f8fafc",
-        theme_color: "#0f172a"
+        background_color: "#f3f6fc",
+        theme_color: "#1456be"
       },
       workbox: {
         cacheId: "ai-clinical-simulation-v2-app-shell",

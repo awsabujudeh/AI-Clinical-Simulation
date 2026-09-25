@@ -11,7 +11,7 @@ import { patientLanguageDirection } from "./session-presentation";
 import { STUDENT_SHELL_LOCALES, type StudentShellLocale } from "./types";
 
 const enUS = {
-  brand: "Clinical Simulation",
+  brand: "BALSIM",
   skipToContent: "Skip to main content",
   publicEyebrow: "Server-authoritative learning",
   publicTitle: "AI Clinical Simulation Platform V2",
@@ -211,7 +211,7 @@ const enUS = {
 type MessageKey = keyof typeof enUS;
 
 const arJO: Record<MessageKey, string> = {
-  brand: "المحاكاة السريرية",
+  brand: "BALSIM",
   skipToContent: "الانتقال إلى المحتوى الرئيسي",
   publicEyebrow: "تعلّم يستند إلى مصدر سريري موثوق",
   publicTitle: "منصة المحاكاة السريرية بالذكاء الاصطناعي V2",

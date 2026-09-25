@@ -1,3 +1,6 @@
+import { useTheme } from "../app/theme";
+import { Brand } from "./Brand";
+import { Icon } from "./Icon";
 import { Link } from "react-router-dom";
 
 import { useLocalization } from "../app/localization";
@@ -7,7 +10,7 @@ import { Button } from "./ui";
 export function LocaleControl() {
   const { locale, setLocale, t } = useLocalization();
   return (
-    <div className="locale-control" aria-label={t("language")}>
+    <div className="locale-control" role="group" aria-label={t("language")}>
       <button
         type="button"
         aria-pressed={locale === "en-US"}
@@ -35,14 +38,14 @@ export function AppFrame({
   auth?: AuthSnapshot;
   onSignOut?: () => void;
 }) {
-  const { t } = useLocalization();
+  const { t, locale } = useLocalization();
+  const { theme, toggle } = useTheme();
   return (
     <div className="app-frame">
       <a className="skip-link" href="#main-content">{t("skipToContent")}</a>
       <header className="topbar">
         <Link className="brand" to="/" aria-label={t("brand")}>
-          <span className="brand__mark" aria-hidden="true">CS</span>
-          <span>{t("brand")}</span>
+          <Brand />
         </Link>
         <div className="topbar__actions">
           {auth?.status === "AUTHENTICATED" ? (
@@ -51,6 +54,10 @@ export function AppFrame({
             </span>
           ) : null}
           <LocaleControl />
+          <button type="button" className="theme-control" onClick={toggle}
+            aria-label={locale === "ar-JO" ? (theme === "bright" ? "الوضع الداكن" : "الوضع الفاتح") : (theme === "bright" ? "Dark mode" : "Bright mode")}>
+            <Icon name={theme === "bright" ? "moon" : "sun"} />
+          </button>
           {auth?.status === "AUTHENTICATED" && onSignOut !== undefined ? (
             <Button type="button" variant="quiet" onClick={onSignOut}>
               {t("signOut")}

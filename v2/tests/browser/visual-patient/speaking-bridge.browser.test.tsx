@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { it, expect, vi } from "vitest";
 import { PatientSpeech } from "../../../apps/web/src/features/voice/PatientSpeech.tsx";
+import { LocalizationProvider } from "../../../apps/web/src/app/localization.tsx";
 import { observePatientAudio } from "../../../apps/web/src/features/voice/patient-audio-playback.ts";
 import { voiceUiHarness } from "../../fixtures/voice/ui-services.ts";
 import { bindVisualExamRequest, currentVisualExamSelection } from "../../../apps/web/src/features/visual-patient/exam-intent.ts";
@@ -18,7 +19,7 @@ it("PatientSpeech propagates actual playback events, replay, mute and unmount; t
   h.services.voice!.adapter.synthesize = async () => handle;
   const listener = vi.fn(); const host = document.createElement("div"); document.body.append(host); const root = createRoot(host);
   try {
-    await act(async () => root.render(<PatientSpeech voice={h.services.voice} turn={result.turn} onSpeaking={listener} />));
+    await act(async () => root.render(<LocalizationProvider><PatientSpeech voice={h.services.voice} turn={result.turn} onSpeaking={listener} /></LocalizationProvider>));
     expect(listener.mock.calls.some(c => c[1] === true)).toBe(false);
     await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
     expect(listener).toHaveBeenLastCalledWith(result.turn.turn_id, true);

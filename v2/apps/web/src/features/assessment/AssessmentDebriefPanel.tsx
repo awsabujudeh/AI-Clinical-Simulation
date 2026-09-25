@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useLocalization } from "../../app/localization";
 import { formatClinicalTime } from "../../app/session-presentation";
@@ -35,6 +35,9 @@ export function AssessmentDebriefPanel({
   const { locale, t } = useLocalization();
   const [endPhase, setEndPhase] = useState<EndPhase>("IDLE");
   const ending = useRef(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const endDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => { if (confirmEnd) endDialog.current?.showModal(); }, [confirmEnd]);
   const current = state.mutation_authority === "SERVER_ONLY";
   const ended = state.projection.status === "ENDED";
   const assessment = useQuery({
@@ -167,11 +170,18 @@ export function AssessmentDebriefPanel({
         title={t("assessmentTitle")}
         subtitle={ended ? t("assessmentFinalSubtitle") : t("assessmentActiveSubtitle")}
         action={canFinalize ? (
-          <Button type="button" disabled={ending.current} onClick={() => void finalize()}>
+          <Button type="button" disabled={ending.current} onClick={() => setConfirmEnd(true)}>
             {endPhase === "SUBMITTING" ? t("endingSimulation") : t("endSimulation")}
           </Button>
         ) : undefined}
       />
+      {confirmEnd && canFinalize ? <dialog ref={endDialog} role="alertdialog"
+        onCancel={() => setConfirmEnd(false)}
+        aria-label={locale === "ar-JO" ? "تأكيد إنهاء المقابلة" : "Confirm end of encounter"}>
+        <p>{locale === "ar-JO" ? "هل تريد إنهاء المحاكاة وعرض التقييم؟" : "End this simulation and view its assessment?"}</p>
+        <Button onClick={() => { setConfirmEnd(false); void finalize(); }}>{t("endSimulation")}</Button>
+        <Button variant="secondary" onClick={() => setConfirmEnd(false)}>{t("actionCancel")}</Button>
+      </dialog> : null}
       {endPhase === "IN_DOUBT" ? <p className="surface-state" role="status">{t("finalizationInDoubt")}</p> : null}
       {endPhase === "FAILED" ? <p className="surface-state surface-state--error" role="alert">{t("finalizationFailed")}</p> : null}
       {content}

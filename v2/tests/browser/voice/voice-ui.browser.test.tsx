@@ -28,6 +28,9 @@ async function fill(selector: string, value: string) {
 }
 it("Patient speech requires final review/edit and explicit text submit; exact reply alone enters TTS", async () => {
   const h = await open(); await click("Start recording");
+  expect(host.querySelector(".voice-controls")?.getAttribute("data-voice-phase")).toBe("LISTENING");
+  expect(host.textContent).toContain("Recording — speak now");
+  expect(host.textContent).not.toContain("LISTENING");
   await act(async () => h.speech.listener().partial("partial secret to no submit"));
   expect(h.calls.questions).toBe(0); expect(host.querySelector('textarea[aria-label="Review final transcript"]')).toBeNull();
   await act(async () => h.speech.listener().final("wrong transcript")); await click("Stop recording"); await act(async () => h.speech.listener().ended());
@@ -48,11 +51,14 @@ it.each(["permission", "token", "disabled"])("%s leaves typed Patient path enabl
 it.each(["tts-fail", "blocked"])("%s never hides approved patient text", async scenario => {
   const h = await open(scenario); await fill(".patient-conversation form > label textarea", "Question"); await click("Ask patient");
   await settle(() => host.textContent?.includes("Approved synthetic patient reply.") === true); await click("Play patient audio");
-  expect(host.textContent).toContain(scenario === "blocked" ? "PLAYBACK_BLOCKED" : "TTS_FAILED");
+  expect(host.textContent).toContain(scenario === "blocked" ? "Your browser blocked audio" : "Patient audio is unavailable");
+  expect(host.querySelector(".patient-speech")?.getAttribute("data-voice-phase")).toBe(scenario === "blocked" ? "PLAYBACK_BLOCKED" : "TTS_FAILED");
+  expect(host.textContent).not.toContain(scenario === "blocked" ? "PLAYBACK_BLOCKED" : "TTS_FAILED");
   expect(host.textContent).toContain("Approved synthetic patient reply."); expect(h.calls.executions).toBe(0);
 });
 it("clinical speech enters Interpreter candidate then existing medication confirmation, never direct execution", async () => {
-  const h = await open(); await click("Medications"); await click("Start recording");
+  const h = await open(); await click("Medications");
+  await click("Start recording");
   await act(async () => h.speech.listener().final("Give synthetic study agent")); await click("Stop recording"); await act(async () => h.speech.listener().ended());
   await click("Use reviewed text"); expect(h.calls.interpretations).toBe(0); await click("Interpret command");
   expect(h.calls.interpretations).toBe(1); expect(h.calls.executions).toBe(0); await click("Propose action");
@@ -73,7 +79,9 @@ it("TTS timeout aborts audio without affecting readable patient response", async
   await open("tts-timeout"); await fill(".patient-conversation form > label textarea", "Question"); await click("Ask patient");
   await settle(() => host.textContent?.includes("Approved synthetic patient reply.") === true);
   vi.useFakeTimers(); await click("Play patient audio"); await act(async () => vi.advanceTimersByTime(12_000));
-  expect(host.textContent).toContain("TTS_TIMEOUT"); expect(host.textContent).toContain("Approved synthetic patient reply.");
+  expect(host.textContent).toContain("Audio took too long");
+  expect(host.querySelector(".patient-speech")?.getAttribute("data-voice-phase")).toBe("TTS_TIMEOUT");
+  expect(host.textContent).not.toContain("TTS_TIMEOUT"); expect(host.textContent).toContain("Approved synthetic patient reply.");
 });
 it("Patient provider outage after reviewed STT retains question text and existing read-only recovery, without fabricated audio", async () => {
   const h = await open("patient-fail"); await click("Start recording");
@@ -81,12 +89,35 @@ it("Patient provider outage after reviewed STT retains question text and existin
   await click("Use reviewed text"); await click("Ask patient");
   expect(h.calls.questions).toBe(1); expect(h.speech.synthesis).toHaveLength(0);
   expect(host.querySelector<HTMLTextAreaElement>(".patient-conversation form > label textarea")?.value).toBe("Question to keep");
-  expect(host.textContent).toContain("Reconnect to ask a new question");
+  expect(host.textContent).toContain("Conversation unavailable");
 });
 it("Interpreter outage after STT retains manual action catalogue and typed input", async () => {
-  const h = await open("interpreter-fail"); await click("Medications"); await click("Start recording");
+  const h = await open("interpreter-fail"); await click("Medications");
+  await click("Start recording");
   await act(async () => h.speech.listener().final("Synthetic request")); await click("Stop recording"); await act(async () => h.speech.listener().ended());
   await click("Use reviewed text"); await click("Interpret command");
-  expect(h.calls.executions).toBe(0); expect(host.textContent).toContain("Manual Clinical Actions remain available");
+  expect(h.calls.executions).toBe(0); expect(host.textContent).toContain("Interpreter unavailable");
   expect(host.querySelector<HTMLTextAreaElement>(".clinical-interpreter > label textarea")?.disabled).toBe(false);
+});
+
+it("Arabic voice controls follow interface language while approved reply audio retains its original language", async () => {
+  const h = await open();
+  await fill(".patient-conversation form > label textarea", "English question"); await click("Ask patient");
+  await settle(() => host.textContent?.includes("Approved synthetic patient reply.") === true);
+  await click("العربية");
+  expect(host.querySelector(".patient-speech")?.getAttribute("aria-label")).toBe("صوت المريض");
+  expect(host.textContent).toContain("الصوت جاهز");
+  expect(host.textContent).not.toContain("Play patient audio");
+  await click("تشغيل صوت المريض");
+  expect(h.speech.synthesis[0]?.locale).toBe("en-US");
+  expect(h.speech.synthesis[0]?.text).toBe("Approved synthetic patient reply.");
+  expect(host.textContent).toContain("جارٍ تشغيل صوت المريض");
+  await click("كتم صوت المريض");
+  expect(host.textContent).toContain("صوت المريض مكتوم");
+  await click("ابدأ التسجيل");
+  await act(async () => h.speech.listener().final("سؤال تجريبي")); await click("أوقف التسجيل");
+  await act(async () => h.speech.listener().ended());
+  expect(host.querySelector('textarea[aria-label="راجع النص النهائي"]')).not.toBeNull();
+  expect(host.textContent).toContain("راجع النص قبل استخدامه");
+  expect(h.calls.questions).toBe(1);
 });

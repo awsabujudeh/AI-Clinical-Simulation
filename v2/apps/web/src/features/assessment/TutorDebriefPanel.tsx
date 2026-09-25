@@ -1,25 +1,27 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { TutorDebrief } from "@ai-clinical-simulation/contracts";
 import type { StudentTutorService } from "../../app/types";
 import { useLocalization } from "../../app/localization";
 import { Button } from "../../components/ui";
-import { formatBasisPoints } from "./assessment-model";
+import { assessmentDomainLabel, formatBasisPoints } from "./assessment-model";
 
 export function TutorDebriefPanel({ sessionId, service, review }: { sessionId: string; service: StudentTutorService; review: boolean }) {
   const { locale } = useLocalization();
   const ar = locale === "ar-JO";
   const [data, setData] = useState<TutorDebrief>();
   const [busy, setBusy] = useState(false);
+  const requested = useRef(false);
   const [failed, setFailed] = useState(false);
   const visible = String(data?.packet.locale) === String(locale) ? data : undefined;
   const text = (en: string, arabic: string) => ar ? arabic : en;
   async function load() {
-    if (busy) return;
+    if (requested.current) return;
+    requested.current = true;
     setBusy(true); setFailed(false);
     try {
       const r = await service.generate(sessionId, locale);
       if (r.kind === "AVAILABLE") setData(r.debrief); else setFailed(true);
-    } catch { setFailed(true); } finally { setBusy(false); }
+    } catch { setFailed(true); } finally { requested.current = false; setBusy(false); }
   }
   const a = visible?.packet.assessment;
   const status = (kind: string, value: string) => {
@@ -59,7 +61,7 @@ export function TutorDebriefPanel({ sessionId, service, review }: { sessionId: s
       <h4>CASE_FEEDBACK</h4>
       <p>{text("Deterministic score", "الدرجة الحتمية")}: <strong>{formatBasisPoints(a.overall_score_basis_points)}</strong> · {a.assessed_through_clinical_time}s · {text("Evidence through event", "الأدلة حتى الحدث")} #{a.event_sequence_through}</p>
       <p>{text("This attempt", "هذه المحاولة")}: {a.criterion_results.filter(c => c.status === "SATISFIED").length} {text("scored criteria completed", "معايير تقييم مكتملة")} · {a.criterion_results.filter(c => c.status === "MISSED").length} {text("missed", "فائتة")} · {a.criterion_results.filter(c => c.status === "TRIGGERED").length} {text("triggered safety / penalty criteria", "معايير سلامة / خصم متحققة")}. {text("These are authored Case findings, not external guideline claims.", "هذه نتائج الحالة المؤلفة وليست ادعاءات بإرشادات خارجية.")}</p>
-      <ul>{a.domain_scores.map(d => <li key={d.domain_id}>{visible.packet.domain_labels.find(l => l.domain_id === d.domain_id)?.label}: {formatBasisPoints(d.score_basis_points)}</li>)}</ul>
+      <ul>{a.domain_scores.map(d => <li key={d.domain_id}>{assessmentDomainLabel(d.domain_id, visible.packet.domain_labels.find(l => l.domain_id === d.domain_id)?.label, locale)}: {formatBasisPoints(d.score_basis_points)}</li>)}</ul>
       <h4>{text("What went well", "ما تم بنجاح")}</h4>
       <ul>{visible.packet.criteria.filter(c => c.criterion.status === "SATISFIED" || (c.criterion.criterion_kind === "CRITICAL_ACTION" && c.criterion.status === "NOT_TRIGGERED")).map(c => card(c.criterion.rubric_item_id))}</ul>
       <h4>{text("Critical actions, errors and unresolved items", "الإجراءات الحرجة والأخطاء والمعايير غير المحسومة")}</h4>

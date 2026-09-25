@@ -182,6 +182,7 @@ export function ClinicalActionsPanel({
   const [issues, setIssues] = useState<readonly ActionParameterIssue[]>([]);
   const [phase, setPhase] = useState<SubmissionPhase>("IDLE");
   const submitting = useRef(false);
+  const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
 
   const actions = state.projection.learner_action_catalogue.actions;
   const visibleActions = useMemo(
@@ -278,15 +279,29 @@ export function ClinicalActionsPanel({
           : undefined}
       />
       <div className="clinical-tabs" role="tablist" aria-label={t("interactionTitle")}>
-        {ACTION_DOMAINS.map((candidate) => (
+        {ACTION_DOMAINS.map((candidate, index) => (
           <button
             key={candidate}
             type="button"
             role="tab"
             aria-selected={domain === candidate}
+            tabIndex={domain === candidate ? 0 : -1}
             aria-controls="clinical-domain-panel"
             id={`tab-${candidate.toLowerCase()}`}
+            ref={element => { tabButtons.current[index] = element; }}
             onClick={() => chooseDomain(candidate)}
+            onKeyDown={event => {
+              const forward = locale === "ar-JO" ? "ArrowLeft" : "ArrowRight";
+              const backward = locale === "ar-JO" ? "ArrowRight" : "ArrowLeft";
+              const next = event.key === "Home" ? 0 : event.key === "End" ? ACTION_DOMAINS.length - 1
+                : event.key === forward || event.key === "ArrowDown" ? (index + 1) % ACTION_DOMAINS.length
+                  : event.key === backward || event.key === "ArrowUp" ? (index + ACTION_DOMAINS.length - 1) % ACTION_DOMAINS.length
+                    : undefined;
+              if (next === undefined) return;
+              event.preventDefault();
+              chooseDomain(ACTION_DOMAINS[next]!);
+              tabButtons.current[next]?.focus();
+            }}
           >
             <span className="clinical-tab__mark" aria-hidden="true" />
             {t(domainMessageKeys[candidate])}

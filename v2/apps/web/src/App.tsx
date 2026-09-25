@@ -4,9 +4,12 @@ import {
   MemoryRouter,
   Navigate,
   Route,
-  Routes
+  Routes,
+  useLocation
 } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ThemeProvider } from "./app/theme";
+import "./design-system.css";
 import {
   PORTABILITY_SMOKE_FIXTURE,
   createPortabilitySmokeResult
@@ -38,9 +41,22 @@ function NotFoundPage() {
   );
 }
 
+function RoutePresentation() {
+  const { pathname } = useLocation();
+  const previous = useRef(pathname);
+  useEffect(() => {
+    if (previous.current === pathname) return;
+    previous.current = pathname;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    document.getElementById("main-content")?.focus({ preventScroll: true });
+  }, [pathname]);
+  return null;
+}
+
 export function StudentRoutes({ services, faculty }: { services: StudentUiServices; faculty?: FacultyDemoService }) {
   return (
     <div data-portability-output={portabilityOutput}>
+      <RoutePresentation />
       <Routes>
         <Route path="/" element={<PublicLanding />} />
         <Route path="/login" element={<LoginPage services={services} />} />
@@ -88,9 +104,9 @@ export function App({
   }));
   const content = (
     <QueryClientProvider client={queryClient}>
-      <LocalizationProvider>
+      <ThemeProvider><LocalizationProvider>
         <StudentRoutes services={services} faculty={faculty} />
-      </LocalizationProvider>
+      </LocalizationProvider></ThemeProvider>
     </QueryClientProvider>
   );
   return initialEntries === undefined

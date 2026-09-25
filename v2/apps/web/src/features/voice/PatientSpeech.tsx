@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { PatientVoiceProfileSchema, SafePatientConversationTurnSchema, VoiceTelemetrySchema,
   type SafePatientConversationTurn, type VoiceFailureCode } from "@ai-clinical-simulation/contracts";
 import type { PatientAudioHandle, StudentVoiceServices } from "./voice-services";
+import { useLocalization } from "../../app/localization";
 
 export function PatientSpeech({ voice, turn, onSpeaking }: { voice?: StudentVoiceServices; turn: SafePatientConversationTurn; onSpeaking?(turnId: string, speaking: boolean): void }) {
+  const { locale } = useLocalization();
   const [muted, setMuted] = useState(false);
   const [phase, setPhase] = useState("IDLE");
   const generation = useRef(0);
@@ -61,9 +63,18 @@ export function PatientSpeech({ voice, turn, onSpeaking }: { voice?: StudentVoic
     } }
     finally { if (own === generation.current) clearTimeout(timer.current); }
   }
-  return <div className="patient-speech">
-    <button type="button" disabled={!voice || muted || phase === "LOADING"} onClick={() => void play()}>{phase === "IDLE" || phase === "PLAYBACK_BLOCKED" ? "Play patient audio" : "Replay patient audio"}</button>
-    <button type="button" aria-pressed={muted} onClick={() => { stop(); setMuted(!muted); setPhase("IDLE"); }}>{muted ? "Unmute patient audio" : "Mute patient audio"}</button>
-    <span role="status">{phase}</span>
+  const text = (en: string, arabic: string) => locale === "ar-JO" ? arabic : en;
+  const status = !voice ? text("Patient audio is unavailable. You can still read the reply.", "صوت المريض غير متاح. يمكنك قراءة الرد.")
+    : muted ? text("Patient audio muted", "صوت المريض مكتوم")
+    : phase === "LOADING" ? text("Preparing patient audio…", "جارٍ تجهيز صوت المريض…")
+    : phase === "PLAYING" ? text("Playing patient audio", "جارٍ تشغيل صوت المريض")
+    : phase === "PLAYBACK_BLOCKED" ? text("Your browser blocked audio. Select Play to try again.", "حظر المتصفح تشغيل الصوت. اختر التشغيل للمحاولة مجدداً.")
+    : phase === "TTS_TIMEOUT" ? text("Audio took too long. Try again or read the reply.", "استغرق تجهيز الصوت وقتاً طويلاً. حاول مجدداً أو اقرأ الرد.")
+    : phase === "TTS_FAILED" ? text("Patient audio is unavailable. You can still read the reply.", "صوت المريض غير متاح. يمكنك قراءة الرد.")
+    : text("Audio ready", "الصوت جاهز");
+  return <div className="patient-speech" role="group" aria-label={text("Patient audio", "صوت المريض")} data-voice-phase={phase}>
+      <button type="button" disabled={!voice || muted || phase === "LOADING"} onClick={() => void play()}>{phase === "IDLE" || phase === "PLAYBACK_BLOCKED" ? text("Play patient audio", "تشغيل صوت المريض") : text("Replay patient audio", "إعادة تشغيل صوت المريض")}</button>
+      <button type="button" aria-pressed={muted} onClick={() => { stop(); setMuted(!muted); setPhase("IDLE"); }}>{muted ? text("Unmute patient audio", "إلغاء كتم صوت المريض") : text("Mute patient audio", "كتم صوت المريض")}</button>
+    <span role="status" aria-live="polite" aria-atomic="true">{status}</span>
   </div>;
 }

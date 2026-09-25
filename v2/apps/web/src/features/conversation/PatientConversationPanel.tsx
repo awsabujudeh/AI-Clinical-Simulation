@@ -97,7 +97,7 @@ export function PatientConversationPanel({
           <p>{t("patientConversationBoundary")}</p>
         </div>
         <StatusBadge tone={phase === "READY" ? "positive" : phase === "SUBMITTING" ? "information" : "warning"}>
-          {phase === "SUBMITTING" ? t("patientResponding") : phase === "READY" ? t("patientConversationReady") : t("patientConversationUnavailable")}
+          {phase === "SUBMITTING" ? t("patientResponding") : phase === "READY" ? t("patientConversationReady") : phase === "LOADING" ? (locale === "ar-JO" ? "جارٍ الاتصال بالمريض…" : "Connecting to patient…") : phase === "ENDED" ? t("patientConversationEnded") : t("patientConversationUnavailable")}
         </StatusBadge>
       </div>
       <div className="patient-conversation__transcript" aria-live="polite" aria-label={t("patientConversationTranscript")}>
@@ -105,13 +105,13 @@ export function PatientConversationPanel({
           ? <p>{t("patientConversationEmpty")}</p>
           : transcript?.turns.map((turn) => (
               <article key={turn.turn_id} className="patient-conversation__turn">
-                <p><strong>{t("learnerSaid")}</strong> {turn.learner_utterance}</p>
-                <p><strong>{t("patientSaid")}</strong> {turn.patient_utterance}</p>
+                <p dir="auto"><strong>{t("learnerSaid")}</strong> <bdi>{turn.learner_utterance}</bdi></p>
+                <p dir="auto"><strong>{t("patientSaid")}</strong> <bdi>{turn.patient_utterance}</bdi></p>
                 {voice ? <PatientSpeech voice={voice} turn={turn} onSpeaking={onSpeaking} /> : null}
               </article>
             ))}
       </div>
-      {phase === "UNAVAILABLE" ? <p role="alert">{t("patientConversationOffline")}</p> : null}
+      {phase === "UNAVAILABLE" ? <p role="alert">{state.kind === "ACTIVE_ONLINE" ? t("patientConversationUnavailable") : t("patientConversationOffline")}</p> : null}
       {phase === "ENDED" ? <p role="status">{t("patientConversationEnded")}</p> : null}
       {phase === "INVALID" ? <p role="alert">{t("patientConversationInvalid")}</p> : null}
       <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
@@ -120,6 +120,7 @@ export function PatientConversationPanel({
         <label>
           <span>{t("patientQuestionLabel")}</span>
           <textarea
+            dir="auto"
             value={question}
             maxLength={4_000}
             disabled={blocked}

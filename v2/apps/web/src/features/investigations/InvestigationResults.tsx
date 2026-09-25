@@ -1,3 +1,4 @@
+import { diagnosticUnitLabel, diagnosticValueLabel } from "./diagnostic-presentation";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { SafeInvestigationProjection } from "@ai-clinical-simulation/contracts";
@@ -44,8 +45,8 @@ export function InvestigationResult({ entry, result, ordered, locale }: {
     <p role="status">{p ? (ar ? "النتيجة متاحة" : "Result available") : result?.kind === "UNAVAILABLE" ? (ar ? "تعذر جلب النتيجة" : "Result unavailable") : ordered ? (ar ? "تم الطلب — قيد الانتظار" : "Ordered — pending") : (ar ? "لم تُطلب بعد" : "Not ordered")}</p>
     {p?.component_status.structured_result === "AVAILABLE" ? <>
       {p.finding_texts?.map((f,i) => <p key={i}>{text(f,locale)}</p>)}
-      {p.structured_result && "structured_measurements" in p.structured_result ? <ul>{p.structured_result.structured_measurements.map(m => <li key={m.measurement_id}>{m.measurement_code}: {m.value} {m.unit_code}</li>)}</ul> : null}
-      {p.structured_result && "analytes" in p.structured_result ? <ul>{p.structured_result.analytes.map(a => <li key={a.analyte_id}>{a.analyte_code}: {a.value} {a.unit_code}</li>)}</ul> : null}
+      {p.structured_result && "structured_measurements" in p.structured_result ? <ul>{p.structured_result.structured_measurements.map(m => <li key={m.measurement_id}>{diagnosticValueLabel(m.measurement_code, locale)}: <bdi dir="ltr">{m.value}</bdi> {diagnosticUnitLabel(m.unit_code, locale)}</li>)}</ul> : null}
+      {p.structured_result && "analytes" in p.structured_result ? <ul>{p.structured_result.analytes.map(a => <li key={a.analyte_id}>{diagnosticValueLabel(a.analyte_code, locale)}: <bdi dir="ltr">{a.value}</bdi> {diagnosticUnitLabel(a.unit_code, locale)}</li>)}</ul> : null}
     </> : null}
     {mediaAllowed ? entry.packaged && !imageFailed ? <figure style={{margin:0}}>
       <figcaption>{ar ? "صورة مرجعية للمراجعة فقط — بانتظار مراجعة الطبيب، نتائج الحالة هي المرجع" : "REVIEW_ONLY reference image — PENDING_PHYSICIAN_REVIEW. Authored case findings remain authoritative."}</figcaption>

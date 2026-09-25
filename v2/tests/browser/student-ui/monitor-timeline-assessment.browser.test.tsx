@@ -209,6 +209,14 @@ describe("V2-017 assessment disclosure and finalization", () => {
     const button = [...host.querySelectorAll<HTMLButtonElement>("button")]
       .find((candidate) => candidate.textContent === "End simulation");
     await act(async () => button?.click());
+    expect(end).not.toHaveBeenCalled();
+    const dialog = host.querySelector<HTMLDialogElement>('dialog[role="alertdialog"]')!;
+    expect(dialog.open).toBe(true);
+    await act(async () => dialog.querySelectorAll<HTMLButtonElement>("button")[1]!.click());
+    expect(end).not.toHaveBeenCalled();
+    expect(host.querySelector("dialog")).toBeNull();
+    await act(async () => button?.click());
+    await act(async () => host.querySelector<HTMLButtonElement>('dialog button')!.click());
     await settle(() => text().includes("Finalization status is uncertain"));
     expect(end).toHaveBeenCalledOnce();
     expect(load).toHaveBeenCalledTimes(2);
