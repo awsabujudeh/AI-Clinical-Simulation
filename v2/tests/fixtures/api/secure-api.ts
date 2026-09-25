@@ -154,6 +154,7 @@ export class ApiTestSessionStore implements SessionCommitAdapter, SessionStartRe
 export type ApiTestHarness = Awaited<ReturnType<typeof createApiTestHarness>>;
 
 export async function createApiTestHarness(input?: {
+  hash_adapter?: SecureApiAppDependencies["hash_adapter"];
   trusted_time_utc?: () => unknown;
   include_stemi?: boolean;
   review_artifact?: Awaited<ReturnType<typeof prepareStemiReviewArtifact>>;
@@ -197,7 +198,7 @@ export async function createApiTestHarness(input?: {
         return { success: false, code: "NOT_FOUND" };
       }
       return { success: true, value: {
-        authority: "REVIEW_ONLY",
+        authority: reviewArtifact.execution_authority,
         membership,
         artifact: reviewArtifact
       } } as AuthorityResult<AuthorizedReviewCase>;
@@ -244,7 +245,7 @@ export async function createApiTestHarness(input?: {
   let trustedTime = "2026-09-06T10:00:00Z";
   const coordinator = createSessionCoordinator({
     adapter: store,
-    hash_adapter: TEST_HASH_ADAPTER,
+    hash_adapter: input?.hash_adapter ?? TEST_HASH_ADAPTER,
     event_id_factory: DETERMINISTIC_EVENT_ID_FACTORY
   });
   let patientProviderCalls = 0;
@@ -318,7 +319,7 @@ export async function createApiTestHarness(input?: {
     session_start_repository: store,
     session_adapter: store,
     session_coordinator: coordinator,
-    hash_adapter: TEST_HASH_ADAPTER,
+    hash_adapter: input?.hash_adapter ?? TEST_HASH_ADAPTER,
     id_factories: {
       createSessionId({ principal_user_id, idempotency_key }) {
         return `session.api.${principal_user_id.slice(-4)}.${idempotency_key.replaceAll(/[^A-Za-z0-9]/gu, "-")}`;

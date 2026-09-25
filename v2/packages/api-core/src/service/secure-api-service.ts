@@ -1,4 +1,5 @@
 import { projectVisualPatient } from "./visual-patient-projection.ts";
+import { investigationStatuses } from "./investigation-status.ts";
 import {
   ASSESSMENT_DISCLOSURE_SCHEMA_VERSION,
   ASSESSMENT_FINALIZATION_BOUNDARY_SCHEMA_VERSION,
@@ -40,7 +41,7 @@ import {
   type SubmitClinicalInterpretationResponseData,
   type SubmitQuestionRequest
 } from "../../../contracts/src/index.ts";
-import { canonicalSerialize } from "../../../case-schema/src/index.ts";
+import { canonicalSerialize, verifyExpoExecution } from "../../../case-schema/src/index.ts";
 import {
   evaluateAssessment,
   evaluateReviewAssessment,
@@ -139,6 +140,10 @@ function localizedLabelsForKey(
 }
 
 function actionLabels(authorization: AuthorizedSession, actionId: string) {
+  const shared = sourceCase(authorization).action_catalogue.shared;
+  const binding = [...(shared?.bindings??[]),...(shared?.search_only?.bindings??[])].find(b => b.case_action_id === actionId);
+  const concept = [...(shared?.catalogue.actions??[]),...(shared?.search_only?.actions??[])].find(a => a.action_id === binding?.concept_id);
+  if (concept) return concept.labels.map(l => ({ locale: PatientLanguageSchema.parse(l.locale), text: l.label }));
   const action = sourceCase(authorization).action_catalogue.actions.find(
     (candidate) => candidate.action_id === actionId
   );
@@ -305,6 +310,7 @@ function artifactMatchesSession(
       && artifact.package_hash === session.pinned_case.package_hash;
   }
   return "review_execution_hash" in artifact
+    && artifact.execution_authority === session.pinned_case.execution_authority
     && artifact.source_identity.case_package_id === session.pinned_case.case_package_id
     && artifact.source_identity.case_version_id === session.pinned_case.case_version_id
     && artifact.source_identity.case_version === session.pinned_case.case_version
@@ -328,11 +334,11 @@ function activeAssessmentProjection(
         compiled_case_package: authorization.artifact,
         session_evidence: evidence.evidence
       })
-    : session.pinned_case.execution_authority === "REVIEW_ONLY"
+    : session.pinned_case.execution_authority !== "PUBLISHED_PRODUCTION"
       && "review_execution_hash" in authorization.artifact
       ? evaluateReviewAssessment({
           evaluation_schema_version: "1.0",
-          execution_authority: "REVIEW_ONLY",
+          execution_authority: session.pinned_case.execution_authority,
           evaluation_phase: "LIVE",
           assessment_id: assessmentId,
           review_execution_artifact: authorization.artifact,
@@ -358,6 +364,9 @@ function safeLearnerActionCatalogue(
   session: InMemorySessionAggregate,
   authorization: AuthorizedSession
 ): ApiServiceResult<SafeLearnerActionCatalogue> {
+  if (session.pinned_case.shared_catalogue) {
+    return { success: true, data: SafeLearnerActionCatalogueSchema.parse(session.pinned_case.shared_catalogue.catalogue) };
+  }
   const caseActions = "review_execution_hash" in authorization.artifact
     ? authorization.artifact.source_case.action_catalogue.actions
     : authorization.artifact.action_catalogue.actions;
@@ -420,6 +429,8 @@ function safeSessionProjection(
     observations,
     visual_patient: projectVisualPatient(session),
     learner_action_catalogue: learnerActionCatalogue.data,
+    ...(session.pinned_case.shared_catalogue?.search_only ? {search_only_actions:session.pinned_case.shared_catalogue.search_only.actions} : {}),
+    ...(investigationStatuses(session) ? { investigations: investigationStatuses(session) } : {}),
     ...(session.status === "ACTIVE"
       ? { assessment_disclosure: activeAssessmentProjection(session, authorization, assessmentId) }
       : {})
@@ -631,6 +642,17 @@ function safePatientConversationTurn(input: unknown) {
 }
 
 export function createSecureApiService(dependencies: SecureApiDependencies) {
+  // Trusted immutable content only. Compare complete canonical bytes on every use;
+  // a mutation invalidates the cached proof. Do not redo reachability/hash work on
+  // each browser poll, or delay intake enough to race the authoritative clock.
+  const expoIntegrity = new WeakMap<object, {bytes:string; valid:Promise<boolean>}>();
+  function verifyExpoOnce(artifact: object): Promise<boolean> {
+    const bytes=canonicalSerialize(artifact), cached=expoIntegrity.get(artifact);
+    if (cached?.bytes===bytes) return cached.valid;
+    const valid=verifyExpoExecution(artifact,dependencies.hash_adapter).catch(()=>false);
+    expoIntegrity.set(artifact,{bytes,valid});
+    return valid;
+  }
   // Bounded server-instance memoization: no browser model/rubric/evidence authority.
   const debriefs = new Map<string, Promise<TutorDebrief>>();
   const tutorAttempts = new Map<string, number>();
@@ -664,6 +686,11 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     const loaded = await dependencies.session_adapter.load(sessionId);
     if (!loaded.success) return sessionFailure(loaded.issues);
     if (!artifactMatchesSession(authorized.value, loaded.session)) {
+      return { success: false, error: ERRORS.authorization };
+    }
+    if ("review_execution_hash" in authorized.value.artifact
+      && authorized.value.artifact.execution_authority === "APPROVED_EXPO"
+      && !await verifyExpoOnce(authorized.value.artifact)) {
       return { success: false, error: ERRORS.authorization };
     }
     return {
@@ -700,6 +727,11 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       } as const;
     }
     const exactCase: AuthorizedCase = resolved.value;
+    if (exactCase.authority !== "PUBLISHED_PRODUCTION"
+      && (exactCase.authority !== exactCase.artifact.execution_authority
+        || (exactCase.authority === "APPROVED_EXPO" && !await verifyExpoOnce(exactCase.artifact)))) {
+      return {success:false,error:ERRORS.authorization} as const;
+    }
     const trustedTime = dependencies.trusted_time_utc();
     const sessionId = dependencies.id_factories.createSessionId({
       principal_user_id: input.authority.principal.user_id,
@@ -808,6 +840,9 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
       return { success: false, error: ERRORS.ended } as const;
     }
     const pinned = loaded.data.session.pinned_case;
+    // Public concept identities never give the client control of the Case binding.
+    const sharedBinding = [...(pinned.shared_catalogue?.bindings??[]),...(pinned.shared_catalogue?.search_only?.bindings??[])].find(b => b.concept_id === input.request.action_id);
+    if (pinned.shared_catalogue && !sharedBinding) return { success: false, error: ERRORS.domainRejected } as const;
     const prior=loaded.data.session.idempotency_records.find(r=>r.idempotency_key===input.authority.idempotency_key);
     const priorEvent=prior && loaded.data.session.committed_events.find(e=>e.event_id===prior.command_event_id);
     const priorPayload=priorEvent?.payload;
@@ -822,7 +857,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
           package_hash: pinned.package_hash
         }
       : {
-          execution_authority: "REVIEW_ONLY" as const,
+          execution_authority: pinned.execution_authority,
           case_package_id: pinned.case_package_id,
           case_version_id: pinned.case_version_id,
           case_version: pinned.case_version,
@@ -846,7 +881,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
           catalogue_membership: "UNVERIFIED",
           command_id: input.request.command_id,
           session_id: input.session_id,
-          action_id: input.request.action_id,
+          action_id: sharedBinding?.case_action_id ?? input.request.action_id,
           request_schema_version: "1.0",
           expected_state_version: input.request.expected_state_version,
           requested_at_clinical_time: originalIntake ?? loaded.data.session.patient_state.clinical_time,
@@ -962,17 +997,25 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     }
     const eventTypes = new Set(
       loaded.data.session.committed_events
-        .filter((event) => event.action_id === action.action_id)
+        .filter((event) => event.action_id === action.action_id && event.status === "COMMITTED"
+          && event.session_id === loaded.data.session.session_id
+          && event.clinical_time <= loaded.data.session.patient_state.clinical_time)
         .map((event) => event.event_type)
     );
+    if (!eventTypes.has("INVESTIGATION_ORDERED")) {
+      return { success: false, error: ERRORS.resultPending } as const;
+    }
     const ended = loaded.data.session.status === "ENDED";
     const available = (visibility: "AT_COMPONENT_AVAILABILITY" | "AFTER_SESSION_END" | "NEVER", eventType: EventType) =>
       visibility === "NEVER" ? "WITHHELD" as const
-        : visibility === "AFTER_SESSION_END" ? ended ? "AVAILABLE" as const : "PENDING" as const
+        : visibility === "AFTER_SESSION_END" ? ended && eventTypes.has(eventType) ? "AVAILABLE" as const : "PENDING" as const
           : eventTypes.has(eventType) ? "AVAILABLE" as const : "PENDING" as const;
     const visibility = action.investigation.learner_visibility;
     const structured = available(visibility.structured_result, "INVESTIGATION_RESULT_AVAILABLE");
-    const media = available(visibility.media, "INVESTIGATION_IMAGE_AVAILABLE");
+    // Current approved Expo paths use authored reports, not unlicensed/mismatched
+    // diagnostic images. Medical approval never promotes legacy asset rights.
+    const media = loaded.data.session.pinned_case.execution_authority === "APPROVED_EXPO"
+      ? "WITHHELD" as const : available(visibility.media, "INVESTIGATION_IMAGE_AVAILABLE");
     const machine = available(visibility.machine_interpretation, "INVESTIGATION_RESULT_AVAILABLE");
     const formal = available(visibility.formal_report, "INVESTIGATION_FORMAL_REPORT_AVAILABLE");
     if ([structured, media, machine, formal].every((status) => status !== "AVAILABLE")) {
@@ -991,6 +1034,10 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     const projection = SafeInvestigationProjectionSchema.safeParse({
       diagnostic_result_id: result.diagnostic_result_id,
       clinical_time: loaded.data.session.patient_state.clinical_time,
+      ...(investigationStatuses(loaded.data.session) ? {timing: investigationStatuses(loaded.data.session)!.find(i=>i.diagnostic_result_id===resultId)} : {}),
+      ...(structured === "AVAILABLE" && result.result_type === "STRUCTURED_LAB" && action.investigation.authoring ? {
+        analyte_labels: result.analytes.map(a=>({analyte_id:a.analyte_id,labels:localizedLabelsForKey(loaded.data.authorization,a.display_label_key)}))
+      } : {}),
       component_status: {
         structured_result: structured,
         media,
@@ -1030,6 +1077,21 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
   ): Promise<ApiServiceResult<AssessmentResult>> {
     if (session.status !== "ENDED" || session.finalization === undefined) {
       return { success: false, error: ERRORS.assessmentPending };
+    }
+    if (session.pinned_case.execution_authority === "APPROVED_EXPO" && "review_execution_hash" in authorization.artifact) {
+      const artifact = authorization.artifact, c = artifact.source_case;
+      const evidence = projectAssessmentEvidenceFromSession(session);
+      if (!evidence.success) return {success:false,error:ERRORS.internal};
+      const evaluated = evaluateReviewAssessment({evaluation_schema_version:"1.0",execution_authority:"APPROVED_EXPO",
+        evaluation_phase:"FINAL",assessment_id:session.finalization.assessment_id,
+        review_execution_artifact:artifact,session_evidence:evidence.evidence,
+        finalization_boundary:{boundary_schema_version:"1.0",authority:"TRUSTED_EXPO_FINALIZATION",
+          assessment_id:session.finalization.assessment_id,session_id:session.session_id,
+          case_package_id:c.manifest.case_package_id,case_version_id:c.manifest.case_version_id,case_version:c.manifest.case_version,
+          package_hash:artifact.review_execution_hash,rubric_id:c.assessment_rubric.rubric_id,
+          rubric_version:c.assessment_rubric.rubric_version,rubric_module_hash:artifact.module_hashes.assessment_rubric,
+          event_sequence_through:session.next_sequence_no-1,clinical_time_through:session.patient_state.clinical_time}});
+      return evaluated.success ? {success:true,data:evaluated.result} : {success:false,error:ERRORS.internal};
     }
     if (session.pinned_case.execution_authority !== "PUBLISHED_PRODUCTION"
       || !("package_hash" in authorization.artifact)) {
@@ -1147,7 +1209,7 @@ export function createSecureApiService(dependencies: SecureApiDependencies) {
     }
     const loaded = await authorizeAndLoad(input.authority, input.session_id);
     if (!loaded.success) return loaded;
-    if (loaded.data.session.pinned_case.execution_authority !== "PUBLISHED_PRODUCTION") {
+    if (loaded.data.session.pinned_case.execution_authority === "REVIEW_ONLY") {
       return { success: false, error: ERRORS.domainRejected } as const;
     }
     const assessmentId = dependencies.id_factories.createAssessmentId({

@@ -18,7 +18,7 @@ export type AuthorizedProductionCase = Readonly<{
 }>;
 
 export type AuthorizedReviewCase = Readonly<{
-  authority: "REVIEW_ONLY";
+  authority: "REVIEW_ONLY" | "APPROVED_EXPO";
   membership: AuthorizedMembership & { role: "FACULTY" | "REVIEWER" };
   artifact: ReviewExecutionArtifact;
 }>;

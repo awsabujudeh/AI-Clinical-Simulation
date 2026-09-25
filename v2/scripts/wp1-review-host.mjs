@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
 import { createObservationReview } from "../runtime/wp1-review-composition.ts";
 import { apiHeaders } from "../tests/fixtures/api/secure-api.ts";
+import { inspectAssets } from "./preflight-assets.mjs";
 import {
   assertLocalReviewEnvironment,
   reviewApiRequestAllowed,
@@ -11,14 +12,17 @@ import {
 
 assertLocalReviewEnvironment(process.env.NODE_ENV);
 const patient = process.argv.includes("--patient=dana") ? "dana" : "khalid";
-const port = patient === "dana" ? 4215 : 4214;
+const catalogue = process.argv.includes("--catalogue=wp2") ? "wp2" : "wp1";
+const port = catalogue === "wp2" ? (patient === "dana" ? 4217 : 4216) : (patient === "dana" ? 4215 : 4214);
 const origin = `http://127.0.0.1:${port}`;
 const namespace = randomUUID();
+if (catalogue === "wp2" && (await inspectAssets()).some(row => row.status === "BLOCKED")) throw Error("EXPO_REQUIRED_ASSETS_UNAVAILABLE");
 // Only this trusted server reads time. Whole seconds match existing clock precision.
 const review = await createObservationReview(
   patient,
   namespace,
   () => new Date(Math.floor(Date.now() / 1000) * 1000).toISOString(),
+  catalogue === "wp2" ? "wp2-approved" : catalogue,
 );
 const vite = await createViteServer({
   root: fileURLToPath(new URL("../apps/web/", import.meta.url)),
@@ -48,6 +52,8 @@ const server = createServer(async (req, res) => {
           session_id: review.sessionId,
           patient_language: "ar-JO",
           review_namespace: namespace,
+          expo_finalization: review.artifact.execution_authority === "APPROVED_EXPO",
+          tutor_enabled: review.artifact.execution_authority === "APPROVED_EXPO",
         }),
       );
       return;
@@ -107,7 +113,7 @@ server.listen(
   "127.0.0.1",
   () =>
     console.log(
-      `WP1 REVIEW_ONLY / providers unavailable: ${origin}/sessions/${review.sessionId}`,
+      `${review.artifact.execution_authority} / local synthetic / providers unavailable: ${origin}/sessions/${review.sessionId}`,
     ),
 );
 const close = () => {

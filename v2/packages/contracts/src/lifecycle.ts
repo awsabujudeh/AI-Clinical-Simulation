@@ -20,6 +20,7 @@ export type SessionLifecycleStatus = z.infer<typeof SessionLifecycleStatusSchema
  */
 export const ExecutionAuthoritySchema = z.enum([
   "PUBLISHED_PRODUCTION",
+  "APPROVED_EXPO",
   "REVIEW_ONLY"
 ]);
 export type ExecutionAuthority = z.infer<typeof ExecutionAuthoritySchema>;

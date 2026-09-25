@@ -32,7 +32,7 @@ export const PreflightReportSchema = z.strictObject({
   checks: z.array(CheckSchema).length(CheckIdSchema.options.length),
   information: z.array(z.strictObject({
     id: z.enum(["stemi_review", "dana_review", "media_review", "clinical_sources", "ju", "just", "live", "production"]),
-    status: z.enum(["REVIEW_PENDING", "SOURCE_PENDING", "NOT_PROBED", "PRODUCTION_PENDING"]),
+    status: z.enum(["MEDICAL_REVIEW_COMPLETE", "REVIEW_PENDING", "SOURCE_PENDING", "NOT_PROBED", "PRODUCTION_PENDING"]),
     detail: z.string().max(650)
   })).max(8),
   hosts: z.array(z.strictObject({ port: z.number().int().min(4186).max(4199),

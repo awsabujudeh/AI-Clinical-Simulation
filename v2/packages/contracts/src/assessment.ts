@@ -52,6 +52,12 @@ export type AssessmentFinalizationBoundary = z.infer<
   typeof AssessmentFinalizationBoundarySchema
 >;
 
+// Identical immutable evidence boundary, explicitly NOT production publication.
+// package_hash binds the approved Expo execution snapshot on this branch only.
+export const ExpoAssessmentFinalizationBoundarySchema = AssessmentFinalizationBoundarySchema.extend({
+  authority: z.literal("TRUSTED_EXPO_FINALIZATION"),
+});
+
 function roundAssessmentRatio(numerator: number, denominator: number): number {
   return Number((BigInt(numerator) + BigInt(denominator) / 2n) / BigInt(denominator));
 }
@@ -129,7 +135,7 @@ export const ProductionAssessmentSessionEvidenceSchema = z.strictObject({
 
 export const ReviewAssessmentSessionEvidenceSchema = z.strictObject({
   ...assessmentSessionEvidenceCommonShape,
-  execution_authority: z.literal("REVIEW_ONLY"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
   review_execution_hash: Sha256DigestSchema,
   review_subject_hash: Sha256DigestSchema
 }).superRefine(refineAssessmentSessionEvidence);
@@ -262,7 +268,7 @@ const assessmentResultCommonShape = {
   evidence_records: z.array(AssessmentEvidenceReferenceSchema).max(4096),
   applied_critical_effects: z.array(AppliedCriticalEffectSchema).max(128),
   unsafe: z.boolean(),
-  finalization_boundary: AssessmentFinalizationBoundarySchema.optional()
+  finalization_boundary: z.union([AssessmentFinalizationBoundarySchema, ExpoAssessmentFinalizationBoundarySchema]).optional()
 } as const;
 
 const ProductionAssessmentResultSchema = z.strictObject({
@@ -273,7 +279,7 @@ const ProductionAssessmentResultSchema = z.strictObject({
 
 const ReviewAssessmentResultSchema = z.strictObject({
   ...assessmentResultCommonShape,
-  execution_authority: z.literal("REVIEW_ONLY"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
   review_execution_hash: Sha256DigestSchema,
   review_subject_hash: Sha256DigestSchema
 });
@@ -317,16 +323,19 @@ export const AssessmentResultSchema = z.union([
     });
   }
   if (
-    value.execution_authority === "PUBLISHED_PRODUCTION"
+    value.execution_authority !== "REVIEW_ONLY"
     && value.finalization_boundary !== undefined
   ) {
+    if (value.finalization_boundary.authority !== (value.execution_authority === "APPROVED_EXPO" ? "TRUSTED_EXPO_FINALIZATION" : "TRUSTED_SESSION_FINALIZATION")) {
+      context.addIssue({code:"custom",path:["finalization_boundary","authority"],message:"Finalization authority must match execution authority."});
+    }
     const boundaryComparisons = [
       ["assessment_id", value.finalization_boundary.assessment_id, value.assessment_id],
       ["session_id", value.finalization_boundary.session_id, value.session_id],
       ["case_package_id", value.finalization_boundary.case_package_id, value.case_package_id],
       ["case_version_id", value.finalization_boundary.case_version_id, value.case_version_id],
       ["case_version", value.finalization_boundary.case_version, value.case_version],
-      ["package_hash", value.finalization_boundary.package_hash, value.package_hash],
+      ["package_hash", value.finalization_boundary.package_hash, value.execution_authority === "PUBLISHED_PRODUCTION" ? value.package_hash : value.review_execution_hash],
       ["rubric_id", value.finalization_boundary.rubric_id, value.rubric_id],
       ["rubric_version", value.finalization_boundary.rubric_version, value.rubric_version],
       ["rubric_module_hash", value.finalization_boundary.rubric_module_hash, value.rubric_module_hash],

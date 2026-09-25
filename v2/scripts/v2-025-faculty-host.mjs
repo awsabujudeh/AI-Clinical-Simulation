@@ -1,9 +1,9 @@
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createServer as createViteServer } from "vite";
-import { prepareStemiConversationArtifact } from "../content/cases/stemi/v2-conversation/stemi-conversation-case.ts";
+import { prepareApprovedExpoCase } from "../content/cases/shared-catalogue/approved-expo-cases.ts";
 import { PORTABLE_SHA256_ADAPTER } from "../tests/fixtures/portable-sha256.ts";
-import { createFacultyDemoStore, projectFacultyStemi } from "../runtime/v2-025-faculty-store.ts";
+import { createFacultyDemoStore, projectFacultyExpo } from "../runtime/v2-025-faculty-store.ts";
 import { assertLocalReviewEnvironment } from './local-review-security.mjs';
 import { createReviewReadiness, serveReviewReadiness } from './review-readiness.mjs';
 
@@ -13,8 +13,8 @@ assertLocalReviewEnvironment(process.env.NODE_ENV);
 // production; no identity, role or institution is accepted from the browser.
 const origin = "http://127.0.0.1:4193";
 const member = Object.freeze({ membership_id: "membership.faculty-demo", institution_id: "institution.faculty-demo", role: "FACULTY" });
-const artifact = await prepareStemiConversationArtifact(PORTABLE_SHA256_ADAPTER);
-const store = createFacultyDemoStore(projectFacultyStemi(artifact), member.institution_id);
+const cases = await Promise.all(["khalid","dana"].map(async patient=>projectFacultyExpo(await prepareApprovedExpoCase(patient,PORTABLE_SHA256_ADAPTER))));
+const store = createFacultyDemoStore(cases, member.institution_id);
 const readiness = await createReviewReadiness('faculty');
 const vite = await createViteServer({ root: fileURLToPath(new URL("../apps/web/", import.meta.url)),
   envDir: false, envPrefix: "__V2_025_NO_CLIENT_ENV__", server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom" });

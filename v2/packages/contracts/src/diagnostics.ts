@@ -117,6 +117,7 @@ export const DiagnosticAnalyteSchema = z.strictObject({
   analyte_code: CaseControlledValueSchema,
   display_label_key: LocalizationKeySchema,
   value: z.number().finite(),
+  value_qualifier: z.literal("GREATER_THAN").optional(),
   unit_code: CaseControlledValueSchema,
   reference_interval: DiagnosticReferenceIntervalSchema.optional(),
   abnormal_flag: DiagnosticAbnormalFlagSchema.optional()
@@ -217,6 +218,13 @@ export type DiagnosticResult = z.infer<typeof DiagnosticResultSchema>;
 export const InvestigationDefinitionSchema = z.strictObject({
   investigation_schema_version: z.literal(DIAGNOSTIC_CONTRACT_SCHEMA_VERSION),
   execution_mode: DiagnosticExecutionModeSchema,
+  authoring: z.strictObject({
+    origin: z.literal("SIMULATION_AUTHORED"),
+    review_status: z.enum(["PENDING_PHYSICIAN_REVIEW", "APPROVED_FOR_EXPO"]),
+    reference_configuration: z.string().min(1).max(160),
+    timing_basis: z.literal("SIMULATION_TIMING_FIXTURE"),
+    sample_context: z.enum(["BASELINE_CASE_SAMPLE", "AT_ORDER_STUDY"])
+  }).optional(),
   result: DiagnosticResultSchema,
   milestones: z.array(DiagnosticMilestoneSchema).min(2).max(8),
   learner_visibility: DiagnosticComponentVisibilitySchema

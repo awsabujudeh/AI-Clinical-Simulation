@@ -53,8 +53,9 @@ export function FacultyPage({ service }: { service?: FacultyDemoService }) {
       <p>DRAFT = incomplete authoring · REVIEW_ONLY = review execution, not publication · PUBLISHED = existing reviewed release only. This demo cannot review, approve or publish.</p>
       {error ? <p role="alert">{error}</p> : !cases ? <p role="status">Loading catalogue…</p> : isNew ? <MetadataForm key="new" service={service} onSaved={saved} /> : caseId ? current ? <>
         <Panel><h2>{current.metadata.title}</h2><StatusBadge tone="warning">{current.execution_authority ?? current.identity.status}</StatusBadge>
-          <p>Lifecycle: {current.identity.status} · version {current.identity.case_version} · metadata revision {current.revision}</p>
-          <p>NOT MEDICALLY APPROVED{current.metadata_shell ? " — metadata shell, not runnable" : " — clinical review pending"}</p>
+          <p>Publication lifecycle: {current.identity.status} · version {current.identity.case_version} · metadata revision {current.revision}</p>
+          {current.medical_approval ? <p>Medical review: Complete · Approval basis: Owner-attested physician review · Physician identity and exact review timestamp: Not formally recorded · Production publication: Pending</p>
+            : <p>NOT MEDICALLY APPROVED{current.metadata_shell ? " — metadata shell, not runnable" : " — clinical review pending"}</p>}
           <p>{current.overview}</p><p>{current.metadata.description}</p>
           <p>{current.metadata.specialty} · {current.metadata.difficulty} · {current.metadata.language}</p>
           <small>{current.identity.case_id} / {current.identity.case_version_id}</small>
@@ -63,7 +64,7 @@ export function FacultyPage({ service }: { service?: FacultyDemoService }) {
           <p>{current.competencies.length ? "Authored Case competencies — not official JU/JUST alignment." : "Not authored for this metadata shell."}</p>
           <h3>Curriculum mappings</h3><p>Official alignment not claimed. Missing or unapproved sources remain pending.</p>
           <ul>{current.curriculum?.mappings.map(m => <li key={m.mapping_id}>{m.institution_id}: {m.competency_code} → {m.objective_id} — {m.status}</li>)}</ul>
-          <h3>Critical actions (authored, review pending)</h3><ul>{current.critical_actions.map((a, i) => <li key={i}>{a}</li>)}</ul>
+          <h3>Critical actions (authored{current.medical_approval ? ", medically approved for Expo" : ", review pending"})</h3><ul>{current.critical_actions.map((a, i) => <li key={i}>{a}</li>)}</ul>
           <h3>Investigation / media / visual package</h3><ul>{current.media_status.map((m, i) => <li key={i}>{m}</li>)}</ul>
           <h3>Sources</h3><ul>{current.sources.map(s => <li key={s.source_id}>{s.source_id} · {s.source_version_id} · {s.status}</li>)}</ul>
           <p>Review types: CLINICAL / CURRICULUM_UX / VISUAL / TECHNICAL. No review or approval is granted here.</p>
@@ -72,6 +73,7 @@ export function FacultyPage({ service }: { service?: FacultyDemoService }) {
       </> : <p role="alert">Case not found.</p> : <Panel><h2>Available cases</h2><ul>{cases.map(c => <li key={c.identity.case_id}>
         <h3><Link to={`/faculty/cases/${c.identity.case_id}`}>{c.metadata.title}</Link></h3>
         <StatusBadge tone="warning">{c.execution_authority ?? c.identity.status}</StatusBadge>
+        {c.medical_approval ? <p>Medical review: Complete · Owner-attested physician review · Production publication: Pending</p> : null}
         <p>{c.metadata.specialty} · {c.metadata.difficulty} · v{c.identity.case_version} · {c.identity.status}</p>
         <p>Curriculum: {c.curriculum?.official_alignment_claimed === false ? "pending source approval / no official alignment" : "not authored"}</p>
       </li>)}</ul></Panel>}

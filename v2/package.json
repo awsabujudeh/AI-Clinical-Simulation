@@ -18,6 +18,8 @@
     "packages/*"
   ],
   "scripts": {
+    "dev:wp2": "node scripts/wp1-review-host.mjs --catalogue=wp2",
+    "test:wp2": "vitest run --config vitest.config.mjs tests/browser/wp2",
     "dev:wp1": "node scripts/wp1-review-host.mjs",
     "test:wp1": "vitest run --config vitest.config.mjs tests/browser/wp1",
     "dev:v2-028": "node scripts/v2-028-preflight-host.mjs",

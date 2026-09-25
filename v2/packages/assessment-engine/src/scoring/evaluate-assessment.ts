@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   ASSESSMENT_RESULT_SCHEMA_VERSION,
   AssessmentFinalizationBoundarySchema,
+  ExpoAssessmentFinalizationBoundarySchema,
   AssessmentIdSchema,
   ReviewAssessmentSessionEvidenceSchema,
   AssessmentResultSchema,
@@ -68,11 +69,18 @@ export type AssessmentEvaluationRequest = z.infer<
 
 export const ReviewAssessmentEvaluationRequestSchema = z.strictObject({
   evaluation_schema_version: z.literal(ASSESSMENT_EVALUATION_SCHEMA_VERSION),
-  execution_authority: z.literal("REVIEW_ONLY"),
-  evaluation_phase: z.literal("LIVE"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
+  evaluation_phase: z.enum(["LIVE", "FINAL"]),
   assessment_id: AssessmentIdSchema,
   review_execution_artifact: ReviewExecutionArtifactSchema,
-  session_evidence: ReviewAssessmentSessionEvidenceSchema
+  session_evidence: ReviewAssessmentSessionEvidenceSchema,
+  finalization_boundary: ExpoAssessmentFinalizationBoundarySchema.optional()
+}).superRefine((v,c) => {
+  if (v.execution_authority !== v.review_execution_artifact.execution_authority
+    || (v.evaluation_phase === "FINAL" && (v.execution_authority !== "APPROVED_EXPO" || !v.finalization_boundary))
+    || (v.evaluation_phase === "LIVE" && v.finalization_boundary)) {
+    c.addIssue({code:"custom",message:"Only approved Expo execution can finalize a non-production assessment, with an exact trusted Expo boundary."});
+  }
 });
 export type ReviewAssessmentEvaluationRequest = z.infer<
   typeof ReviewAssessmentEvaluationRequestSchema
@@ -358,8 +366,8 @@ function pinnedIdentityIssues(
     }));
   }
   if (
-    evidence.execution_authority === "REVIEW_ONLY"
-    && context.execution_authority === "REVIEW_ONLY"
+    evidence.execution_authority !== "PUBLISHED_PRODUCTION"
+    && context.execution_authority !== "PUBLISHED_PRODUCTION"
     && (
       evidence.review_execution_hash !== context.review_execution_hash
       || evidence.review_subject_hash !== context.review_subject_hash
@@ -376,10 +384,10 @@ function pinnedIdentityIssues(
 }
 
 function finalizationBoundaryIssues(input: {
-  boundary: AssessmentFinalizationBoundary;
+  boundary: AssessmentFinalizationBoundary | z.infer<typeof ExpoAssessmentFinalizationBoundarySchema>;
   assessmentId: string;
   evidence: AssessmentEvaluationRequest["session_evidence"];
-  context: PinnedAssessmentContext;
+  context: ExecutablePinnedAssessmentContext;
 }): AssessmentIssue[] {
   const eventSequenceThrough = input.evidence.committed_events.at(-1)?.sequence_no ?? 0;
   const comparisons = [
@@ -388,7 +396,8 @@ function finalizationBoundaryIssues(input: {
     ["case_package_id", input.boundary.case_package_id, input.context.case_package_id],
     ["case_version_id", input.boundary.case_version_id, input.context.case_version_id],
     ["case_version", input.boundary.case_version, input.context.case_version],
-    ["package_hash", input.boundary.package_hash, input.context.package_hash],
+    ["authority", input.boundary.authority, input.context.execution_authority === "APPROVED_EXPO" ? "TRUSTED_EXPO_FINALIZATION" : "TRUSTED_SESSION_FINALIZATION"],
+    ["package_hash", input.boundary.package_hash, input.context.execution_authority === "PUBLISHED_PRODUCTION" ? input.context.package_hash : input.context.review_execution_hash],
     ["rubric_id", input.boundary.rubric_id, input.context.rubric_id],
     ["rubric_version", input.boundary.rubric_version, input.context.rubric_version],
     ["rubric_module_hash", input.boundary.rubric_module_hash, input.context.rubric_module_hash],
@@ -458,10 +467,10 @@ function evaluateExecutableAssessment(
       return { success: false, issues: sortAssessmentIssues(identityIssues) };
     }
     if (
-      request.data.execution_authority === "PUBLISHED_PRODUCTION"
-      && pinned.context.execution_authority === "PUBLISHED_PRODUCTION"
+      request.data.execution_authority !== "REVIEW_ONLY"
       && request.data.evaluation_phase === "FINAL"
     ) {
+      if (!request.data.finalization_boundary) return {success:false,issues:[assessmentIssue({code:"FINALIZATION_BOUNDARY_INVALID",path:"$.finalization_boundary",message:"Missing finalization boundary.",related_ids:[]})]};
       const boundaryIssues = finalizationBoundaryIssues({
         boundary: request.data.finalization_boundary,
         assessmentId: request.data.assessment_id,
@@ -592,7 +601,7 @@ function evaluateExecutableAssessment(
             package_hash: pinned.context.package_hash
           }
         : {
-            execution_authority: "REVIEW_ONLY" as const,
+            execution_authority: pinned.context.execution_authority,
             review_execution_hash: pinned.context.review_execution_hash,
             review_subject_hash: pinned.context.review_subject_hash
           }),

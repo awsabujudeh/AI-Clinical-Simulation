@@ -9,6 +9,7 @@ import {
 } from "../../../contracts/src/index.ts";
 import {
   CaseActionDefinitionSchema,
+  ActionCatalogueModuleSchema,
   CompiledCasePackageSchema,
   ReviewExecutionArtifactSchema,
   createPinnedClinicalPolicy,
@@ -31,6 +32,7 @@ const PinnedActionBaseSchema = CaseActionDefinitionSchema.pick({
   confirmation_policy: true,
   repeat_policy: true,
   observation_acquisition: true,
+  outcome_policy: true,
   investigation: true
 });
 
@@ -76,6 +78,7 @@ function executionEventTypeForActionType(actionType: ActionType): EventType {
 }
 
 const pinnedSessionContextCommonShape = {
+  shared_catalogue: ActionCatalogueModuleSchema.shape.shared,
   context_schema_version: z.literal(PINNED_SESSION_CASE_CONTEXT_SCHEMA_VERSION),
   case_package_id: PinnedClinicalPolicyEnvelopeSchema.shape.case_package_id,
   case_version_id: PinnedClinicalPolicyEnvelopeSchema.shape.case_version_id,
@@ -139,6 +142,7 @@ export const PinnedSessionCaseContextSchema = z.strictObject({
   clinical_policy: PinnedClinicalPolicyEnvelopeSchema
 }).superRefine((value, context) => {
   refinePinnedSessionContext(value, context);
+  if (value.execution_authority !== value.clinical_policy.execution_authority) context.addIssue({code:"custom",message:"Pinned execution authority must match clinical policy."});
   if (value.package_hash !== value.clinical_policy.package_hash) {
     context.addIssue({
       code: "custom",
@@ -151,12 +155,13 @@ export type PinnedSessionCaseContext = z.infer<typeof PinnedSessionCaseContextSc
 
 export const PinnedReviewSessionCaseContextSchema = z.strictObject({
   ...pinnedSessionContextCommonShape,
-  execution_authority: z.literal("REVIEW_ONLY"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
   review_execution_hash: PinnedReviewClinicalPolicyEnvelopeSchema.shape.review_execution_hash,
   review_subject_hash: PinnedReviewClinicalPolicyEnvelopeSchema.shape.review_subject_hash,
   clinical_policy: PinnedReviewClinicalPolicyEnvelopeSchema
 }).superRefine((value, context) => {
   refinePinnedSessionContext(value, context);
+  if (value.execution_authority !== value.clinical_policy.execution_authority) context.addIssue({code:"custom",message:"Pinned execution authority must match clinical policy."});
   if (value.review_execution_hash !== value.clinical_policy.review_execution_hash) {
     context.addIssue({
       code: "custom",
@@ -221,6 +226,7 @@ export function createPinnedSessionCaseContext(
       case_version: casePackage.data.manifest.case_version,
       package_hash: casePackage.data.package_hash,
       clinical_policy: clinicalPolicy,
+      ...(casePackage.data.action_catalogue.shared ? { shared_catalogue: casePackage.data.action_catalogue.shared } : {}),
       action_catalogue: casePackage.data.action_catalogue.actions.map((action) => ({
         action_id: action.action_id,
         action_type: action.action_type,
@@ -228,6 +234,7 @@ export function createPinnedSessionCaseContext(
         prerequisite_action_ids: action.prerequisite_action_ids,
         confirmation_policy: action.confirmation_policy,
         repeat_policy: action.repeat_policy,
+        ...(action.outcome_policy ? { outcome_policy: action.outcome_policy } : {}),
         ...(action.observation_acquisition === undefined ? {} : { observation_acquisition: action.observation_acquisition }),
         ...(action.investigation === undefined
           ? {}
@@ -281,13 +288,14 @@ export function createPinnedReviewSessionCaseContext(
     const casePackage = artifact.data.source_case;
     const context = PinnedReviewSessionCaseContextSchema.safeParse({
       context_schema_version: PINNED_SESSION_CASE_CONTEXT_SCHEMA_VERSION,
-      execution_authority: "REVIEW_ONLY",
+      execution_authority: artifact.data.execution_authority,
       case_package_id: artifact.data.source_identity.case_package_id,
       case_version_id: artifact.data.source_identity.case_version_id,
       case_version: artifact.data.source_identity.case_version,
       review_execution_hash: artifact.data.review_execution_hash,
       review_subject_hash: artifact.data.review_subject_hash,
       clinical_policy: clinicalPolicy,
+      ...(casePackage.action_catalogue.shared ? { shared_catalogue: casePackage.action_catalogue.shared } : {}),
       action_catalogue: casePackage.action_catalogue.actions.map((action) => ({
         action_id: action.action_id,
         action_type: action.action_type,
@@ -295,6 +303,7 @@ export function createPinnedReviewSessionCaseContext(
         prerequisite_action_ids: action.prerequisite_action_ids,
         confirmation_policy: action.confirmation_policy,
         repeat_policy: action.repeat_policy,
+        ...(action.outcome_policy ? { outcome_policy: action.outcome_policy } : {}),
         ...(action.investigation === undefined ? {} : { investigation: action.investigation }),
         ...(action.observation_acquisition === undefined ? {} : { observation_acquisition: action.observation_acquisition }),
         execution_event_type: executionEventTypeForActionType(action.action_type)

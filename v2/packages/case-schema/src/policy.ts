@@ -73,7 +73,7 @@ export function createPinnedReviewClinicalPolicy(
 
   return PinnedReviewClinicalPolicyEnvelopeSchema.parse({
     policy_schema_version: PINNED_CLINICAL_POLICY_SCHEMA_VERSION,
-    execution_authority: "REVIEW_ONLY",
+    execution_authority: artifact.execution_authority,
     case_package_id: artifact.source_identity.case_package_id,
     case_version_id: artifact.source_identity.case_version_id,
     case_version: artifact.source_identity.case_version,

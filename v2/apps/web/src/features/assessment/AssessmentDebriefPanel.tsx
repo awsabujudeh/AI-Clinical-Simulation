@@ -160,7 +160,7 @@ export function AssessmentDebriefPanel({
   const canFinalize = !ended
     && current
     && state.kind === "ACTIVE_ONLINE"
-    && state.projection.pinned_case.execution_authority === "PUBLISHED_PRODUCTION"
+    && state.projection.pinned_case.execution_authority !== "REVIEW_ONLY"
     && endPhase !== "IN_DOUBT";
 
   return (

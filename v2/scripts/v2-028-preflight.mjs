@@ -54,9 +54,9 @@ export function configurationChecks(configuration, hosts) {
   return rows;
 }
 const information = [
-  { id: 'stemi_review', status: 'REVIEW_PENDING', detail: 'Khalid / STEMI remains UNDER_REVIEW / REVIEW_ONLY. Physician review is pending, not technical demo approval.' },
-  { id: 'dana_review', status: 'REVIEW_PENDING', detail: 'Dana / Anaphylaxis remains UNDER_REVIEW / REVIEW_ONLY. Owner visual approval is not physician approval.' },
-  { id: 'media_review', status: 'REVIEW_PENDING', detail: 'STEMI ECG/CXR matching and formal rights review pending. ECG reference 84 bpm vs Case 112 bpm discrepancy unchanged. Dana diagnostic media text-only; distribution rights review pending.' },
+  { id: 'stemi_review', status: 'MEDICAL_REVIEW_COMPLETE', detail: 'Khalid medical content APPROVED_FOR_EXPO through owner-attested physician review, conditional on the exact package check. Physician identity/time not formally recorded. Not production publication.' },
+  { id: 'dana_review', status: 'MEDICAL_REVIEW_COMPLETE', detail: 'Dana medical content APPROVED_FOR_EXPO through owner-attested physician review, conditional on the exact package check. Physician identity/time not formally recorded. Not production publication.' },
+  { id: 'media_review', status: 'REVIEW_PENDING', detail: 'Clinical reports approved for Expo. Separate image matching/rights remain pending: legacy STEMI 84-bpm tracing withheld; rights-pending images withheld. Authoritative text reports remain available.' },
   { id: 'clinical_sources', status: 'SOURCE_PENDING', detail: 'Trusted real clinical documents: 0. Guideline sources unresolved; Case truth and rubrics are never RAG evidence.' },
   { id: 'ju', status: 'SOURCE_PENDING', detail: 'JU curriculum: CURRICULUM_SOURCE_PENDING. Objective IDs UNKNOWN_PENDING_SOURCE_REVIEW.' },
   { id: 'just', status: 'SOURCE_PENDING', detail: 'JUST curriculum: CURRICULUM_SOURCE_PENDING. No invented official alignment.' },

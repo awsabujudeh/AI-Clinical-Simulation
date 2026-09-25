@@ -73,6 +73,9 @@ test('whole preflight: both cases/fallbacks, pending RAG, zero provider requests
   assert(PreflightReportSchema.safeParse(report).success); assert.equal(report.overall, 'DEGRADED'); assert.equal(report.blockers, 0);
   assert.equal(report.clinical_mutations, 0); assert.equal(report.provider_requests, 0);
   assert.equal(report.information.filter(i => i.status === 'SOURCE_PENDING').length, 3);
+  assert.equal(report.information.filter(i => i.status === 'MEDICAL_REVIEW_COMPLETE').length, 2);
+  assert(report.information.filter(i => i.status === 'MEDICAL_REVIEW_COMPLETE').every(i => /owner-attested/.test(i.detail)));
+  assert(report.information.some(i => /production/i.test(i.detail) && i.status === 'PRODUCTION_PENDING'));
   assert(!/fact\.stemi|fact\.dana|api_key|voice_id|patient_state|instructions/i.test(JSON.stringify(report)));
   assert(!PreflightReportSchema.safeParse({ ...report, overall: 'READY' }).success);
   assert(!PreflightReportSchema.safeParse({ ...report, checks: report.checks.map(() => report.checks[0]) }).success);

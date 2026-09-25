@@ -315,8 +315,8 @@ function matchesExpectedPinnedCase(
     }));
   }
   if (
-    command.expected_case.execution_authority === "REVIEW_ONLY"
-    && session.pinned_case.execution_authority === "REVIEW_ONLY"
+    command.expected_case.execution_authority !== "PUBLISHED_PRODUCTION"
+    && session.pinned_case.execution_authority !== "PUBLISHED_PRODUCTION"
     && command.expected_case.review_execution_hash !== session.pinned_case.review_execution_hash
   ) {
     issues.push(createSessionCommandIssue({
@@ -668,10 +668,11 @@ export async function processExternalLearnerCommand(
 
   // Explicit Case-owned compressed duration, never a browser elapsed-time input.
   // Due work is settled chronologically; interruption commits no measurement/action.
-  if(parsedAction.observation_acquisition) {
+  const actionDuration = parsedAction.observation_acquisition?.duration_seconds ?? parsedAction.outcome_policy?.duration_seconds;
+  if(actionDuration !== undefined) {
     const advanced=advanceClinicalTime({advancement_schema_version:"1.0",source:"CASE_OWNED_DURATION",
       clock:due.next_clock,policy:session.pinned_case.clinical_policy,state:due.next_state,scheduler_state:due.next_scheduler_state,
-      prior_event_facts:due.prior_event_facts,requested_target_clinical_time:due.next_state.clinical_time+parsedAction.observation_acquisition.duration_seconds});
+      prior_event_facts:due.prior_event_facts,requested_target_clinical_time:due.next_state.clinical_time+actionDuration});
     if(!advanced.success) return failure([createSessionCommandIssue({code:"DUE_WORK_FAILED",path:"$.action.observation_acquisition",message:"Acquisition duration failed closed."})]);
     due={success:true,status:advanced.status,next_clock:advanced.next_clock,next_state:advanced.next_state,next_scheduler_state:advanced.next_scheduler_state,
       event_proposals:[...due.event_proposals,...advanced.event_proposals],interrupting_event_proposals:[...due.interrupting_event_proposals,...advanced.interrupting_event_proposals],
@@ -768,6 +769,10 @@ export async function processExternalLearnerCommand(
       catalogue_membership: "VERIFIED",
       execution_status: "EXECUTED",
       intake_clinical_time: command.action_request.requested_at_clinical_time,
+      ...(parsedAction.outcome_policy ? { case_outcome_code: parsedAction.outcome_policy.outcome_code,
+        case_outcome_behavior: parsedAction.outcome_policy.behavior,
+        outcome_policy_version: parsedAction.outcome_policy.policy_version,
+        action_duration_seconds: actionDuration } : {}),
       ...(observationSamples ? { observation_samples:observationSamples } : {})
     },
     clinical_effect_ids: [],

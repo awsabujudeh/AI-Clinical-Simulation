@@ -29,6 +29,12 @@ const labels: Readonly<Record<string, readonly [string, string]>> = {
 };
 
 const units: Readonly<Record<string, readonly [string, string]>> = {
+  "unit.ml-min-1-73m2": ["mL/min/1.73m²", "مل/دقيقة/1.73م²"],
+  "unit.ph": ["pH", "pH"],
+  "unit.mm-hg": ["mmHg", "ملم زئبق"],
+  "unit.u-l": ["U/L", "وحدة/لتر"],
+  "unit.mg-l": ["mg/L", "ملغ/لتر"],
+  "unit.mg-l-feu": ["mg/L FEU", "ملغ/لتر FEU"],
   "unit.millisecond": ["ms", "مللي ثانية"],
   "unit.millimeter": ["mm", "ملم"],
   "unit.percent": ["%", "%"],

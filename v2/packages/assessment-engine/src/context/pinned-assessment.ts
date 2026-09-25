@@ -62,7 +62,7 @@ export type PinnedAssessmentContext = z.infer<typeof PinnedAssessmentContextSche
 
 export const PinnedReviewAssessmentContextSchema = z.strictObject({
   context_schema_version: z.literal(PINNED_ASSESSMENT_CONTEXT_SCHEMA_VERSION),
-  execution_authority: z.literal("REVIEW_ONLY"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
   case_package_id: CasePackageIdSchema,
   case_version_id: CaseVersionIdSchema,
   case_version: SemanticVersionSchema,
@@ -176,7 +176,7 @@ export function createPinnedReviewAssessmentContext(
   }
   const context = PinnedReviewAssessmentContextSchema.safeParse({
     context_schema_version: PINNED_ASSESSMENT_CONTEXT_SCHEMA_VERSION,
-    execution_authority: "REVIEW_ONLY",
+    execution_authority: artifact.data.execution_authority,
     case_package_id: artifact.data.source_identity.case_package_id,
     case_version_id: artifact.data.source_identity.case_version_id,
     case_version: artifact.data.source_identity.case_version,

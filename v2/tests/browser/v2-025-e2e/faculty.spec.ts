@@ -3,11 +3,13 @@ test("actual App Faculty catalogue, details, create/edit/reload and no publicati
   await page.goto("/expo");
   await page.getByRole("link", { name: "Faculty demo — case management" }).click();
   await expect(page.getByRole("heading", { name: "Available cases" })).toBeVisible();
-  await expect(page.getByText("REVIEW_ONLY", { exact: true })).toBeVisible();
+  await expect(page.getByText("APPROVED_EXPO", { exact: true })).toHaveCount(2);
+  await expect(page.getByRole("link",{name:"Dana / Anaphylaxis",exact:true})).toBeVisible();
   await page.screenshot({ path: info.outputPath("faculty-catalogue.png"), fullPage: true });
-  await page.getByRole("link", { name: "Acute Inferior STEMI with Right Ventricular Involvement" }).click();
-  await expect(page.getByText(/Lifecycle: UNDER_REVIEW/)).toBeVisible();
-  await expect(page.getByText(/84 bpm/)).toBeVisible();
+  await page.getByRole("link", { name: "Khalid / STEMI",exact:true }).click();
+  await expect(page.getByText(/Publication lifecycle: UNDER_REVIEW/)).toBeVisible();
+  await expect(page.getByText(/Physician identity and exact review timestamp: Not formally recorded/)).toBeVisible();
+  await expect(page.getByText(/legacy 84-bpm ECG is not reintroduced/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save DRAFT" })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("faculty-stemi-details.png"), fullPage: true });
   await page.getByRole("link", { name: "New Case Draft" }).click();

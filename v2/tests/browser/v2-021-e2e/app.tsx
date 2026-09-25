@@ -2,7 +2,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "../../../apps/web/src/App.tsx";
 import type { StudentUiServices } from "../../../apps/web/src/app/types.ts";
 import { SafeSessionProjectionSchema, SafeLearnerTimelineProjectionSchema,
-  SafeAssessmentApiProjectionSchema, PatientConversationTranscriptSchema, SafePatientConversationTurnSchema, SafeInvestigationProjectionSchema } from "../../../packages/contracts/src/index.ts";
+  SafeAssessmentApiProjectionSchema, SafeFinalAssessmentProjectionSchema, PatientConversationTranscriptSchema, SafePatientConversationTurnSchema, SafeInvestigationProjectionSchema } from "../../../packages/contracts/src/index.ts";
 import "../../../apps/web/src/styles.css";
 import { createElevenLabsStudentVoiceServices } from "../../../apps/web/src/features/voice/create-voice-services";
 import { createFetchSpeechTokenSource } from "../../../apps/web/src/features/voice/fetch-speech-token";
@@ -35,7 +35,16 @@ const services: StudentUiServices = {
     return r.data !== undefined ? { kind: "COMMITTED", replayed: r.data.replayed, idempotency_key: requestId("idempotency", sequence), committed_event_ids: r.data.committed_event_ids, projection: SafeSessionProjectionSchema.parse(r.data.session) } : { kind: r.error?.code === "SESSION_VERSION_CONFLICT" ? "STALE" : "REJECTED", requires_authoritative_sync: true }; } },
   timeline: { async load(id) { const r = await read(`/v1/sessions/${id}/timeline`); return r.data !== undefined ? { kind: "AVAILABLE", projection: SafeLearnerTimelineProjectionSchema.parse(r.data) } : { kind: "UNAVAILABLE" }; } },
   assessment: { async load(id) { const r = await read(`/v1/sessions/${id}/assessment`); return r.data !== undefined ? { kind: "AVAILABLE", projection: SafeAssessmentApiProjectionSchema.parse(r.data) } : { kind: "PENDING" }; } },
-  finalization: { async end() { return { kind: "UNAVAILABLE", requires_authoritative_sync: false }; } },
+  finalization: { async end(intent) {
+    // Capability from the trusted host only enables transport. The server still
+    // validates the exact approval/pin, ownership and state version before ending.
+    // Historical review hosts do not enable this; their behavior is unchanged.
+    if (current.expo_finalization !== true) return { kind: "UNAVAILABLE", requires_authoritative_sync: false };
+    const r=await read(`/v1/sessions/${intent.session_id}/end`,{expected_state_version:intent.expected_state_version,reason:"LEARNER_COMPLETED"});
+    return r.data!==undefined
+      ? {kind:"COMMITTED",replayed:r.data.replayed,idempotency_key:requestId("idempotency",sequence),projection:SafeSessionProjectionSchema.parse(r.data.session),assessment:SafeFinalAssessmentProjectionSchema.parse(r.data.assessment)}
+      : {kind:r.error?.code==="SESSION_VERSION_CONFLICT"?"STALE":"REJECTED",requires_authoritative_sync:true};
+  } },
   patient_conversation: {
     async load(id) { const r = await read(`/v1/sessions/${id}/questions`); return r.data !== undefined ? { kind: "AVAILABLE", transcript: PatientConversationTranscriptSchema.parse(r.data) } : { kind: "UNAVAILABLE" }; },
     async submit(intent) { const r = await read(`/v1/sessions/${intent.session_id}/questions`, createV2_021QuestionBody(intent, requestId("utterance", ++sequence))); return r.data !== undefined ? { kind: "COMMITTED", replayed: r.data.replayed, turn: SafePatientConversationTurnSchema.parse(r.data.turn) } : { kind: "UNAVAILABLE" }; }

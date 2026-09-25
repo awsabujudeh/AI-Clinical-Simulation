@@ -3,6 +3,25 @@ import { FacultyCaseViewSchema, FacultyDraftMetadataSchema, FacultyDraftUpdateSc
 import type { AuthorizedMembership } from "../packages/api-core/src/authorization/api-authority.ts";
 import type { ReviewExecutionArtifact } from "../packages/case-schema/src/index.ts";
 import media from "../content/media/stemi/manifest.json" with { type: "json" };
+import { EXPO_MEDICAL_APPROVAL_BINDINGS } from "../content/cases/shared-catalogue/approved-expo-cases.ts";
+
+/** Current medically approved catalogues; historical STEMI projection below is
+ * deliberately retained for historical hosts/tests and pinned review Sessions. */
+export function projectFacultyExpo(artifact: ReviewExecutionArtifact): FacultyCaseView {
+  const c=artifact.source_case, b=Object.values(EXPO_MEDICAL_APPROVAL_BINDINGS).find(b=>b.execution===artifact.review_execution_hash);
+  if (artifact.execution_authority!=="APPROVED_EXPO" || !artifact.medical_approval || !b) throw Error("EXPO_APPROVAL_REQUIRED");
+  const label=(key:string)=>c.localization.entries.find(e=>e.key===key)?.translations.find(t=>t.locale==="en-US")?.text??key;
+  return FacultyCaseViewSchema.parse({
+    identity:{case_id:c.manifest.case_id,case_version_id:c.manifest.case_version_id,case_package_id:c.manifest.case_package_id,case_version:c.manifest.case_version,status:c.manifest.status},
+    metadata:{title:b.id.startsWith("stemi")?"Khalid / STEMI":"Dana / Anaphylaxis",specialty:c.classification.specialty_codes[0],difficulty:c.classification.difficulty_code,
+      language:c.patient_profile.default_language,description:label(c.presentation.triage_summary_key)},
+    revision:0,metadata_shell:false,execution_authority:artifact.execution_authority,medical_approval:artifact.medical_approval,
+    overview:label(c.presentation.triage_summary_key),competencies:[...new Set(c.curriculum_mappings.mappings.map(m=>m.competency_code))],curriculum:c.curriculum_mappings,
+    critical_actions:c.assessment_rubric.critical_items.filter(i=>i.kind==="CRITICAL_ACTION").map(i=>i.evidence.action_ids.map(id=>c.action_catalogue.actions.find(a=>a.action_id===id)?.aliases.find(a=>a.locale==="en-US")?.phrases[0]??id).join(" / ")),
+    sources:c.validation.sources,media_status:["Clinical interpretations/reports: APPROVED_FOR_EXPO (owner-attested).",
+      "Diagnostic images withheld: rights/matching/asset availability remain separate. Authoritative text remains available.",
+      "Khalid legacy 84-bpm ECG is not reintroduced. Production publication: PENDING."]});
+}
 
 export function projectFacultyStemi(artifact: ReviewExecutionArtifact): FacultyCaseView {
   const c = artifact.source_case;
@@ -29,8 +48,8 @@ export function projectFacultyStemi(artifact: ReviewExecutionArtifact): FacultyC
 
 type Result<T> = { success: true; data: T } | { success: false; code: "FORBIDDEN" | "INVALID" | "NOT_FOUND" | "READ_ONLY" | "VERSION_CONFLICT" | "CAPACITY" };
 /** Explicit localhost demo store. No production persistence or publication API. */
-export function createFacultyDemoStore(seed: FacultyCaseView, institutionId: string) {
-  const records = new Map<string, FacultyCaseView>([[seed.identity.case_id, FacultyCaseViewSchema.parse(seed)]]);
+export function createFacultyDemoStore(seed: FacultyCaseView | FacultyCaseView[], institutionId: string) {
+  const records = new Map<string, FacultyCaseView>((Array.isArray(seed)?seed:[seed]).map(s=>[s.identity.case_id, FacultyCaseViewSchema.parse(s)]));
   let sequence = 0;
   const allowed = (member: AuthorizedMembership | null) => member?.institution_id === institutionId && member.role === "FACULTY";
   const clone = (v: FacultyCaseView) => FacultyCaseViewSchema.parse(v);

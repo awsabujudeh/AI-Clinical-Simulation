@@ -185,11 +185,12 @@ export function ClinicalActionsPanel({
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
 
   const actions = state.projection.learner_action_catalogue.actions;
+  const searchableActions=state.projection.search_only_actions??[];
   const visibleActions = useMemo(
-    () => actionsForDomain(actions, domain, locale, search),
-    [actions, domain, locale, search]
+    () => actionsForDomain(search.trim().length>=3?[...actions,...searchableActions]:actions, domain, locale, search),
+    [actions, searchableActions, domain, locale, search]
   );
-  const selectedAction = actions.find((action) => action.action_id === selectedActionId);
+  const selectedAction = [...actions,...searchableActions].find((action) => action.action_id === selectedActionId);
   const status = statusPresentation(phase, t);
   const locked = !enabled || submitting.current
     || ["SUBMITTING", "PROCESSING", "IN_DOUBT"].includes(phase);

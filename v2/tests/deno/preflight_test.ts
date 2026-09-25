@@ -6,5 +6,5 @@ Deno.test("V2-028 portable two-case local checks / truthful pending sources", as
   if (JSON.stringify(first) !== JSON.stringify(second) || first.length !== 8
     || aggregateReadiness(first).overall !== "READY"
     || !first.find(c => c.id === "knowledge")?.detail.includes("0 trusted real documents")) throw Error("PREFLIGHT_PARITY_FAILED");
-  if (await PORTABLE_SHA256_ADAPTER.sha256(JSON.stringify(first)) !== "ea126ec5c885747ae4005ff1cac481b61986aa6466e1da5331b416be5bcf5f17") throw Error("BROWSER_DENO_HASH_MISMATCH");
+  if (await PORTABLE_SHA256_ADAPTER.sha256(JSON.stringify(first)) !== "913e7049936a94ee604b36d95974ee9bd25ea58ef1c6f3b1257a63d8a153a356") throw Error("BROWSER_DENO_HASH_MISMATCH");
 });

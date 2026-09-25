@@ -16,14 +16,15 @@ describe("operator readiness, downstream only", () => {
   it("validates both actual cases, local Clinical Engine, six-domain assessment, Tutor fallback, RAG and Faculty", async () => {
     const checks = await inspectDomain();
     expect(checks).toHaveLength(8); expect(checks.every(c => c.status === "READY")).toBe(true);
-    expect(checks.find(c => c.id === "stemi")!.detail).toContain("2.0.1");
-    expect(checks.find(c => c.id === "dana")!.detail).toContain("1.0.0");
+    expect(checks.find(c => c.id === "stemi")!.detail).toContain("2.4.0");
+    expect(checks.find(c => c.id === "dana")!.detail).toContain("1.5.0");
+    for (const id of ["stemi", "dana"]) expect(checks.find(c => c.id === id)!.detail).toContain("Medical review COMPLETE via owner attestation");
     expect(checks.find(c => c.id === "knowledge")!.detail).toContain("0 trusted real documents");
     expect(checks.find(c => c.id === "faculty")!.detail).toContain("SERVER-MEMORY DEMO");
-    expect(checks.find(c => c.id === "assessment")!.detail).toContain("SNAPSHOT");
+    expect(checks.find(c => c.id === "assessment")!.detail).toContain("Approved Expo finalization is distinct from production publication");
     expect(JSON.stringify(checks)).not.toMatch(/fact\.dana|fact\.stemi|patient_state|instructions|Authorization/);
     expect(await inspectDomain()).toEqual(checks);
-    expect(await PORTABLE_SHA256_ADAPTER.sha256(JSON.stringify(checks))).toBe("ea126ec5c885747ae4005ff1cac481b61986aa6466e1da5331b416be5bcf5f17");
+    expect(await PORTABLE_SHA256_ADAPTER.sha256(JSON.stringify(checks))).toBe("913e7049936a94ee604b36d95974ee9bd25ea58ef1c6f3b1257a63d8a153a356");
   });
   it("does not mutate the Case, initial state, review status or accept a swapped Case pin", async () => {
     const prepared = await prepareDanaReview(PORTABLE_SHA256_ADAPTER); if (!prepared.success) throw Error();

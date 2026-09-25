@@ -30,13 +30,14 @@ export function buildTutorEvidence(input: {
   if (!parsed.success) return undefined;
   const a = parsed.data;
   const artifact = input.artifact;
-  const review = "review_execution_hash" in artifact;
+  const review = "review_execution_hash" in artifact && artifact.execution_authority === "REVIEW_ONLY";
   const c = "review_execution_hash" in artifact ? artifact.source_case : artifact;
   if (a.case_package_id !== c.manifest.case_package_id || a.case_version_id !== c.manifest.case_version_id
     || a.case_version !== c.manifest.case_version || a.rubric_id !== c.assessment_rubric.rubric_id
     || a.rubric_version !== c.assessment_rubric.rubric_version) return undefined;
   if ("review_execution_hash" in artifact) {
-    if (a.execution_authority !== "REVIEW_ONLY" || a.evaluation_phase !== "LIVE"
+    if (a.execution_authority === "PUBLISHED_PRODUCTION" || a.execution_authority !== artifact.execution_authority
+      || a.evaluation_phase !== (artifact.execution_authority === "APPROVED_EXPO" ? "FINAL" : "LIVE")
       || a.review_execution_hash !== artifact.review_execution_hash
       || a.review_subject_hash !== artifact.review_subject_hash
       || a.rubric_module_hash !== artifact.module_hashes.assessment_rubric) return undefined;

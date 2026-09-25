@@ -4,6 +4,7 @@ export * from "./hashing.ts";
 export * from "./policy.ts";
 export * from "./report.ts";
 export * from "./review-execution.ts";
+export * from "./expo-approval.ts";
 export * from "./reachability.ts";
 export * from "./schemas.ts";
 export * from "./validation.ts";

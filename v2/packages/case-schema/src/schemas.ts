@@ -3,6 +3,10 @@ import { z } from "zod";
 import {
   ActionIdSchema,
   ActionTypeSchema,
+  CaseActionOutcomePolicySchema,
+  ClinicalConceptBindingSchema,
+  SafeLearnerActionCatalogueSchema,
+  SafeLearnerActionSchema,
   AssessmentDomainIdSchema,
   AuthoredLocaleSchema,
   CaseControlledValueSchema,
@@ -10,6 +14,7 @@ import {
   CaseLifecycleSchema,
   CasePackageIdSchema,
   CaseReviewTypeSchema,
+  OwnerAttestedMedicalReviewSchema,
   CaseVersionIdSchema,
   CurriculumObjectiveIdSchema,
   DiagnosticAssetModalitySchema,
@@ -290,12 +295,21 @@ export const CaseActionDefinitionSchema = z.strictObject({
   ]),
   repeat_policy: z.enum(["NOT_REPEATABLE", "REPEATABLE", "CASE_DEFINED"]),
   source_ids: z.array(SourceIdSchema).max(16),
+  outcome_policy: CaseActionOutcomePolicySchema.optional(),
   observation_acquisition: ObservationAcquisitionPolicySchema.optional(),
   investigation: InvestigationDefinitionSchema.optional()
 });
 
 export const ActionCatalogueModuleSchema = z.strictObject({
   ...moduleBaseShape,
+  shared: z.strictObject({
+    catalogue: SafeLearnerActionCatalogueSchema,
+    bindings: z.array(ClinicalConceptBindingSchema).min(1).max(256),
+    search_only: z.strictObject({
+      actions: z.array(SafeLearnerActionSchema).min(1).max(16),
+      bindings: z.array(ClinicalConceptBindingSchema).min(1).max(16)
+    }).optional(),
+  }).optional(),
   actions: z.array(CaseActionDefinitionSchema).max(256)
 });
 export type ActionCatalogueModule = z.infer<typeof ActionCatalogueModuleSchema>;
@@ -732,7 +746,8 @@ export type ReviewExecutionSourceCase = z.infer<typeof ReviewExecutionSourceCase
 export const ReviewExecutionArtifactSchema = z.strictObject({
   artifact_kind: z.literal("REVIEW_EXECUTION_ARTIFACT"),
   artifact_schema_version: z.literal(REVIEW_EXECUTION_ARTIFACT_SCHEMA_VERSION),
-  execution_authority: z.literal("REVIEW_ONLY"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
+  medical_approval: OwnerAttestedMedicalReviewSchema.optional(),
   hash_algorithm: z.literal("SHA-256"),
   source_identity: z.strictObject({
     case_package_id: CasePackageIdSchema,
@@ -747,6 +762,20 @@ export const ReviewExecutionArtifactSchema = z.strictObject({
   source_case: ReviewExecutionSourceCaseSchema
 }).superRefine((artifact, context) => {
   const manifest = artifact.source_case.manifest;
+  const approval = artifact.medical_approval;
+  if ((artifact.execution_authority === "APPROVED_EXPO") !== (approval !== undefined)) {
+    context.addIssue({ code: "custom", path: ["medical_approval"], message: "Expo execution requires exact owner-attested medical approval; legacy review execution cannot claim it." });
+  }
+  if (approval) {
+    const shared = artifact.source_case.action_catalogue.shared;
+    if (approval.case_id !== manifest.case_id || approval.case_version_id !== manifest.case_version_id
+      || approval.case_version !== manifest.case_version || approval.reviewed_execution_hash !== artifact.review_execution_hash
+      || approval.review_subject_hash !== artifact.review_subject_hash
+      || approval.shared_catalogue_id !== shared?.catalogue.identity?.catalogue_id
+      || approval.shared_catalogue_version !== shared?.catalogue.identity?.version) {
+      context.addIssue({ code: "custom", path: ["medical_approval"], message: "Medical approval must bind this exact immutable execution snapshot and shared catalogue." });
+    }
+  }
   const comparisons = [
     ["case_package_id", artifact.source_identity.case_package_id, manifest.case_package_id],
     ["case_version_id", artifact.source_identity.case_version_id, manifest.case_version_id],

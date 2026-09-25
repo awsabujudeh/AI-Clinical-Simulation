@@ -48,7 +48,7 @@ export function projectAssessmentEvidenceFromSession(
           package_hash: session.data.pinned_case.package_hash
         }
       : {
-          execution_authority: "REVIEW_ONLY" as const,
+          execution_authority: session.data.pinned_case.execution_authority,
           review_execution_hash: session.data.pinned_case.review_execution_hash,
           review_subject_hash: session.data.pinned_case.review_subject_hash
         }),

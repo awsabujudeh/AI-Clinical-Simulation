@@ -18,11 +18,24 @@ export function matchingStemiMedia(state: SessionPresentationState) {
   const p = state.projection.pinned_case;
   return p.execution_authority === "REVIEW_ONLY" && ((p.case_version_id === manifest.case_association.case_version_id
     && p.case_version === manifest.case_association.case_version && p.case_package_id === manifest.case_association.case_package_id)
-    || (p.case_version_id==="case-version.stemi.inferior-rv.003" && p.case_package_id==="case-package.stemi.inferior-rv.003" && p.case_version==="2.1.0"));
+    || (p.case_version_id==="case-version.stemi.inferior-rv.003" && p.case_package_id==="case-package.stemi.inferior-rv.003" && p.case_version==="2.1.0")
+    || (p.case_version_id==="case-version.stemi.inferior-rv.004" && p.case_package_id==="case-package.stemi.inferior-rv.004" && p.case_version==="2.2.0"));
 }
 export function matchingCaseDiagnostics(state: SessionPresentationState): readonly Entry[] | undefined {
-  if (matchingStemiMedia(state)) return manifest.diagnostics;
+  if(state.projection.investigations) return state.projection.investigations.map(i=>{
+    // Manifest resolves media only; result inventory and labels are server-owned.
+    const entry=[...manifest.diagnostics,...danaManifest.diagnostics].find(d=>d.diagnostic_result_id===i.diagnostic_result_id);
+    const mismatch=i.diagnostic_result_id==="diagnostic-result.stemi.ecg-standard";
+    const expo=state.projection.pinned_case.execution_authority==="APPROVED_EXPO";
+    return {...entry,action_id:i.action_id,diagnostic_result_id:i.diagnostic_result_id,labels:i.labels,
+      ...(expo?{packaged:null,review_note:mismatch?"ECG_IMAGE_MATCHING_PENDING":"MEDIA_RIGHTS_OR_ASSET_PENDING"}
+        :mismatch?{packaged:null,review_note:"ECG_MATCHED_IMAGE_PENDING_PHYSICIAN_REVIEW"}:{})};
+  });
+  if (matchingStemiMedia(state)) return state.projection.learner_action_catalogue.identity
+    ? manifest.diagnostics.filter(d=>["investigation.ecg-standard", "investigation.chest-xray"].includes(d.action_id)) : manifest.diagnostics;
   const p=state.projection.pinned_case;
+  if(p.execution_authority==="REVIEW_ONLY" && p.case_package_id==="case-package.anaphylaxis.dana.003"
+    && p.case_version_id==="case-version.anaphylaxis.dana.003" && p.case_version==="1.2.0") return danaManifest.diagnostics.filter(d=>["investigation.dana.ecg", "investigation.dana.cxr"].includes(d.action_id));
   // WP1 successor inherits the exact diagnostic definitions and pending media review.
   if(p.execution_authority==="REVIEW_ONLY" && p.case_package_id==="case-package.anaphylaxis.dana.002"
     && p.case_version_id==="case-version.anaphylaxis.dana.002" && p.case_version==="1.1.0") return danaManifest.diagnostics;
@@ -47,11 +60,13 @@ export function InvestigationResult({ entry, result, ordered, locale }: {
   return <article data-testid={entry.diagnostic_result_id} style={{borderTop:"1px solid #d8e2e6",padding:".8rem 0"}}>
     <h3>{text(entry.labels, locale)}</h3>
     <p role="status">{p ? (ar ? "النتيجة متاحة" : "Result available") : result?.kind === "UNAVAILABLE" ? (ar ? "تعذر جلب النتيجة" : "Result unavailable") : ordered ? (ar ? "تم الطلب — قيد الانتظار" : "Ordered — pending") : (ar ? "لم تُطلب بعد" : "Not ordered")}</p>
+    {p?.timing ? <p>{ar?"وقت الطلب / العينة / الإتاحة (ثانية سريرية)":"Order / sample / availability (clinical seconds)"}: <bdi>{p.timing.ordered_at} / {p.timing.collection_at} / {p.timing.available_at}</bdi>{p.timing.sample_context==="BASELINE_CASE_SAMPLE" ? (ar?" — عينة خط أساس الحالة؛ ليست قياسًا متجددًا بعد العلاج":" — Case baseline sample; not a dynamic post-treatment measurement") : null}</p> : null}
     {p?.component_status.structured_result === "AVAILABLE" ? <>
       {p.finding_texts?.map((f,i) => <p key={i}>{text(f,locale)}</p>)}
       {p.structured_result && "structured_measurements" in p.structured_result ? <ul>{p.structured_result.structured_measurements.map(m => <li key={m.measurement_id}>{diagnosticValueLabel(m.measurement_code, locale)}: <bdi dir="ltr">{m.value}</bdi> {diagnosticUnitLabel(m.unit_code, locale)}</li>)}</ul> : null}
-      {p.structured_result && "analytes" in p.structured_result ? <ul>{p.structured_result.analytes.map(a => <li key={a.analyte_id}>{diagnosticValueLabel(a.analyte_code, locale)}: <bdi dir="ltr">{a.value}</bdi> {diagnosticUnitLabel(a.unit_code, locale)}</li>)}</ul> : null}
+      {p.structured_result && "analytes" in p.structured_result ? <><ul>{p.structured_result.analytes.map(a => <li key={a.analyte_id}>{text(p.analyte_labels?.find(l=>l.analyte_id===a.analyte_id)?.labels,locale) ?? diagnosticValueLabel(a.analyte_code, locale)}: <bdi dir="ltr">{a.value_qualifier==="GREATER_THAN"?"> ":""}{a.value}</bdi> {diagnosticUnitLabel(a.unit_code, locale)}{a.reference_interval ? <> — {ar?"المجال المرجعي":"Reference"}: <bdi dir="ltr">{a.reference_interval.lower_bound ?? "—"}–{a.reference_interval.upper_bound ?? "—"}</bdi> ({a.abnormal_flag})</> : null}</li>)}</ul><p>{ar?"المجالات المرجعية خاصة بالاختبار/المختبر وليست حدودًا عالمية.":"Reference intervals are assay/laboratory-specific, not universal limits."}</p></> : null}
     </> : null}
+    {p && entry.review_note ? <p>{entry.review_note}</p> : null}
     {mediaAllowed ? entry.packaged && !imageFailed ? <figure style={{margin:0}}>
       <figcaption>{ar ? "صورة مرجعية للمراجعة فقط — بانتظار مراجعة الطبيب، نتائج الحالة هي المرجع" : "REVIEW_ONLY reference image — PENDING_PHYSICIAN_REVIEW. Authored case findings remain authoritative."}</figcaption>
       {entry.review_note ? <p>{entry.review_note}</p> : null}
@@ -74,6 +89,6 @@ export function InvestigationResults({state, services}: {state: SessionPresentat
     },enabled:allowed && !!services.investigations,retry:false,refetchInterval:2000,refetchOnWindowFocus:false});
   return <Panel className="investigation-slot" aria-labelledby="investigation-title"><SectionHeader id="investigation-title" title={t("investigationsTitle")} />
     {!allowed || !services.investigations ? <p>Results unavailable in this session context.</p> : query.isError ? <p role="alert">Results unavailable. Refresh authoritative Session state.</p> : query.data?.entries.map(({entry,result})=><InvestigationResult key={`${state.projection.session_id}:${entry.diagnostic_result_id}`} entry={entry} result={result} locale={locale}
-      ordered={query.data.timeline.kind === "AVAILABLE" && query.data.timeline.projection.items.some(i=>i.action_id===entry.action_id && i.item_type==="ACTION_COMMITTED")} />) ?? <p>Loading investigations…</p>}
+      ordered={state.projection.investigations?.some(i=>i.diagnostic_result_id===entry.diagnostic_result_id && i.status!=="NOT_ORDERED") || (query.data.timeline.kind === "AVAILABLE" && query.data.timeline.projection.items.some(i=>i.action_id===entry.action_id && i.item_type==="ACTION_COMMITTED"))} />) ?? <p>Loading investigations…</p>}
   </Panel>;
 }

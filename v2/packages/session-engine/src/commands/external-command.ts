@@ -45,7 +45,7 @@ export const ExpectedPinnedCaseIdentitySchema = z.discriminatedUnion(
     }),
     z.strictObject({
       ...expectedPinnedCaseCommonShape,
-      execution_authority: z.literal("REVIEW_ONLY"),
+      execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
       review_execution_hash: Sha256DigestSchema
     })
   ]

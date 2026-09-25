@@ -2,12 +2,13 @@ import { createObservationReview } from "../../runtime/wp1-review-composition.ts
 import { apiHeaders } from "./api/secure-api.ts";
 import { SafeSessionProjectionSchema } from "../../packages/contracts/src/index.ts";
 let serial = 0;
-export async function wp1Fixture(patient: "khalid" | "dana" = "dana") {
+export async function wp1Fixture(patient: "khalid" | "dana" = "dana", catalogue: "wp1" | "wp2" | "wp2-complete" | "wp2-author-complete" | "wp2-approved" = "wp1") {
   let seconds = 0, n = 0;
   const r = await createObservationReview(
     patient,
     `test-${++serial}`,
     () => new Date(Date.UTC(2026, 8, 25, 0, 0, seconds)).toISOString(),
+    catalogue,
   );
   const path = `/v1/sessions/${r.sessionId}`;
   async function response(

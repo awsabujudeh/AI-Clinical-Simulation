@@ -2,6 +2,7 @@ import { z } from "zod";
 import { VisualPatientPresentationSchema } from "./visual-patient.ts";
 
 import { ActionTypeSchema } from "./actions.ts";
+import { ClinicalCatalogueIdentitySchema, ClinicalCatalogueCategorySchema } from "./clinical-catalogue.ts";
 
 import {
   ActionIdSchema,
@@ -86,7 +87,7 @@ export const SubmitQuestionRequestSchema = z.strictObject({
 export type SubmitQuestionRequest = z.infer<typeof SubmitQuestionRequestSchema>;
 
 export const SafePinnedCaseIdentitySchema = z.strictObject({
-  execution_authority: z.enum(["PUBLISHED_PRODUCTION", "REVIEW_ONLY"]),
+  execution_authority: z.enum(["PUBLISHED_PRODUCTION", "REVIEW_ONLY", "APPROVED_EXPO"]),
   case_package_id: CasePackageIdSchema,
   case_version_id: CaseVersionIdSchema,
   case_version: z.string().regex(/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u)
@@ -137,6 +138,9 @@ export const LearnerActionParameterDefinitionSchema = z.strictObject({
 
 export const SafeLearnerActionSchema = z.strictObject({
   action_id: ActionIdSchema,
+  category: ClinicalCatalogueCategorySchema.optional(),
+  subcategory: z.string().min(1).max(64).optional(),
+  prerequisite_concept_ids: z.array(ActionIdSchema).max(16).optional(),
   action_type: ActionTypeSchema,
   labels: z.array(LearnerActionLocalizedLabelSchema).max(2),
   aliases: z.array(LearnerActionAliasSchema).max(16).optional(),
@@ -187,6 +191,7 @@ export type SafeLearnerAction = z.infer<typeof SafeLearnerActionSchema>;
 
 export const SafeLearnerActionCatalogueSchema = z.strictObject({
   catalogue_schema_version: z.literal(LEARNER_ACTION_CATALOGUE_SCHEMA_VERSION),
+  identity: ClinicalCatalogueIdentitySchema.optional(),
   actions: z.array(SafeLearnerActionSchema).max(256)
 }).superRefine((value, context) => {
   const actionIds = new Set<string>();
@@ -243,6 +248,16 @@ export const SafeActiveAssessmentDisclosureSchema = z.discriminatedUnion(
   ]
 );
 
+export const SafeInvestigationStatusSchema = z.strictObject({
+  action_id: ActionIdSchema,
+  diagnostic_result_id: DiagnosticResultIdSchema,
+  labels: z.array(LearnerLocalizedTextSchema).min(1).max(2),
+  status: z.enum(["NOT_ORDERED", "ORDERED", "PENDING", "AVAILABLE"]),
+  ordered_at: ClinicalTimeSchema.optional(),
+  collection_at: ClinicalTimeSchema.optional(),
+  available_at: ClinicalTimeSchema.optional(),
+  sample_context: z.enum(["BASELINE_CASE_SAMPLE", "AT_ORDER_STUDY"]).optional()
+});
 export const SafeSessionProjectionSchema = z.strictObject({
   session_id: SessionIdSchema,
   status: SessionLifecycleStatusSchema,
@@ -254,6 +269,8 @@ export const SafeSessionProjectionSchema = z.strictObject({
   clock_status: z.enum(["RUNNING", "PAUSED"]),
   observations: LearnerObservationsSchema,
   learner_action_catalogue: SafeLearnerActionCatalogueSchema,
+  search_only_actions: z.array(SafeLearnerActionSchema).max(16).optional(),
+  investigations: z.array(SafeInvestigationStatusSchema).max(256).optional(),
   assessment_disclosure: SafeActiveAssessmentDisclosureSchema.optional(),
   visual_patient: VisualPatientPresentationSchema.optional()
 }).superRefine((v,c)=>{
@@ -352,6 +369,7 @@ const LearnerDiagnosticAnalyteSchema = z.strictObject({
   analyte_code: CaseControlledValueSchema,
   display_label_key: z.string().min(3).max(160),
   value: z.number().finite(),
+  value_qualifier: z.literal("GREATER_THAN").optional(),
   unit_code: CaseControlledValueSchema,
   reference_interval: DiagnosticReferenceIntervalSchema.optional(),
   abnormal_flag: DiagnosticAbnormalFlagSchema.optional()
@@ -402,9 +420,16 @@ export const InvestigationComponentStateSchema = z.enum([
   "WITHHELD"
 ]);
 
+// A report is not a short UI label. Still bounded and rendered as plain text.
+const LearnerDiagnosticTextSchema = LearnerLocalizedTextSchema.extend({text:z.string().trim().min(1).max(4_000)});
 export const SafeInvestigationProjectionSchema = z.strictObject({
   diagnostic_result_id: DiagnosticResultIdSchema,
   clinical_time: ClinicalTimeSchema,
+  timing: SafeInvestigationStatusSchema.optional(),
+  analyte_labels: z.array(z.strictObject({
+    analyte_id: DiagnosticAnalyteIdSchema,
+    labels: z.array(LearnerLocalizedTextSchema).min(1).max(2)
+  })).max(256).optional(),
   component_status: z.strictObject({
     structured_result: InvestigationComponentStateSchema,
     media: InvestigationComponentStateSchema,
@@ -415,8 +440,8 @@ export const SafeInvestigationProjectionSchema = z.strictObject({
   media_assets: z.array(DiagnosticAssetReferenceSchema).max(16).optional(),
   machine_interpretation_key: z.string().min(3).max(160).optional(),
   formal_report_key: z.string().min(3).max(160).optional(),
-  finding_texts: z.array(z.array(LearnerLocalizedTextSchema).max(2)).max(256).optional(),
-  formal_report_text: z.array(LearnerLocalizedTextSchema).max(2).optional()
+  finding_texts: z.array(z.array(LearnerDiagnosticTextSchema).max(2)).max(256).optional(),
+  formal_report_text: z.array(LearnerDiagnosticTextSchema).max(2).optional()
 });
 export type SafeInvestigationProjection = z.infer<typeof SafeInvestigationProjectionSchema>;
 

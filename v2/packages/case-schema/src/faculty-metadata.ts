@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PatientLanguageSchema, ExecutionAuthoritySchema } from "../../contracts/src/index.ts";
+import { PatientLanguageSchema, ExecutionAuthoritySchema, OwnerAttestedMedicalReviewSchema } from "../../contracts/src/index.ts";
 import { CaseManifestSchema, ClassificationModuleSchema, LocalizedEntrySchema,
   CurriculumMappingsModuleSchema, CaseSourceReferenceSchema } from "./schemas.ts";
 
@@ -18,6 +18,7 @@ export const FacultyCaseViewSchema = z.strictObject({
   revision: z.number().int().nonnegative(),
   metadata_shell: z.boolean(),
   execution_authority: ExecutionAuthoritySchema.nullable(),
+  medical_approval: OwnerAttestedMedicalReviewSchema.optional(),
   overview: Text,
   competencies: z.array(z.string()),
   curriculum: CurriculumMappingsModuleSchema.nullable(),

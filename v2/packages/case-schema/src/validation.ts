@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sharedCatalogueProblems } from "./shared-catalogue-validation.ts";
 
 import type {
   HashAdapter,
@@ -1619,6 +1620,9 @@ function validateParsedCase(
     }
   }
 
+  for (const message of sharedCatalogueProblems(casePackage)) {
+    issues.push(issue({ code: "SCHEMA_INVALID", severity: "ERROR", module: "action_catalogue", path: "$.action_catalogue.shared", message }));
+  }
   validateDiagnosticContracts(casePackage, issues, mode, facts, sources);
 
   for (const rule of casePackage.rules.rules) {

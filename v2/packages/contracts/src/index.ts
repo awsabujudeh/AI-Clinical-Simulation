@@ -1,4 +1,6 @@
 export * from "./actions.ts";
+export * from "./clinical-catalogue.ts";
+export * from "./medical-review.ts";
 export * from "./assessment.ts";
 export * from "./adapters.ts";
 export * from "./ai.ts";

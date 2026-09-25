@@ -406,7 +406,7 @@ export type PinnedClinicalPolicyEnvelope = z.infer<
 
 export const PinnedReviewClinicalPolicyEnvelopeSchema = z.strictObject({
   ...pinnedClinicalPolicyCommonShape,
-  execution_authority: z.literal("REVIEW_ONLY"),
+  execution_authority: z.enum(["REVIEW_ONLY", "APPROVED_EXPO"]),
   review_execution_hash: Sha256DigestSchema,
   case_fact_ids: z.array(FactIdSchema).max(512)
 }).superRefine((value, context) =>

@@ -51,15 +51,15 @@ describe("V2-013 safe diagnostic milestone projection", () => {
     "INVESTIGATION_IMAGE_AVAILABLE" | "INVESTIGATION_RESULT_AVAILABLE" | "INVESTIGATION_FORMAL_REPORT_AVAILABLE"
   >) {
     const session = harness.store.sessions.get(sessionId)!;
-    const events = eventTypes.map((eventType, index) => CanonicalEventEnvelopeSchema.parse({
+    const events = (["INVESTIGATION_ORDERED", ...eventTypes] as const).map((eventType, index) => CanonicalEventEnvelopeSchema.parse({
       event_id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
       session_id: sessionId,
       sequence_no: index + 1,
       event_schema_version: "1.0",
       clinical_time: index + 1,
       real_time_utc: `2026-09-06T10:00:0${index + 1}Z`,
-      actor_type: "SYSTEM",
-      source: "ENGINE",
+      actor_type: eventType === "INVESTIGATION_ORDERED" ? "LEARNER" : "SYSTEM",
+      source: eventType === "INVESTIGATION_ORDERED" ? "UI" : "ENGINE",
       correlation_id: `correlation.api.diagnostic-${index + 1}`,
       action_id: actionId,
       event_type: eventType,
@@ -76,6 +76,8 @@ describe("V2-013 safe diagnostic milestone projection", () => {
     }));
     harness.store.sessions.set(sessionId, InMemorySessionAggregateSchema.parse({
       ...session,
+      patient_state: {...session.patient_state, clinical_time: events.length},
+      clinical_clock: {...session.clinical_clock, clinical_time: events.length},
       committed_events: events,
       next_sequence_no: events.length + 1
     }));
@@ -132,5 +134,50 @@ describe("V2-013 safe diagnostic milestone projection", () => {
     });
     expect(foreign.status).toBe(404);
     expect((await body(foreign)).error.code).toBe("RESOURCE_NOT_ACCESSIBLE");
+  });
+
+  it("Session end cannot reveal an unordered investigation", async () => {
+    const previous = harness.store.sessions.get(sessionId)!;
+    harness.store.sessions.set(sessionId, InMemorySessionAggregateSchema.parse({ ...previous, committed_events: [], next_sequence_no: 1 }));
+    try {
+      const end = await harness.app.request(`/v1/sessions/${sessionId}/end`, {
+        method: "POST", headers: apiHeaders({idempotency:"idempotency.diagnostic.end-unordered"}),
+        body: JSON.stringify({expected_state_version:previous.patient_state.state_version,reason:"LEARNER_COMPLETED"}),
+      });
+      expect(end.status).toBe(200);
+      const response = await harness.app.request(`/v1/sessions/${sessionId}/investigations/${resultId}`, { headers: apiHeaders() });
+      expect(response.status).toBe(422);
+      expect((await body(response)).error.code).toBe("RESULT_PENDING");
+    } finally { harness.store.sessions.set(sessionId, previous); }
+  });
+
+  it("Session end cannot replace missing result/report availability", async () => {
+    commitMilestones([]);
+    const previous = harness.store.sessions.get(sessionId)!;
+    try {
+      const end = await harness.app.request(`/v1/sessions/${sessionId}/end`, {
+        method: "POST", headers: apiHeaders({idempotency:"idempotency.diagnostic.end-future"}),
+        body: JSON.stringify({expected_state_version:previous.patient_state.state_version,reason:"LEARNER_COMPLETED"}),
+      });
+      expect(end.status).toBe(200);
+      const response = await harness.app.request(`/v1/sessions/${sessionId}/investigations/${resultId}`, { headers: apiHeaders() });
+      expect(response.status).toBe(422);
+      expect((await body(response)).error.code).toBe("RESULT_PENDING");
+    } finally { harness.store.sessions.set(sessionId, previous); }
+  });
+
+  it("future result/report receipts cannot reveal results before Clinical Time", async () => {
+    commitMilestones(["INVESTIGATION_RESULT_AVAILABLE", "INVESTIGATION_FORMAL_REPORT_AVAILABLE"]);
+    const previous = harness.store.sessions.get(sessionId)!;
+    harness.store.sessions.set(sessionId, InMemorySessionAggregateSchema.parse({
+      ...previous,
+      patient_state: { ...previous.patient_state, clinical_time: 1 },
+      clinical_clock: { ...previous.clinical_clock, clinical_time: 1 },
+    }));
+    try {
+      const response = await harness.app.request(`/v1/sessions/${sessionId}/investigations/${resultId}`, { headers: apiHeaders() });
+      expect(response.status).toBe(422);
+      expect((await body(response)).error.code).toBe("RESULT_PENDING");
+    } finally { harness.store.sessions.set(sessionId, previous); }
   });
 });
